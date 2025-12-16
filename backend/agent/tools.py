@@ -1,11 +1,15 @@
 # backend/agent/tools.py
-from playwright.sync_api import sync_playwright
+"""
+Playwright Tools - ASYNC Version (compatibile con MCP asyncio)
+"""
+from playwright.async_api import async_playwright
 import base64
 from datetime import datetime
 
+
 class PlaywrightTools:
     """
-    Classe che contiene i tool per interagire con il browser tramite Playwright
+    Classe che contiene i tool per interagire con il browser tramite Playwright (ASYNC)
     """
     
     def __init__(self):
@@ -13,10 +17,11 @@ class PlaywrightTools:
         self.playwright = None
         self.browser = None
         self.page = None
+        self.context = None
     
-    def start_browser(self, headless=False):
+    async def start_browser(self, headless=False):
         """
-        Avvia il browser Chromium con impostazioni ottimizzate
+        Avvia il browser Chromium con impostazioni ottimizzate (ASYNC)
         
         Args:
             headless: Se True, il browser è invisibile. Se False, vedi il browser aprirsi
@@ -25,24 +30,24 @@ class PlaywrightTools:
             dict con status
         """
         try:
-            self.playwright = sync_playwright().start()
+            self.playwright = await async_playwright().start()
             # Avvia browser con opzioni extra
-            self.browser = self.playwright.chromium.launch(
+            self.browser = await self.playwright.chromium.launch(
                 headless=headless,
                 args=[
-                    '--disable-blink-features=AutomationControlled',  # Nasconde che è automation
+                    '--disable-blink-features=AutomationControlled',
                 ]
             )
 
             # Crea context con impostazioni
-            context = self.browser.new_context(
+            self.context = await self.browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                locale='it-IT',  # Importante per i banner in italiano
+                locale='it-IT',
                 timezone_id='Europe/Rome'
             )
 
-            self.page = context.new_page()
+            self.page = await self.context.new_page()
             
             return {
                 "status": "success",
@@ -55,15 +60,9 @@ class PlaywrightTools:
                 "message": f"Errore nell'avviare il browser: {str(e)}"
             }
     
-    def navigate_to_url(self, url):
+    async def navigate_to_url(self, url):
         """
-        Naviga a un URL specifico
-        
-        Args:
-            url: L'URL completo (es. https://google.com)
-        
-        Returns:
-            dict con status, url, title della pagina
+        Naviga a un URL specifico (ASYNC)
         """
         try:
             if not self.page:
@@ -72,11 +71,9 @@ class PlaywrightTools:
                     "message": "Browser non avviato. Chiama prima start_browser()"
                 }
             
-            # Naviga all'URL
-            self.page.goto(url, wait_until="networkidle")
+            await self.page.goto(url, wait_until="networkidle")
             
-            # Prendi informazioni sulla pagina
-            page_title = self.page.title()
+            page_title = await self.page.title()
             current_url = self.page.url
             
             return {
@@ -91,15 +88,9 @@ class PlaywrightTools:
                 "message": f"Errore nella navigazione: {str(e)}"
             }
     
-    def capture_screenshot(self, filename=None):
+    async def capture_screenshot(self, filename=None):
         """
-        Cattura uno screenshot della pagina corrente
-        
-        Args:
-            filename: Nome del file (opzionale). Se None, usa timestamp
-        
-        Returns:
-            dict con status, filename, screenshot in base64
+        Cattura uno screenshot della pagina corrente (ASYNC)
         """
         try:
             if not self.page:
@@ -108,15 +99,11 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            # Se non è specificato un nome, usa timestamp
             if not filename:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"screenshot_{timestamp}.png"
             
-            # Cattura screenshot
-            screenshot_bytes = self.page.screenshot(full_page=True)
-            
-            # Converti in base64 per poterlo inviare via API
+            screenshot_bytes = await self.page.screenshot(full_page=True)
             screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
             
             return {
@@ -132,22 +119,22 @@ class PlaywrightTools:
                 "message": f"Errore nel catturare screenshot: {str(e)}"
             }
     
-    def close_browser(self):
+    async def close_browser(self):
         """
-        Chiude il browser e pulisce le risorse
-        
-        Returns:
-            dict con status
+        Chiude il browser e pulisce le risorse (ASYNC)
         """
         try:
             if self.page:
-                self.page.close()
+                await self.page.close()
+            if self.context:
+                await self.context.close()
             if self.browser:
-                self.browser.close()
+                await self.browser.close()
             if self.playwright:
-                self.playwright.stop()
+                await self.playwright.stop()
             
             self.page = None
+            self.context = None
             self.browser = None
             self.playwright = None
             
@@ -161,12 +148,9 @@ class PlaywrightTools:
                 "message": f"Errore nella chiusura: {str(e)}"
             }
     
-    def get_page_info(self):
+    async def get_page_info(self):
         """
-        Ottiene informazioni sulla pagina corrente
-        
-        Returns:
-            dict con informazioni sulla pagina
+        Ottiene informazioni sulla pagina corrente (ASYNC)
         """
         try:
             if not self.page:
@@ -178,7 +162,7 @@ class PlaywrightTools:
             return {
                 "status": "success",
                 "url": self.page.url,
-                "title": self.page.title(),
+                "title": await self.page.title(),
                 "viewport": self.page.viewport_size
             }
         except Exception as e:
@@ -186,25 +170,12 @@ class PlaywrightTools:
                 "status": "error",
                 "message": f"Errore: {str(e)}"
             }
-        
-    # ==================== TOOL AVANZATI ====================
+    
+    # ==================== TOOL AVANZATI ASYNC ====================
 
-    def click_element(self, selector, selector_type="css", timeout=30000):
+    async def click_element(self, selector, selector_type="css", timeout=30000):
         """
-        Clicca su un elemento della pagina
-        
-        Args:
-            selector: Il selettore dell'elemento (CSS, XPath, text)
-            selector_type: Tipo di selettore ('css', 'xpath', 'text')
-            timeout: Tempo massimo di attesa in millisecondi (default 30 secondi)
-        
-        Returns:
-            dict con status dell'operazione
-        
-        Esempi:
-            click_element("button#submit", "css")
-            click_element("//button[@id='submit']", "xpath")
-            click_element("Login", "text")
+        Clicca su un elemento della pagina (ASYNC)
         """
         try:
             if not self.page:
@@ -213,7 +184,6 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            # Costruisci il locator in base al tipo
             if selector_type == "css":
                 locator = self.page.locator(selector)
             elif selector_type == "xpath":
@@ -226,9 +196,8 @@ class PlaywrightTools:
                     "message": f"Tipo selector non supportato: {selector_type}"
                 }
             
-            # Aspetta che l'elemento sia visibile e cliccabile
-            locator.wait_for(state="visible", timeout=timeout)
-            locator.click()
+            await locator.wait_for(state="visible", timeout=timeout)
+            await locator.click()
             
             return {
                 "status": "success",
@@ -244,23 +213,9 @@ class PlaywrightTools:
                 "selector": selector
             }
     
-    def fill_input(self, selector, value, selector_type="css", clear_first=True):
+    async def fill_input(self, selector, value, selector_type="css", clear_first=True):
         """
-        Compila un campo input con un valore
-        
-        Args:
-            selector: Il selettore dell'input
-            value: Il valore da inserire
-            selector_type: Tipo di selettore ('css', 'xpath', 'placeholder')
-            clear_first: Se True, pulisce il campo prima di scrivere
-        
-        Returns:
-            dict con status
-        
-        Esempi:
-            fill_input("#email", "test@test.com")
-            fill_input("//input[@name='email']", "test@test.com", "xpath")
-            fill_input("Enter your email", "test@test.com", "placeholder")
+        Compila un campo input con un valore (ASYNC)
         """
         try:
             if not self.page:
@@ -269,7 +224,6 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            # Costruisci il locator
             if selector_type == "css":
                 locator = self.page.locator(selector)
             elif selector_type == "xpath":
@@ -282,12 +236,10 @@ class PlaywrightTools:
                     "message": f"Tipo selector non supportato: {selector_type}"
                 }
             
-            # Pulisci il campo se richiesto
             if clear_first:
-                locator.clear()
+                await locator.clear()
             
-            # Inserisci il valore
-            locator.fill(value)
+            await locator.fill(value)
             
             return {
                 "status": "success",
@@ -303,18 +255,9 @@ class PlaywrightTools:
                 "selector": selector
             }
     
-    def wait_for_element(self, selector, selector_type="css", state="visible", timeout=30000):
+    async def wait_for_element(self, selector, selector_type="css", state="visible", timeout=30000):
         """
-        Aspetta che un elemento appaia/scompaia dalla pagina
-        
-        Args:
-            selector: Il selettore dell'elemento
-            selector_type: Tipo di selettore ('css', 'xpath', 'text')
-            state: Stato da aspettare ('visible', 'hidden', 'attached', 'detached')
-            timeout: Tempo massimo in millisecondi
-        
-        Returns:
-            dict con status
+        Aspetta che un elemento appaia/scompaia dalla pagina (ASYNC)
         """
         try:
             if not self.page:
@@ -323,7 +266,6 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            # Costruisci il locator
             if selector_type == "css":
                 locator = self.page.locator(selector)
             elif selector_type == "xpath":
@@ -336,8 +278,7 @@ class PlaywrightTools:
                     "message": f"Tipo selector non supportato: {selector_type}"
                 }
             
-            # Aspetta lo stato richiesto
-            locator.wait_for(state=state, timeout=timeout)
+            await locator.wait_for(state=state, timeout=timeout)
             
             return {
                 "status": "success",
@@ -353,16 +294,9 @@ class PlaywrightTools:
                 "selector": selector
             }
     
-    def get_text(self, selector, selector_type="css"):
+    async def get_text(self, selector, selector_type="css"):
         """
-        Estrae il testo da un elemento
-        
-        Args:
-            selector: Il selettore dell'elemento
-            selector_type: Tipo di selettore ('css', 'xpath')
-        
-        Returns:
-            dict con status e testo estratto
+        Estrae il testo da un elemento (ASYNC)
         """
         try:
             if not self.page:
@@ -371,7 +305,6 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            # Costruisci il locator
             if selector_type == "css":
                 locator = self.page.locator(selector)
             elif selector_type == "xpath":
@@ -382,8 +315,7 @@ class PlaywrightTools:
                     "message": f"Tipo selector non supportato: {selector_type}"
                 }
             
-            # Estrai il testo
-            text = locator.inner_text()
+            text = await locator.inner_text()
             
             return {
                 "status": "success",
@@ -399,16 +331,9 @@ class PlaywrightTools:
                 "selector": selector
             }
     
-    def check_element_exists(self, selector, selector_type="css"):
+    async def check_element_exists(self, selector, selector_type="css"):
         """
-        Verifica se un elemento esiste nella pagina
-        
-        Args:
-            selector: Il selettore dell'elemento
-            selector_type: Tipo di selettore ('css', 'xpath', 'text')
-        
-        Returns:
-            dict con status e booleano exists
+        Verifica se un elemento esiste nella pagina (ASYNC)
         """
         try:
             if not self.page:
@@ -417,7 +342,6 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            # Costruisci il locator
             if selector_type == "css":
                 locator = self.page.locator(selector)
             elif selector_type == "xpath":
@@ -430,12 +354,12 @@ class PlaywrightTools:
                     "message": f"Tipo selector non supportato: {selector_type}"
                 }
             
-            # Verifica esistenza (con timeout breve per non aspettare troppo)
-            exists = locator.count() > 0
+            count = await locator.count()
+            exists = count > 0
             is_visible = False
             
             if exists:
-                is_visible = locator.first.is_visible()
+                is_visible = await locator.first.is_visible()
             
             return {
                 "status": "success",
@@ -452,18 +376,9 @@ class PlaywrightTools:
                 "selector": selector
             }
     
-    def press_key(self, key):
+    async def press_key(self, key):
         """
-        Simula la pressione di un tasto
-        
-        Args:
-            key: Il tasto da premere ('Enter', 'Escape', 'ArrowDown', etc)
-        
-        Returns:
-            dict con status
-        
-        Esempi comuni:
-            'Enter', 'Escape', 'Tab', 'Backspace', 'ArrowDown', 'ArrowUp'
+        Simula la pressione di un tasto (ASYNC)
         """
         try:
             if not self.page:
@@ -472,7 +387,7 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
             
-            self.page.keyboard.press(key)
+            await self.page.keyboard.press(key)
             
             return {
                 "status": "success",

@@ -1,19 +1,26 @@
-# 🤖 AI Test Automation Project
+# 🤖 AI Test Automation Project (MCP Edition)
 
-Sistema di test automation intelligente che usa LLM (Large Language Models) e Playwright per automatizzare test di interfacce web.
+Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**, LLM (Large Language Models) e Playwright per automatizzare test di interfacce web con architettura enterprise-ready.
 
 ---
 
 ## 📋 Indice
 
-- [Cosa Fa Questo Progetto](#cosa-fa-questo-progetto)
-- [Tecnologie Utilizzate](#tecnologie-utilizzate)
-- [Struttura del Progetto](#struttura-del-progetto)
-- [Setup Iniziale](#setup-iniziale)
-- [Tool Playwright Implementati](#tool-playwright-implementati)
-- [API Endpoints Disponibili](#api-endpoints-disponibili)
-- [Come Usare il Sistema](#come-usare-il-sistema)
-- [Prossimi Step](#prossimi-step)
+- [Cosa Fa Questo Progetto](#-cosa-fa-questo-progetto)
+- [Architettura MCP](#-architettura-mcp)
+- [Tecnologie Utilizzate](#️-tecnologie-utilizzate)
+- [Struttura del Progetto](#-struttura-del-progetto)
+- [Setup Completo](#-setup-completo)
+- [Configurazione MCP](#-configurazione-mcp)
+- [Configurazione LLM](#-configurazione-llm-openai--azure--openrouter)
+- [Tool Playwright Disponibili](#️-tool-playwright-disponibili)
+- [API Endpoints](#-api-endpoints)
+- [Screenshot in Base64](#-screenshot-in-base64)
+- [Esempi di Utilizzo](#-esempi-di-utilizzo)
+- [MCP: Locale vs Remoto](#-mcp-locale-vs-remoto)
+- [Troubleshooting](#-troubleshooting)
+- [Per Martina](#-per-martina-setup-veloce)
+- [Risorse](#-risorse)
 
 ---
 
@@ -21,45 +28,124 @@ Sistema di test automation intelligente che usa LLM (Large Language Models) e Pl
 
 Questo sistema permette di:
 - ✅ Descrivere test in **linguaggio naturale** (es. "vai su google.com e cerca 'test automation'")
-- ✅ L'**AI Agent** capisce il test e lo esegue automaticamente
-- ✅ **Playwright** controlla il browser (clicca, compila form, naviga)
-- ✅ **Vision AI** analizza screenshot per verificare i risultati
-- ✅ Genera **report automatici** dei test eseguiti
+- ✅ **AI Agent** (GPT-4, Claude, etc.) capisce il test e lo esegue automaticamente
+- ✅ **MCP Protocol** gestisce i tool in modo isolato e scalabile
+- ✅ **Playwright Async** controlla il browser (clicca, compila form, naviga)
+- ✅ **Screenshot Base64** ritornati direttamente nella risposta JSON
+- ✅ **AJAX handling** automatico per caricamenti dinamici
+- ✅ Test **robusti** con retry logic e wait strategies
 
-### Esempio di Utilizzo
+### 🌟 Esempio Pratico
 
 ```
-Input: "Vai su https://example.com, clicca su Login, 
-        inserisci email test@test.com e password 123, 
-        poi verifica che appaia il messaggio di benvenuto"
+👤 User: "Go to google.com, search for 'AI testing', 
+         wait for results, and take a screenshot"
 
-Output: ✅ Test PASSED
-        - Navigato a https://example.com
-        - Cliccato su bottone Login
-        - Compilati campi email e password
-        - Verificato messaggio "Benvenuto, test@test.com"
-        - Screenshot salvato
+🤖 AI Agent:
+   1. ✅ start_browser()
+   2. ✅ navigate_to_url("https://google.com")
+   3. ✅ fill_input("textarea[name='q']", "AI testing")
+   4. ✅ press_key("Enter")
+   5. ✅ wait_for_element("#search", state="visible")
+   6. ✅ capture_screenshot("search-results.png")
+   7. ✅ close_browser()
+
+📊 Result: Test PASSED
+📸 Screenshot: Base64 in JSON response (no disk files!)
 ```
+
+---
+
+## 🏗️ Architettura MCP
+
+### Cos'è MCP?
+
+**MCP (Model Context Protocol)** è uno standard aperto per comunicazione tra LLM e tool esterni. Creato da Anthropic, supportato da OpenAI e altri.
+
+### Architettura del Sistema
+
+```
+┌─────────────────────────────────────────────┐
+│         FRONTEND (Angular)                  │
+│  - UI per creare test                       │
+│  - Dashboard risultati                      │
+│  - Live streaming                           │
+└──────────────────┬──────────────────────────┘
+                   │ HTTP REST API
+                   ▼
+┌─────────────────────────────────────────────┐
+│         BACKEND (Flask)                     │
+│  - Endpoint REST                            │
+│  - CORS handling                            │
+│  - Screenshot base64 extraction             │
+└──────────────────┬──────────────────────────┘
+                   │ Python call
+                   ▼
+┌─────────────────────────────────────────────┐
+│         AI AGENT (LangGraph)                │
+│  - ReAct pattern                            │
+│  - Natural language → Actions               │
+│  - Tool selection                           │
+│  - Multi-LLM support (OpenAI/Azure/Router)  │
+└──────────────────┬──────────────────────────┘
+                   │ MCP Protocol
+                   ▼
+┌─────────────────────────────────────────────┐
+│         MCP CLIENT                          │
+│  - Tool discovery                           │
+│  - Request/Response handling (async)        │
+└──────────────────┬──────────────────────────┘
+                   │ stdio OR HTTP
+                   ▼
+┌─────────────────────────────────────────────┐
+│    MCP SERVER (Playwright Tools)            │
+│  - Exposes 11 async tools                   │
+│  - Isolated process                         │
+│  - Returns base64 screenshots               │
+└──────────────────┬──────────────────────────┘
+                   │ Async call
+                   ▼
+┌─────────────────────────────────────────────┐
+│         Playwright Async (Chromium)         │
+│  - Browser automation (async API)           │
+│  - In-memory screenshots                    │
+└─────────────────────────────────────────────┘
+```
+
+### Vantaggi di MCP
+
+| Vantaggio | Descrizione |
+|-----------|-------------|
+| **🔒 Isolamento** | Tool in processo separato → più robusto |
+| **📈 Scalabile** | Tool su server dedicati se necessario |
+| **🔄 Riusabile** | Tool condivisibili tra team/progetti |
+| **📜 Standard** | Protocol aperto, 1000+ tool disponibili |
+| **🛡️ Sicuro** | Security boundaries chiari |
+| **⚡ Async** | Non-blocking I/O per performance |
 
 ---
 
 ## 🛠️ Tecnologie Utilizzate
 
 ### Backend (Python)
-- **Python 3.12.10** - Linguaggio principale
-- **Flask 3.1.2** - Framework web per API REST
-- **Playwright** - Automazione browser
-- **LangChain** - Framework per LLM Agent (coming soon)
-- **LangGraph** - Orchestrazione workflow (coming soon)
+- **Python 3.10+** - Linguaggio principale
+- **Flask 3.1.2** - Web framework per API REST
+- **Playwright 1.49.1 (Async API)** ⭐ - Browser automation
+- **LangChain 0.3.21** - Framework per LLM
+- **LangGraph 0.4.3** - Workflow orchestration
+- **MCP 1.12.3** ⭐ - Model Context Protocol
+- **langchain-mcp-adapters 0.1.7** - MCP integration
 
-### Frontend (Angular)
-- **Angular 18+** - Framework frontend (coming soon)
-- **TypeScript** - Linguaggio per Angular
-- **Material UI** - Componenti UI
+### AI/LLM (Multi-Provider)
+- **OpenAI GPT-4o-mini** - Fast & cost-effective
+- **Azure OpenAI** - Enterprise compliance
+- **OpenRouter** ⭐ - Access to Claude, Gemini, etc.
+- **Temperature 0** - Deterministic per testing
 
-### AI/LLM
-- **OpenAI GPT-4** - LLM principale per l'agent
-- **GPT-4 Vision** - Analisi screenshot
+### Frontend (Angular) - Coming Soon
+- **Angular 18+** - Framework frontend
+- **TypeScript** - Type-safe development
+- **Material UI** - UI components
 
 ---
 
@@ -68,745 +154,615 @@ Output: ✅ Test PASSED
 ```
 ai-test-automation/
 │
-├── backend/                    # Backend Python
-│   ├── venv/                  # Ambiente virtuale Python
-│   ├── .gitignore
-│   ├── .env.example
-│   ├── README.md
-│   ├── app.py                 # Server Flask principale
-│   ├── .env                   # Variabili d'ambiente (API keys)
-│   ├── requirements.txt       # Dipendenze Python
+├── backend/                           # Backend Python
+│   ├── venv/                         # Virtual environment
+│   ├── .env                          # Environment variables (SECRET!)
+│   ├── .env.example                  # Template per .env
+│   ├── .gitignore                    # Git ignore rules
+│   ├── requirements.txt              # Python dependencies (con MCP)
+│   ├── app.py                        # Flask server principale
+│   ├── README.md                     # Questa documentazione
 │   │
-│   ├── agent/                 # Moduli per AI Agent
-│   │   ├── test_agent.py     # Agent LLM principale
-│   │   ├── tools.py          # Tool per Playwright (IMPLEMENTATI!)
-│   │   └── evaluator.py      # Valutazione risultati
+│   ├── agent/                        # AI Agent modules
+│   │   ├── __init__.py
+│   │   ├── tools.py                  # ⭐ Playwright tools ASYNC (base)
+│   │   └── test_agent_mcp.py        # ⭐ Agent con MCP (multi-LLM)
 │   │
-│   └── tests/                 # Test cases
-│       └── test_cases.json   # Dataset di test
+│   └── mcp_servers/                  # ⭐ MCP Servers ASYNC
+│       ├── __init__.py
+│       ├── playwright_server_local.py    # Server locale (stdio) ASYNC
+│       └── playwright_server_remote.py   # Server remoto (HTTP) ASYNC
 │
-└── frontend/                  # Frontend Angular
+└── frontend/                         # Frontend Angular
     └── (coming soon)
 ```
 
 ---
 
-## 🚀 Setup Iniziale
+## 🚀 Setup Completo
 
 ### Prerequisiti
 
-- **Python 3.10+** installato ([Download Python](https://www.python.org/downloads/))
-- **Node.js 18+** per Angular (coming soon)
-- **Git** per version control
+- ✅ **Python 3.10+** ([Download](https://www.python.org/downloads/))
+- ✅ **Git** per version control
+- ✅ **API Key** per uno di questi:
+  - [OpenAI API Key](https://platform.openai.com/api-keys)
+  - [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
+  - [OpenRouter API Key](https://openrouter.ai/) ⭐ (accesso a Claude, Gemini, etc.)
+
+---
 
 ### Step 1: Clona il Repository
 
 ```bash
 git clone <repository-url>
-cd ai-test-automation
+cd ai-test-automation/backend
 ```
 
-### Step 2: Setup Backend Python
+---
+
+### Step 2: Crea Ambiente Virtuale
 
 ```bash
-# Vai nella cartella backend
-cd backend
-
-# Crea ambiente virtuale
+# Crea venv
 python -m venv venv
 
-# Attiva ambiente virtuale
-# Su Windows:
+# Attiva venv
+# Windows PowerShell:
 .\venv\Scripts\Activate
-# Su Mac/Linux:
+
+# Mac/Linux:
 source venv/bin/activate
 
+# Verifica attivazione (dovresti vedere "(venv)" nel prompt)
+```
+
+---
+
+### Step 3: Installa Dipendenze (incluso MCP)
+
+```bash
 # Aggiorna pip
 python -m pip install --upgrade pip
 
-# Installa dipendenze
-python -m pip install python-dotenv flask flask-cors playwright
+# Installa tutte le dipendenze
+pip install -r requirements.txt
 
-# Installa browser Chromium per Playwright
+# Verifica installazione MCP
+python -c "import mcp; print('✅ MCP version:', mcp.__version__)"
+
+# Installa browser Chromium
 playwright install chromium
 ```
 
-### Step 3: Configura Variabili d'Ambiente
+**Dipendenze installate:**
+- Flask, Flask-CORS
+- Playwright (async API)
+- LangChain, LangGraph
+- **MCP + langchain-mcp-adapters** ⭐
+- OpenAI SDK
 
-Crea un file `.env` nella cartella `backend/`:
+**⏱️ Tempo stimato:** 3-5 minuti
+
+---
+
+### Step 4: Configura Variabili d'Ambiente
+
+Crea il file `.env` nella cartella `backend/`:
 
 ```bash
 # backend/.env
-OPENAI_API_KEY=your_openai_api_key_here
+
+# ============================================
+# LLM Configuration (scegli UNO)
+# ============================================
+
+# Opzione 1: OpenRouter (Raccomandato - accesso a Claude, Gemini, GPT) ⭐
+OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+# Altri modelli: openai/gpt-4o-mini, google/gemini-2.0-flash-exp:free
+
+# Opzione 2: OpenAI Standard
+# OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
+
+# Opzione 3: Azure OpenAI (Enterprise)
+# AZURE_OPENAI_API_KEY=your_azure_key
+# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+# AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
+# AZURE_OPENAI_API_VERSION=2024-08-01-preview
+
+# ============================================
+# Flask Configuration
+# ============================================
 FLASK_ENV=development
 FLASK_DEBUG=True
+FLASK_PORT=5000
+
+# ============================================
+# Playwright Configuration (opzionale)
+# ============================================
+PLAYWRIGHT_HEADLESS=False
+PLAYWRIGHT_TIMEOUT=30000
 ```
 
-> ⚠️ **IMPORTANTE:** Non committare mai il file `.env` su Git! Aggiungi `.env` al `.gitignore`.
+> 🔐 **IMPORTANTE:** 
+> - Non committare MAI `.env` su Git!
+> - Usa `.env.example` come template
+> - Configura SOLO UNO dei provider LLM
 
-### Step 4: Avvia il Server
+**Priorità Detection:**
+1. 🟣 OpenRouter (se `OPENROUTER_API_KEY` presente)
+2. 🔵 Azure OpenAI (se `AZURE_OPENAI_API_KEY` presente)
+3. 🟢 OpenAI Standard (se `OPENAI_API_KEY` presente)
+
+---
+
+### Step 5: Test Installazione
 
 ```bash
-# Assicurati di essere in backend/ con venv attivo
+# Test 1: Verifica Python packages
+python -c "import flask, playwright, langchain, mcp; print('✅ All packages OK')"
+
+# Test 2: Verifica MCP
+python -c "from langchain_mcp_adapters.client import MultiServerMCPClient; print('✅ MCP adapters OK')"
+
+# Test 3: Verifica API key
+python -c "import os; from dotenv import load_dotenv; load_dotenv(); print('✅ API key loaded' if (os.getenv('OPENAI_API_KEY') or os.getenv('OPENROUTER_API_KEY') or os.getenv('AZURE_OPENAI_API_KEY')) else '❌ Missing API key')"
+```
+
+Se tutti i test passano: **✅ Setup completato!**
+
+---
+
+### Step 6: Avvia il Server
+
+```bash
+# Assicurati che venv sia attivo
 python app.py
 ```
 
-Dovresti vedere:
+**Output atteso (con OpenRouter):**
+
 ```
+🟣 Usando OpenRouter
+   Model: anthropic/claude-3.5-sonnet
+
+💻 Usando MCP Server LOCALE (stdio)
+✅ AI Agent MCP caricato con successo!
+
 ==================================================
-SERVER AI TEST AUTOMATION
+🤖 AI TEST AUTOMATION SERVER (MCP Edition)
 ==================================================
 URL: http://localhost:5000
-Endpoints disponibili:
-   [Esistenti]
-   - GET  /
-   - GET  /api/health
-   - GET  /api/test
-   
-   [Playwright - Browser Control]
+
+📋 ENDPOINT DISPONIBILI:
+
+[BASE]
+   - GET  /                      → Server info
+   - GET  /api/health            → Health check
+
+[BROWSER - Diretti]
    - POST /api/browser/start
    - POST /api/browser/navigate
    - GET  /api/browser/screenshot
-   - GET  /api/browser/info
    - POST /api/browser/close
-   
-   [Playwright - Advanced Tools]
-   - POST /api/browser/click
-   - POST /api/browser/fill
-   - POST /api/browser/wait
-   - POST /api/browser/get-text
-   - POST /api/browser/check-exists
-   - POST /api/browser/press-key
+
+[AI AGENT MCP] ⭐
+   - POST /api/agent/mcp/test/run    → Esegui test con AI+MCP
+   - GET  /api/agent/mcp/test/stream → Stream real-time
+   - GET  /api/mcp/info              → Info configurazione MCP
+
+   💡 MCP Mode: Locale (stdio) di default
+   💡 Screenshots ritornati in base64 (no disk files)
+
+==================================================
+Premi CTRL+C per fermare il server
 ==================================================
 ```
 
 ---
 
-## 🛠️ Tool Playwright Implementati
+### Step 7: Test Rapido
 
-Il sistema include una suite completa di tool per automatizzare interazioni con il browser.
-
-### Tool Base
-
-#### 1. `start_browser(headless=False)`
-Avvia il browser Chromium con configurazioni ottimizzate.
-
-**Parametri:**
-- `headless`: Se `True`, browser invisibile. Se `False`, vedi il browser aprirsi.
-
-**Esempio:**
-```python
-playwright_tools.start_browser(headless=False)  # Vedi il browser
-```
-
----
-
-#### 2. `navigate_to_url(url)`
-Naviga a un URL specifico e aspetta il caricamento completo.
-
-**Esempio:**
-```python
-playwright_tools.navigate_to_url("https://google.com")
-```
-
----
-
-#### 3. `capture_screenshot(filename=None)`
-Cattura screenshot full-page della pagina corrente.
-
-**Esempio:**
-```python
-playwright_tools.capture_screenshot("test-result.png")
-```
-
----
-
-#### 4. `close_browser()`
-Chiude il browser e libera le risorse.
-
----
-
-### Tool Avanzati ⭐
-
-#### 5. `click_element(selector, selector_type="css", timeout=30000)`
-Clicca su qualsiasi elemento della pagina.
-
-**Parametri:**
-- `selector`: Selettore dell'elemento
-- `selector_type`: `"css"`, `"xpath"`, o `"text"`
-- `timeout`: Tempo massimo di attesa in millisecondi
-
-**Esempi:**
-```python
-# Click con CSS selector
-click_element("#login-button", "css")
-
-# Click cercando per testo visibile
-click_element("Accedi", "text")
-
-# Click con XPath
-click_element("//button[@type='submit']", "xpath")
-```
-
----
-
-#### 6. `fill_input(selector, value, selector_type="css", clear_first=True)`
-Compila campi input con testo.
-
-**Parametri:**
-- `selector`: Selettore del campo
-- `value`: Testo da inserire
-- `selector_type`: `"css"`, `"xpath"`, o `"placeholder"`
-- `clear_first`: Se `True`, cancella il contenuto prima
-
-**Esempi:**
-```python
-# Compila email
-fill_input("#email", "test@example.com")
-
-# Compila cercando per placeholder
-fill_input("Inserisci password", "MyPass123", "placeholder")
-
-# Aggiungi testo senza cancellare
-fill_input("#notes", " - nota aggiuntiva", clear_first=False)
-```
-
----
-
-#### 7. `wait_for_element(selector, selector_type="css", state="visible", timeout=30000)`
-Aspetta che un elemento appaia/scompaia. **FONDAMENTALE per caricamenti AJAX!**
-
-**Parametri:**
-- `state`: `"visible"`, `"hidden"`, `"attached"`, `"detached"`
-
-**Esempi:**
-```python
-# Aspetta che appaia un messaggio
-wait_for_element(".success-message", state="visible")
-
-# Aspetta che scompaia lo spinner di caricamento
-wait_for_element(".loading-spinner", state="hidden")
-```
-
-**💡 Quando usarlo:**
-- Dopo click su bottoni che caricano dati (AJAX)
-- Prima di leggere risultati di operazioni asincrone
-- Quando aspetti che modali/popup appaiano o scompaiano
-
----
-
-#### 8. `get_text(selector, selector_type="css")`
-Estrae il testo visibile da un elemento.
-
-**Esempi:**
-```python
-# Leggi messaggio di errore
-result = get_text(".error-message")
-print(result["text"])  # "Email non valida"
-
-# Leggi titolo
-result = get_text("h1")
-```
-
----
-
-#### 9. `check_element_exists(selector, selector_type="css")`
-Verifica se un elemento esiste ed è visibile.
-
-**Ritorna:**
-```json
-{
-    "status": "success",
-    "exists": true,
-    "is_visible": true
-}
-```
-
-**Esempi:**
-```python
-# Verifica presenza di errore
-result = check_element_exists(".error-message")
-if result["exists"]:
-    print("❌ Test FAILED: c'è un errore")
-
-# Verifica successo login
-result = check_element_exists(".user-dashboard")
-if result["exists"] and result["is_visible"]:
-    print("✅ Login SUCCESS")
-```
-
----
-
-#### 10. `press_key(key)`
-Simula pressione di tasti speciali.
-
-**Tasti comuni:**
-- `"Enter"` - Invio form
-- `"Escape"` - Chiude modali
-- `"Tab"` - Naviga tra campi
-- `"ArrowDown"`, `"ArrowUp"` - Naviga dropdown
-- `"Control+A"` - Seleziona tutto
-
-**Esempi:**
-```python
-# Invio form con Enter
-fill_input("#search", "test automation")
-press_key("Enter")
-
-# Chiudi modale
-press_key("Escape")
-```
-
----
-
-## 🌐 API Endpoints Disponibili
-
-### Endpoint Base
-
-#### `GET /`
-Health check del server.
-
-#### `GET /api/health`
-Status del servizio.
-
----
-
-### Endpoint Browser Control
-
-#### `POST /api/browser/start`
-Avvia il browser.
-
-**Body:**
-```json
-{
-    "headless": false
-}
-```
-
-**Response:**
-```json
-{
-    "status": "success",
-    "message": "Browser avviato con successo"
-}
-```
-
----
-
-#### `POST /api/browser/navigate`
-Naviga a un URL.
-
-**Body:**
-```json
-{
-    "url": "https://google.com"
-}
-```
-
-**Response:**
-```json
-{
-    "status": "success",
-    "url": "https://google.com",
-    "page_title": "Google"
-}
-```
-
----
-
-#### `GET /api/browser/screenshot`
-Cattura screenshot.
-
-**Response:**
-```json
-{
-    "status": "success",
-    "filename": "screenshot_20241210_143022.png",
-    "screenshot": "base64_encoded_image...",
-    "size_bytes": 245678
-}
-```
-
----
-
-#### `POST /api/browser/close`
-Chiude il browser.
-
----
-
-### Endpoint Tool Avanzati (DA IMPLEMENTARE)
-
-> ⚠️ **Nota:** Questi endpoint vanno ancora aggiunti in `app.py`
-
-#### `POST /api/browser/click`
-Clicca su un elemento.
-
-**Body:**
-```json
-{
-    "selector": "#login-button",
-    "selector_type": "css",
-    "timeout": 30000
-}
-```
-
----
-
-#### `POST /api/browser/fill`
-Compila un campo input.
-
-**Body:**
-```json
-{
-    "selector": "#email",
-    "value": "test@test.com",
-    "selector_type": "css",
-    "clear_first": true
-}
-```
-
----
-
-#### `POST /api/browser/wait`
-Aspetta un elemento.
-
-**Body:**
-```json
-{
-    "selector": ".success-message",
-    "selector_type": "css",
-    "state": "visible",
-    "timeout": 30000
-}
-```
-
----
-
-#### `POST /api/browser/get-text`
-Estrae testo da un elemento.
-
-**Body:**
-```json
-{
-    "selector": ".user-name",
-    "selector_type": "css"
-}
-```
-
----
-
-#### `POST /api/browser/check-exists`
-Verifica esistenza elemento.
-
-**Body:**
-```json
-{
-    "selector": ".error-message",
-    "selector_type": "css"
-}
-```
-
----
-
-#### `POST /api/browser/press-key`
-Simula pressione tasto.
-
-**Body:**
-```json
-{
-    "key": "Enter"
-}
-```
-
----
-
-## 🧪 Come Usare il Sistema
-
-### Test Manuale con cURL
+Apri un **nuovo terminale** e testa:
 
 ```bash
-# 1. Avvia il browser
-curl -X POST http://localhost:5000/api/browser/start \
+# Test 1: Health check
+curl http://localhost:5000/api/health
+
+# Test 2: MCP info
+curl http://localhost:5000/api/mcp/info
+
+# Test 3: Esegui test con AI Agent
+curl -X POST http://localhost:5000/api/agent/mcp/test/run \
   -H "Content-Type: application/json" \
-  -d '{"headless": false}'
+  -d '{"test_description": "Go to google.com, take a screenshot, and close the browser"}'
+```
 
-# 2. Naviga a Google
-curl -X POST http://localhost:5000/api/browser/navigate \
+**Risposta attesa (Test 3):**
+```json
+{
+  "status": "success",
+  "final_answer": "✅ Test completed successfully...",
+  "passed": true,
+  "mcp_mode": "local",
+  "screenshots": [
+    {
+      "filename": "screenshot_1.png",
+      "base64": "iVBORw0KGgoAAAANSUhEUg...",
+      "size_bytes": 245678,
+      "source": "ai_agent_response"
+    }
+  ],
+  "screenshots_count": 1,
+  "timestamp": "2024-12-15T..."
+}
+```
+
+Se vedi questo: **🎉 Tutto funziona!**
+
+---
+
+## 🔧 Configurazione LLM (OpenAI / Azure / OpenRouter)
+
+Il sistema supporta **3 provider LLM** con auto-detection:
+
+### OpenRouter (Raccomandato) ⭐
+
+**Vantaggi:**
+- ✅ Accesso a Claude, Gemini, GPT, e altri
+- ✅ API key unica per tutti i modelli
+- ✅ Modelli gratuiti disponibili
+- ✅ Economico per testing
+
+**Setup:**
+```bash
+# .env
+OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+```
+
+**Modelli consigliati:**
+- `anthropic/claude-3.5-sonnet` - Migliore qualità
+- `anthropic/claude-3-haiku` - Economico
+- `openai/gpt-4o-mini` - GPT via OpenRouter
+- `google/gemini-2.0-flash-exp:free` - Gratuito
+
+**Ottieni key:** [openrouter.ai](https://openrouter.ai/)
+
+---
+
+### Azure OpenAI (Enterprise)
+
+**Vantaggi:**
+- ✅ Compliance aziendale
+- ✅ Data residency EU
+- ✅ SLA garantito
+
+**Setup:**
+```bash
+# .env
+AZURE_OPENAI_API_KEY=your_key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_API_VERSION=2024-08-01-preview
+```
+
+---
+
+### OpenAI Standard
+
+**Setup:**
+```bash
+# .env
+OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
+```
+
+**Modello:** `gpt-4o-mini` (hardcoded)
+
+---
+
+## 🛠️ Tool Playwright Disponibili
+
+Il sistema espone **11 tool async** tramite MCP Server:
+
+### 1. `start_browser(headless: bool = False)`
+Avvia browser Chromium (async).
+
+**Args:**
+- `headless`: Se True, browser invisibile
+
+**Esempio:**
+```python
+await start_browser(headless=False)  # Vedi il browser
+```
+
+---
+
+### 2. `navigate_to_url(url: str)`
+Naviga a URL e aspetta caricamento (async).
+
+**Esempio:**
+```python
+await navigate_to_url("https://google.com")
+```
+
+---
+
+### 3. `click_element(selector: str, selector_type: str = "css", timeout: int = 30000)`
+Clicca su elemento (async).
+
+**Selector types:**
+- `"css"` - CSS selector (default)
+- `"xpath"` - XPath
+- `"text"` - Testo visibile
+
+**Esempi:**
+```python
+await click_element("#login-button", "css")
+await click_element("//button[@type='submit']", "xpath")
+await click_element("Accedi", "text")
+```
+
+---
+
+### 4. `fill_input(selector: str, value: str, selector_type: str = "css", clear_first: bool = True)`
+Compila campo input (async).
+
+---
+
+### 5. `wait_for_element(selector: str, state: str = "visible", selector_type: str = "css", timeout: int = 30000)` ⭐
+
+**FONDAMENTALE per AJAX!** Aspetta che elemento appaia/scompaia (async).
+
+**States:**
+- `"visible"` - Elemento visibile
+- `"hidden"` - Elemento nascosto
+- `"attached"` - Nel DOM
+- `"detached"` - Rimosso dal DOM
+
+---
+
+### 6-11. Altri Tool
+
+- `get_text()` - Estrae testo
+- `check_element_exists()` - Verifica esistenza
+- `press_key()` - Simula tasto
+- `capture_screenshot()` ⭐ - **Ritorna base64**
+- `close_browser()` - Chiude browser
+- `get_page_info()` - Info pagina
+
+---
+
+## 📸 Screenshot in Base64
+
+### Come Funziona
+
+Gli screenshot **NON vengono salvati su disco**. Il flusso è:
+
+```
+1. Browser cattura screenshot → genera bytes in memoria
+2. Tool converte in base64
+3. MCP Server ritorna base64 nel messaggio (con marker)
+4. AI Agent riceve il messaggio
+5. Flask estrae base64 dal messaggio AI
+6. JSON response include base64 direttamente
+```
+
+**ZERO file su disco!** Solo base64 in memoria → JSON response.
+
+---
+
+### Response con Screenshot
+
+```json
+{
+  "status": "success",
+  "final_answer": "✅ Test completed...",
+  "passed": true,
+  "screenshots": [
+    {
+      "filename": "screenshot_1.png",
+      "base64": "iVBORw0KGgoAAAANSUhEUgAAA...",
+      "size_bytes": 245678,
+      "source": "ai_agent_response"
+    }
+  ],
+  "screenshots_count": 1
+}
+```
+
+---
+
+### Salvare Screenshot da PowerShell
+
+```powershell
+# Esegui test
+$response = Invoke-RestMethod -Uri http://localhost:5000/api/agent/mcp/test/run `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"test_description": "Go to google.com, take a screenshot"}'
+
+# Salva screenshot se presente
+if ($response.screenshots_count -gt 0) {
+    $screenshot = $response.screenshots[0]
+    $bytes = [Convert]::FromBase64String($screenshot.base64)
+    [IO.File]::WriteAllBytes("screenshot.png", $bytes)
+    Write-Host "✅ Screenshot salvato: screenshot.png"
+    start screenshot.png
+}
+```
+
+---
+
+### Salvare Screenshot da Python
+
+```python
+import requests
+import base64
+
+# Esegui test
+response = requests.post("http://localhost:5000/api/agent/mcp/test/run",
+    json={"test_description": "Go to google.com, take a screenshot"})
+
+data = response.json()
+
+# Salva screenshot
+if data["screenshots_count"] > 0:
+    screenshot_base64 = data["screenshots"][0]["base64"]
+    screenshot_bytes = base64.b64decode(screenshot_base64)
+    
+    with open("screenshot.png", "wb") as f:
+        f.write(screenshot_bytes)
+    
+    print("✅ Screenshot salvato!")
+```
+
+---
+
+## 🌐 API Endpoints
+
+### AI Agent MCP Endpoints
+
+#### `POST /api/agent/mcp/test/run`
+Esegue test con AI Agent tramite MCP.
+
+**Body:**
+```json
+{
+  "test_description": "Go to google.com and search for 'AI testing'",
+  "use_remote": false
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "test_description": "Go to google.com...",
+  "final_answer": "✅ Test completed successfully...",
+  "passed": true,
+  "mcp_mode": "local",
+  "screenshots": [
+    {
+      "filename": "screenshot_1.png",
+      "base64": "iVBORw0KGgo...",
+      "size_bytes": 245678,
+      "source": "ai_agent_response"
+    }
+  ],
+  "screenshots_count": 1,
+  "timestamp": "2024-12-15T..."
+}
+```
+
+---
+
+## 💡 Esempi di Utilizzo
+
+### Esempio 1: Test con Screenshot Base64
+
+```bash
+curl -X POST http://localhost:5000/api/agent/mcp/test/run \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://google.com"}'
+  -d '{
+    "test_description": "Go to google.com, take a screenshot, and close the browser"
+  }' | jq '.screenshots[0].base64' > screenshot.b64
 
-# 3. Cattura screenshot
-curl http://localhost:5000/api/browser/screenshot
-
-# 4. Chiudi browser
-curl -X POST http://localhost:5000/api/browser/close
+# Decodifica base64 e salva
+base64 -d screenshot.b64 > screenshot.png
 ```
 
 ---
 
-### Esempio: Test di Login Completo
-
-```python
-from agent.tools import PlaywrightTools
-
-tools = PlaywrightTools()
-
-# 1. Setup
-tools.start_browser(headless=False)
-tools.navigate_to_url("https://example.com/login")
-
-# 2. Compila form
-tools.fill_input("#email", "test@test.com")
-tools.fill_input("#password", "Password123")
-
-# 3. Submit
-tools.click_element("#login-button", "css")
-
-# 4. Aspetta caricamento (AJAX)
-tools.wait_for_element(".loading-spinner", state="visible")
-tools.wait_for_element(".loading-spinner", state="hidden")
-
-# 5. Verifica successo
-result = tools.check_element_exists(".user-dashboard")
-
-if result["exists"] and result["is_visible"]:
-    print("✅ Login SUCCESS!")
-    user_name = tools.get_text(".user-name")
-    print(f"Benvenuto, {user_name['text']}")
-else:
-    print("❌ Login FAILED")
-    error = tools.get_text(".error-message")
-    print(f"Errore: {error['text']}")
-
-# 6. Screenshot e cleanup
-tools.capture_screenshot("login-test-result.png")
-tools.close_browser()
-```
-
----
-
-## 📚 Comandi Utili
-
-### Backend
+### Esempio 2: Test con OpenRouter + Claude
 
 ```bash
-# Attiva ambiente virtuale
-.\venv\Scripts\Activate  # Windows
-source venv/bin/activate  # Mac/Linux
+# .env configurato con OpenRouter
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 
-# Installa nuova dipendenza
-python -m pip install <package-name>
+# Esegui test
+curl -X POST http://localhost:5000/api/agent/mcp/test/run \
+  -H "Content-Type: application/json" \
+  -d '{"test_description": "Complex test with AJAX..."}'
 
-# Salva dipendenze
-python -m pip freeze > requirements.txt
-
-# Avvia server
-python app.py
-
-# Disattiva ambiente virtuale
-deactivate
+# Claude interpreta e esegue il test
 ```
-
-### Playwright
-
-```bash
-# Installa tutti i browser
-playwright install
-
-# Installa solo Chromium
-playwright install chromium
-
-# Esegui test Playwright
-pytest
-```
-
----
-
-## 🔍 Cos'è AJAX e Perché è Importante
-
-**AJAX** (Asynchronous JavaScript And XML) = Caricamento dati in background senza ricaricare la pagina.
-
-### Esempi Quotidiani di AJAX:
-- 📱 Facebook feed che carica nuovi post quando scrolli
-- 🗺️ Google Maps che carica nuove zone quando sposti la mappa
-- 📧 Gmail che mostra email senza cambiare pagina
-- 🔍 Suggerimenti di ricerca mentre digiti
-
-### Perché è Cruciale nei Test?
-
-**Problema:** Il browser esegue azioni più veloce di quanto i dati arrivino dal server.
-
-```python
-# ❌ SBAGLIATO - Test fallisce!
-click_element("#load-data")
-get_text("#result")  # ERRORE: dati non ancora caricati!
-
-# ✅ CORRETTO - Aspetta AJAX
-click_element("#load-data")
-wait_for_element("#result", state="visible", timeout=5000)
-get_text("#result")  # OK: dati pronti
-```
-
-### Pattern Comuni:
-
-#### 1. Spinner Pattern
-```python
-click_element("#submit")
-wait_for_element(".loading-spinner", state="visible")   # Appare
-wait_for_element(".loading-spinner", state="hidden")    # Scompare
-wait_for_element(".success-message", state="visible")   # Risultato pronto
-```
-
-#### 2. Button Disabled Pattern
-```python
-click_element("#submit")
-wait_for_element("#submit[disabled]")          # Bottone disabilitato
-wait_for_element("#submit:not([disabled])")    # Bottone riabilitato
-```
-
----
-
-## 🔜 Prossimi Step
-
-### Step 2: Endpoint API per Tool Avanzati ✅ (IN PROGRESS)
-- [ ] Implementare endpoint `/api/browser/click`
-- [ ] Implementare endpoint `/api/browser/fill`
-- [ ] Implementare endpoint `/api/browser/wait`
-- [ ] Implementare endpoint `/api/browser/get-text`
-- [ ] Implementare endpoint `/api/browser/check-exists`
-- [ ] Implementare endpoint `/api/browser/press-key`
-- [ ] Test manuali con cURL/Postman
-
-### Step 3: Creare l'AI Agent con LangChain (PLANNED)
-- [ ] Setup LangChain + LangGraph
-- [ ] Configurazione OpenAI API
-- [ ] Definire tool per l'agent
-- [ ] Agent con ReAct pattern
-- [ ] Test agent con linguaggio naturale
-- [ ] Esempi: "vai su google e cerca X"
-
-### Step 4: Integrare Vision AI (PLANNED)
-- [ ] Integrazione GPT-4 Vision
-- [ ] Screenshot analysis
-- [ ] Confronto expected vs actual
-- [ ] Validazione automatica risultati
-- [ ] Report visuale con annotazioni
-
-### Step 5: Frontend Angular (PLANNED)
-- [ ] Setup Angular project
-- [ ] Dashboard UI
-- [ ] API service per backend
-- [ ] Test runner component
-- [ ] Results viewer
-- [ ] Test case creator
-
-### Step 6: Tool Avanzati Extra (FUTURE)
-- [ ] Database query tool
-- [ ] API call tool
-- [ ] Visual regression tool
-- [ ] Performance monitoring tool
-- [ ] Test data generator
-- [ ] Multi-browser testing
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Problema: `pip` non funziona
+### Problema: Screenshot count = 0
 
-**Soluzione:** Usa `python -m pip` invece di `pip`
-```bash
-python -m pip install <package>
-```
+**Causa:** Base64 non estratto correttamente dalla risposta AI.
 
-### Problema: Server non si avvia
-
-**Soluzione:** Verifica che la porta 5000 sia libera
-```bash
-# Windows
-netstat -ano | findstr :5000
-
-# Mac/Linux
-lsof -i :5000
-```
-
-### Problema: Playwright non trova i browser
-
-**Soluzione:** Reinstalla i browser
-```bash
-playwright install chromium --force
-```
-
-### Problema: Test fallisce con AJAX
-
-**Soluzione:** Aggiungi `wait_for_element()` dopo ogni azione che carica dati
-```python
-click_element("#button")
-wait_for_element(".result", state="visible", timeout=10000)
-```
+**Soluzione:**
+1. Verifica che `tools.py` usa **async Playwright**
+2. Verifica che MCP server ritorna base64 con marker `🔑 SCREENSHOT_BASE64_START`
+3. Verifica che `app.py` estrae con regex corretta
 
 ---
 
-## 📖 Risorse Utili
+### Problema: AsyncIO errors
 
-### Documentazione
+**Causa:** Mixing sync/async code.
 
-- [Flask Documentation](https://flask.palletsprojects.com/)
-- [Playwright Python](https://playwright.dev/python/)
-- [LangChain Docs](https://python.langchain.com/)
-- [OpenAI API](https://platform.openai.com/docs/)
-
-### Tutorial
-
-- [Playwright Tutorial](https://playwright.dev/python/docs/intro)
-- [Flask Mega-Tutorial](https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world)
-- [LangChain Quickstart](https://python.langchain.com/docs/get_started/quickstart)
-
----
-
-## 🤝 Contribuire
-
-Questo è un progetto educativo in fase di sviluppo. 
-
-### Workflow di Sviluppo
-
-1. Ogni step viene implementato gradualmente
-2. Testiamo ogni componente prima di procedere
-3. Documentiamo ogni decisione tecnica
-4. Committiamo spesso con messaggi descrittivi
+**Soluzione:**
+- Usa **async Playwright** (`from playwright.async_api import async_playwright`)
+- Tutti i tool devono essere `async def`
+- Tutti i MCP server tool devono essere `async`
 
 ---
 
 ## 📝 Changelog
 
-### [0.2.0] - 2024-12-10
+### [2.1.0-async] - 2024-12-15
 
-#### ✅ Tool Avanzati Implementati
-- [x] `click_element()` - Click su elementi con CSS/XPath/Text
-- [x] `fill_input()` - Compilazione campi input
-- [x] `wait_for_element()` - Gestione caricamenti AJAX
-- [x] `get_text()` - Estrazione testo da elementi
-- [x] `check_element_exists()` - Verifica esistenza elementi
-- [x] `press_key()` - Simulazione pressione tasti
-- [x] Documentazione completa tool avanzati
-- [x] Esempi pratici di utilizzo
-- [x] Spiegazione AJAX e pattern comuni
+#### 🎉 Major Update: Full Async + Base64 Screenshots
 
-#### 🔄 In Progress
-- [ ] Endpoint API per tool avanzati
+**✨ Features:**
+- [x] **Async Playwright** - Full async/await API
+- [x] **Screenshot Base64** - No disk files, memory only
+- [x] **OpenRouter Support** ⭐ - Access to Claude, Gemini, etc.
+- [x] **Multi-LLM** - OpenAI, Azure, OpenRouter
+- [x] **Auto-detection** - LLM provider priority system
+- [x] **Response Enhancement** - Screenshots array in JSON
 
-### [0.1.0] - 2024-12-10
+**🔧 Technical:**
+- Converted all Playwright tools to `async def`
+- `async_playwright()` instead of `sync_playwright()`
+- MCP servers return base64 with delimiters
+- Flask extracts base64 from AI response via regex
+- Zero filesystem I/O for screenshots
 
-#### ✅ Setup Base Completato
-- [x] Setup ambiente Python
-- [x] Installazione Flask
-- [x] Creazione API REST base
-- [x] Installazione Playwright
-- [x] Test endpoint funzionanti
-- [x] Tool base browser control
+**📦 Dependencies:** (no changes)
+- Same as 2.0.0-mcp
 
 ---
 
-**Ultimo aggiornamento:** 10 Dicembre 2024  
-**Versione:** 0.1.0  
-**Status:** 🟢 In Development - Tool Avanzati Implementati
+### [2.0.0-mcp] - 2024-12-10
+
+#### 🎉 Major Release: MCP Integration
+
+**✨ Features:**
+- [x] **MCP Architecture** - Model Context Protocol
+- [x] **12 Tool Playwright** - Via MCP protocol
+- [x] **Dual Mode** - Locale/Remoto switchable
+---
+
+## 📄 Licenza
+---
+
+**Ultimo aggiornamento:** 15 Dicembre 2024  
+**Versione:** 2.1.0-async  
+**Status:** 🟢 Production Ready (Async Edition)
+
+**Contatti:**
+- Serena (serena@eng.it)
+- Martina (martina.bertoldi@eng.it)
+
+---
+
+🚀 **Happy Testing with Async MCP!** 🤖
