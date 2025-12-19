@@ -15,9 +15,14 @@ load_dotenv()
 # Aggiungi la cartella parent al path per importare tools
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.tools import PlaywrightTools
+from config.settings import AppConfig
 
 # Crea il server MCP con porta HTTP
-mcp = FastMCP("PlaywrightTools", port=8001)
+mcp = FastMCP(
+    "PlaywrightTools",
+    host=AppConfig.MCP.REMOTE_HOST,
+    port=AppConfig.MCP.REMOTE_PORT
+)
 
 # Istanza globale dei tool Playwright
 playwright = PlaywrightTools()
@@ -29,9 +34,9 @@ async def start_browser(headless: bool = False) -> str:
     result = await playwright.start_browser(headless)
     
     if result["status"] == "success":
-        return f"✅ Browser avviato con successo (headless={headless})"
+        return f"Browser avviato con successo (headless={headless})"
     else:
-        return f"❌ Errore nell'avviare il browser: {result['message']}"
+        return f"Errore nell'avviare il browser: {result['message']}"
 
 
 @mcp.tool()
@@ -40,9 +45,9 @@ async def navigate_to_url(url: str) -> str:
     result = await playwright.navigate_to_url(url)
     
     if result["status"] == "success":
-        return f"✅ Navigato a {result['url']}\nTitolo pagina: {result['page_title']}"
+        return f"Navigato a {result['url']}\nTitolo pagina: {result['page_title']}"
     else:
-        return f"❌ Errore nella navigazione: {result['message']}"
+        return f"Errore nella navigazione: {result['message']}"
 
 
 @mcp.tool()
@@ -51,9 +56,9 @@ async def click_element(selector: str, selector_type: str = "css", timeout: int 
     result = await playwright.click_element(selector, selector_type, timeout)
     
     if result["status"] == "success":
-        return f"✅ Click eseguito su elemento: {selector} ({selector_type})"
+        return f"Click eseguito su elemento: {selector} ({selector_type})"
     else:
-        return f"❌ Errore nel click: {result['message']}\nSelector: {selector}"
+        return f"Errore nel click: {result['message']}\nSelector: {selector}"
 
 
 @mcp.tool()
@@ -63,9 +68,9 @@ async def fill_input(selector: str, value: str, selector_type: str = "css", clea
     
     if result["status"] == "success":
         display_value = "***" if "password" in selector.lower() else value
-        return f"✅ Campo compilato: {selector} = {display_value}"
+        return f"Campo compilato: {selector} = {display_value}"
     else:
-        return f"❌ Errore nella compilazione: {result['message']}\nSelector: {selector}"
+        return f"Errore nella compilazione: {result['message']}\nSelector: {selector}"
 
 
 @mcp.tool()
@@ -74,9 +79,9 @@ async def wait_for_element(selector: str, state: str = "visible", selector_type:
     result = await playwright.wait_for_element(selector, selector_type, state, timeout)
     
     if result["status"] == "success":
-        return f"✅ Elemento {selector} è ora {state}"
+        return f"Elemento {selector} è ora {state}"
     else:
-        return f"❌ Timeout: elemento {selector} non è diventato {state}\n{result['message']}"
+        return f"Timeout: elemento {selector} non è diventato {state}\n{result['message']}"
 
 
 @mcp.tool()
@@ -87,7 +92,7 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
     if result["status"] == "success":
         return f"Testo estratto da {selector}:\n{result['text']}"
     else:
-        return f"❌ Errore nell'estrazione del testo: {result['message']}"
+        return f"Errore nell'estrazione del testo: {result['message']}"
 
 
 @mcp.tool()
@@ -100,13 +105,13 @@ async def check_element_exists(selector: str, selector_type: str = "css") -> str
         visible = result["is_visible"]
         
         if exists and visible:
-            return f"✅ Elemento {selector} esiste ed è visibile"
+            return f"Elemento {selector} esiste ed è visibile"
         elif exists and not visible:
-            return f"⚠️ Elemento {selector} esiste ma NON è visibile"
+            return f"Elemento {selector} esiste ma NON è visibile"
         else:
-            return f"❌ Elemento {selector} NON esiste nella pagina"
+            return f"Elemento {selector} NON esiste nella pagina"
     else:
-        return f"❌ Errore nella verifica: {result['message']}"
+        return f"Errore nella verifica: {result['message']}"
 
 
 @mcp.tool()
@@ -115,26 +120,36 @@ async def press_key(key: str) -> str:
     result = await playwright.press_key(key)
     
     if result["status"] == "success":
-        return f"✅ Tasto premuto: {key}"
+        return f"Tasto premuto: {key}"
     else:
-        return f"❌ Errore: {result['message']}"
+        return f"Errore: {result['message']}"
 
 
-@mcp.tool()
-async def capture_screenshot(filename: str = None) -> str:
-    """Cattura uno screenshot full-page della pagina corrente e ritorna base64."""
-    result = await playwright.capture_screenshot(filename)
+mcp.tool()
+async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
+    """
+    Cattura uno screenshot full-page della pagina corrente.
+    
+    Args:
+        filename: Nome file per reference (opzionale)
+        return_base64: Se True, include il base64 nella risposta. 
+                       ATTENZIONE: aumenta i token! Usa solo se necessario.
+    
+    Returns:
+        Conferma con metadata. Se return_base64=True, include anche il base64.
+    """
+    result = await playwright.capture_screenshot(filename, return_base64)
     
     if result["status"] == "success":
-        # ⭐ Ritorna base64 nel messaggio così l'AI può usarlo
-        return f"""✅ Screenshot catturato: {result['filename']} ({result['size_bytes']} bytes)
-📸 Base64: {result['screenshot'][:100]}... (truncated)
-
-🔑 SCREENSHOT_BASE64_START
-{result['screenshot']}
-🔑 SCREENSHOT_BASE64_END"""
+        response = f"Screenshot catturato: {result['filename']} ({result['size_bytes']} bytes)"
+        
+        # Include base64 SOLO se richiesto
+        if return_base64 and "base64" in result:
+            response += f"\n\n SCREENSHOT_BASE64:\n{result['base64']}"
+        
+        return response
     else:
-        return f"❌ Errore nello screenshot: {result['message']}"
+        return f"Errore nello screenshot: {result['message']}"
 
 
 @mcp.tool()
@@ -143,9 +158,9 @@ async def close_browser() -> str:
     result = await playwright.close_browser()
     
     if result["status"] == "success":
-        return "✅ Browser chiuso correttamente"
+        return "Browser chiuso correttamente"
     else:
-        return f"❌ Errore nella chiusura: {result['message']}"
+        return f"Errore nella chiusura: {result['message']}"
 
 
 @mcp.tool()
@@ -159,21 +174,101 @@ async def get_page_info() -> str:
 - Titolo: {result['title']}
 - Viewport: {result['viewport']}"""
     else:
-        return f"❌ Errore: {result['message']}"
+        return f"Errore: {result['message']}"
+
+
+@mcp.tool() 
+async def inspect_page_structure() -> str:
+    """
+    Inspects the current page structure to find selectors for forms, inputs, and buttons.
+    
+    This is extremely useful for debugging login forms or any interactive elements.
+    Returns detailed information about:
+    - All input fields (type, name, id, placeholder, suggested selectors)
+    - All buttons (text, type, id, suggested selectors)
+    - All forms (action, method, id)
+    
+    Use this when you need to figure out the correct selectors for a page you haven't seen before.
+    
+    Returns:
+        Detailed JSON structure with all page elements and suggested selectors
+    """
+    result = await playwright.inspect_page_structure()
+    
+    if result["status"] == "success":
+        # Formatta output in modo leggibile
+        output = f""" Page Structure Analysis Complete
+
+Page Info:
+   URL: {result['page_info']['url']}
+   Title: {result['page_info']['title']}
+
+INPUT FIELDS ({len(result['inputs'])}):
+"""
+        
+        for inp in result['inputs']:
+            output += f"\n   Input #{inp['index']}:"
+            output += f"\n      Type: {inp['type']}"
+            if inp['name']:
+                output += f"\n      Name: {inp['name']}"
+            if inp['id']:
+                output += f"\n      ID: {inp['id']}"
+            if inp['placeholder']:
+                output += f"\n      Placeholder: {inp['placeholder']}"
+            output += f"\n      Suggested selectors:"
+            for selector in inp['selector_suggestions']:
+                if selector:
+                    output += f"\n         - {selector}"
+            output += "\n"
+        
+        output += f"\n BUTTONS ({len(result['buttons'])}):\n"
+        
+        for btn in result['buttons']:
+            output += f"\n   Button #{btn['index']}:"
+            output += f"\n      Text: '{btn['text']}'"
+            if btn['type']:
+                output += f"\n      Type: {btn['type']}"
+            if btn['id']:
+                output += f"\n      ID: {btn['id']}"
+            output += f"\n      Suggested selectors:"
+            for selector in btn['selector_suggestions']:
+                if selector:
+                    output += f"\n         - {selector}"
+            output += "\n"
+        
+        if result['forms']:
+            output += f"\n FORMS ({len(result['forms'])}):\n"
+            for form in result['forms']:
+                output += f"\n   Form #{form['index']}:"
+                if form['action']:
+                    output += f"\n      Action: {form['action']}"
+                if form['method']:
+                    output += f"\n      Method: {form['method']}"
+                if form['id']:
+                    output += f"\n      ID: {form['id']}"
+                output += "\n"
+        
+        return output
+    else:
+        return f"Error: {result['message']}"
 
 
 # Avvia il server MCP su HTTP
 if __name__ == "__main__":
+    port = AppConfig.MCP.REMOTE_PORT
+    host = AppConfig.MCP.REMOTE_HOST
+    
     print("=" * 80)
-    print("🚀 MCP Playwright Server (HTTP transport) - ASYNC Version")
+    print("  MCP Playwright Server (HTTP transport) - ASYNC Version")
     print("=" * 80)
-    print(f"📡 Server URL: http://localhost:8001/mcp/")
-    print(f"🔧 Tool disponibili: 11")
-    print(f"📝 Per usarlo dall'agent, configura:")
-    print(f'   "url": "http://localhost:8001/mcp/"')
-    print(f'   "transport": "streamable_http"')
+    print(f"  Server URL: http://{host}:{port}/mcp/")
+    print(f"  Tool disponibili: 11")
+    print(f"  Per usarlo dall'agent, configura in config/settings.py:")
+    print(f'  MCPConfig.MODE = "remote"')
+    print(f'  MCPConfig.REMOTE_PORT = {port}')
     print("=" * 80)
     print("Premi CTRL+C per fermare il server")
     print("=" * 80)
     
+    # run() senza parametri - tutto è già in __init__
     mcp.run(transport="streamable-http")

@@ -25,9 +25,9 @@ async def start_browser(headless: bool = False) -> str:
     result = await playwright.start_browser(headless)
     
     if result["status"] == "success":
-        return f"✅ Browser avviato con successo (headless={headless})"
+        return f"Browser avviato con successo (headless={headless})"
     else:
-        return f"❌ Errore nell'avviare il browser: {result['message']}"
+        return f"Errore nell'avviare il browser: {result['message']}"
 
 
 @mcp.tool()
@@ -36,9 +36,9 @@ async def navigate_to_url(url: str) -> str:
     result = await playwright.navigate_to_url(url)
     
     if result["status"] == "success":
-        return f"✅ Navigato a {result['url']}\nTitolo pagina: {result['page_title']}"
+        return f"Navigato a {result['url']}\nTitolo pagina: {result['page_title']}"
     else:
-        return f"❌ Errore nella navigazione: {result['message']}"
+        return f"Errore nella navigazione: {result['message']}"
 
 
 @mcp.tool()
@@ -47,9 +47,9 @@ async def click_element(selector: str, selector_type: str = "css", timeout: int 
     result = await playwright.click_element(selector, selector_type, timeout)
     
     if result["status"] == "success":
-        return f"✅ Click eseguito su elemento: {selector} ({selector_type})"
+        return f"Click eseguito su elemento: {selector} ({selector_type})"
     else:
-        return f"❌ Errore nel click: {result['message']}\nSelector: {selector}"
+        return f"Errore nel click: {result['message']}\nSelector: {selector}"
 
 
 @mcp.tool()
@@ -59,9 +59,9 @@ async def fill_input(selector: str, value: str, selector_type: str = "css", clea
     
     if result["status"] == "success":
         display_value = "***" if "password" in selector.lower() else value
-        return f"✅ Campo compilato: {selector} = {display_value}"
+        return f"Campo compilato: {selector} = {display_value}"
     else:
-        return f"❌ Errore nella compilazione: {result['message']}\nSelector: {selector}"
+        return f"Errore nella compilazione: {result['message']}\nSelector: {selector}"
 
 
 @mcp.tool()
@@ -70,9 +70,9 @@ async def wait_for_element(selector: str, state: str = "visible", selector_type:
     result = await playwright.wait_for_element(selector, selector_type, state, timeout)
     
     if result["status"] == "success":
-        return f"✅ Elemento {selector} è ora {state}"
+        return f"Elemento {selector} è ora {state}"
     else:
-        return f"❌ Timeout: elemento {selector} non è diventato {state}\n{result['message']}"
+        return f"Timeout: elemento {selector} non è diventato {state}\n{result['message']}"
 
 
 @mcp.tool()
@@ -83,7 +83,7 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
     if result["status"] == "success":
         return f"Testo estratto da {selector}:\n{result['text']}"
     else:
-        return f"❌ Errore nell'estrazione del testo: {result['message']}"
+        return f"Errore nell'estrazione del testo: {result['message']}"
 
 
 @mcp.tool()
@@ -96,13 +96,13 @@ async def check_element_exists(selector: str, selector_type: str = "css") -> str
         visible = result["is_visible"]
         
         if exists and visible:
-            return f"✅ Elemento {selector} esiste ed è visibile"
+            return f"Elemento {selector} esiste ed è visibile"
         elif exists and not visible:
-            return f"⚠️ Elemento {selector} esiste ma NON è visibile"
+            return f"Elemento {selector} esiste ma NON è visibile"
         else:
-            return f"❌ Elemento {selector} NON esiste nella pagina"
+            return f"Elemento {selector} NON esiste nella pagina"
     else:
-        return f"❌ Errore nella verifica: {result['message']}"
+        return f"Errore nella verifica: {result['message']}"
 
 
 @mcp.tool()
@@ -111,26 +111,36 @@ async def press_key(key: str) -> str:
     result = await playwright.press_key(key)
     
     if result["status"] == "success":
-        return f"✅ Tasto premuto: {key}"
+        return f"Tasto premuto: {key}"
     else:
-        return f"❌ Errore: {result['message']}"
+        return f"Errore: {result['message']}"
 
 
-@mcp.tool()
-async def capture_screenshot(filename: str = None) -> str:
-    """Cattura uno screenshot full-page della pagina corrente e ritorna base64."""
-    result = await playwright.capture_screenshot(filename)
+mcp.tool()
+async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
+    """
+    Cattura uno screenshot full-page della pagina corrente.
+    
+    Args:
+        filename: Nome file per reference (opzionale)
+        return_base64: Se True, include il base64 nella risposta. 
+                       ATTENZIONE: aumenta i token! Usa solo se necessario.
+    
+    Returns:
+        Conferma con metadata. Se return_base64=True, include anche il base64.
+    """
+    result = await playwright.capture_screenshot(filename, return_base64)
     
     if result["status"] == "success":
-        # ⭐ Ritorna base64 nel messaggio così l'AI può usarlo
-        return f"""✅ Screenshot catturato: {result['filename']} ({result['size_bytes']} bytes)
-📸 Base64: {result['screenshot'][:100]}... (truncated)
-
-🔑 SCREENSHOT_BASE64_START
-{result['screenshot']}
-🔑 SCREENSHOT_BASE64_END"""
+        response = f"Screenshot catturato: {result['filename']} ({result['size_bytes']} bytes)"
+        
+        # Include base64 SOLO se richiesto
+        if return_base64 and "base64" in result:
+            response += f"\n\n SCREENSHOT_BASE64:\n{result['base64']}"
+        
+        return response
     else:
-        return f"❌ Errore nello screenshot: {result['message']}"
+        return f"Errore nello screenshot: {result['message']}"
 
 
 @mcp.tool()
@@ -139,9 +149,9 @@ async def close_browser() -> str:
     result = await playwright.close_browser()
     
     if result["status"] == "success":
-        return "✅ Browser chiuso correttamente"
+        return "Browser chiuso correttamente"
     else:
-        return f"❌ Errore nella chiusura: {result['message']}"
+        return f"Errore nella chiusura: {result['message']}"
 
 
 @mcp.tool()
@@ -155,13 +165,13 @@ async def get_page_info() -> str:
 - Titolo: {result['title']}
 - Viewport: {result['viewport']}"""
     else:
-        return f"❌ Errore: {result['message']}"
+        return f"Errore: {result['message']}"
 
 
 # Avvia il server MCP
 if __name__ == "__main__":
     print("=" * 80)
-    print("🚀 MCP Playwright Server (stdio transport) - ASYNC Version")
+    print("MCP Playwright Server (stdio transport) - ASYNC Version")
     print("=" * 80)
     print("   Questo server comunica tramite stdin/stdout")
     print("   Tool disponibili: 11")

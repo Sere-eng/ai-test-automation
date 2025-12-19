@@ -7,9 +7,14 @@ Espone endpoint REST per l'AI Agent MCP e i tool Playwright.
 from flask import Flask, jsonify, request, Response, stream_with_context
 from flask_cors import CORS
 from agent.tools import PlaywrightTools
+from config.settings import AppConfig
 import json
 import asyncio
 from datetime import datetime
+import re
+
+# Valida configurazione all'avvio
+AppConfig.validate_all()
 
 # Crea l'applicazione Flask
 app = Flask(__name__)
@@ -25,13 +30,13 @@ AGENT_MCP_AVAILABLE = False
 try:
     from agent.test_agent_mcp import TestAgentMCP
     # Inizializza l'agent (verrà inizializzato alla prima chiamata)
-    # IMPORTANTE: usa_remote=True per server HTTP remoto (più stabile)
+    # IMPORTANTE: usa_remote=True per server HTTP remoto, parametro che prende da config
     # Assicurati che playwright_server_remote.py sia in esecuzione su porta 8001
-    test_agent_mcp = TestAgentMCP(use_remote=True)  # Usa remoto HTTP
+    test_agent_mcp = TestAgentMCP()  # Usa remoto HTTP
     AGENT_MCP_AVAILABLE = True
-    print("✅ AI Agent MCP caricato con successo!")
+    print(" AI Agent MCP caricato con successo!")
 except ImportError as e:
-    print(f"⚠️ AI Agent MCP non disponibile: {e}")
+    print(f" AI Agent MCP non disponibile: {e}")
     print("   Installare: pip install mcp langchain-mcp-adapters")
     test_agent_mcp = None
 
@@ -116,8 +121,7 @@ def agent_mcp_run_test():
     
     Body JSON:
     {
-        "test_description": "Go to google.com and search for 'AI testing'",
-        "use_remote": false  // opzionale, default false (usa stdio locale)
+        "test_description": "Go to google.com and search for 'AI testing'"
     }
     
     Response include screenshots in base64!
@@ -137,69 +141,31 @@ def agent_mcp_run_test():
             }), 400
         
         test_description = data['test_description']
-        use_remote = data.get('use_remote', False)
-        
-        # Aggiorna configurazione agent se necessario
-        if use_remote != test_agent_mcp.use_remote:
-            test_agent_mcp.use_remote = use_remote
-            test_agent_mcp._initialized = False  # Forza re-inizializzazione
-        
-        # Nota il timestamp prima del test
-        import time
-        test_start_time = time.time()
         
         # Esegui il test con l'agent MCP (sincrono)
         result = test_agent_mcp.run_test(test_description, verbose=False)
         
-        # ⭐ ESTRAI SCREENSHOT BASE64 DALLA RISPOSTA AI
-        import re
-        screenshots_data = []
-        
-        # Cerca nei messaggi dell'agent per base64
-        if "all_messages" in result:
-            for msg in result["all_messages"]:
-                content = str(msg.content) if hasattr(msg, 'content') else str(msg)
-                
-                # Cerca pattern: SCREENSHOT_BASE64_START ... SCREENSHOT_BASE64_END
-                matches = re.findall(
-                    r'🔑 SCREENSHOT_BASE64_START\s*\n(.*?)\n🔑 SCREENSHOT_BASE64_END',
-                    content,
-                    re.DOTALL
-                )
-                
-                for idx, base64_data in enumerate(matches):
-                    base64_clean = base64_data.strip()
-                    
-                    screenshots_data.append({
-                        "filename": f"screenshot_{idx + 1}.png",
-                        "base64": base64_clean,
-                        "size_bytes": len(base64_clean) * 3 // 4,  # Stima dimensione
-                        "source": "ai_agent_response"
-                    })
-        
-        return jsonify({
+        response_data = {
             "status": "success",
             "test_description": result["test_description"],
             "final_answer": result["final_answer"],
             "passed": result["success"],
-            "mcp_mode": "remote" if use_remote else "local",
-            "screenshots": screenshots_data,  # ⭐ BASE64 ESTRATTO DA AI
-            "screenshots_count": len(screenshots_data),
+            "mcp_mode": AppConfig.MCP.MODE,
             "timestamp": datetime.now().isoformat()
-        })
+        }
+        
+        # Non estrarre base64 da all_messages perché LangGraph satura il numero di token!
+        # Se l'utente vuole base64, deve chiederlo esplicitamente nel test
+        # e l'AI lo includerà nel final_answer
+        
+        return jsonify(response_data)
         
     except Exception as e:
         import traceback
-        stack = traceback.format_exc()
-        print("=" * 80)
-        print("❌ ERRORE NEL AGENT MCP:")
-        print(stack)
-        print("=" * 80)
         return jsonify({
             "status": "error",
             "message": str(e),
-            "error_type": type(e).__name__,
-            "traceback": stack
+            "traceback": traceback.format_exc()
         }), 500
 
 @app.route('/api/agent/mcp/test/stream', methods=['GET'])
@@ -300,17 +266,142 @@ def mcp_info():
         ]
     })
 
+# ==================== ENDPOINT AMC LOGIN ====================
+
+@app.route('/api/test/amc/login', methods=['POST'])
+def test_amc_login():
+    """
+    Test automatico login AMC usando credenziali da config.
+    
+    Body JSON (opzionale):
+    {
+        "wait_after_login": 3,  // secondi da aspettare dopo login (default: 3)
+        "take_screenshot": true  // cattura screenshot finale (default: true)
+    }
+    """
+    if not AGENT_MCP_AVAILABLE:
+        return jsonify({
+            "status": "error",
+            "message": "AI Agent MCP non disponibile"
+        }), 503
+    
+    if not AppConfig.AMC.validate():
+        return jsonify({
+            "status": "error",
+            "message": "AMC credentials non configurate. Aggiungi AMC_USERNAME e AMC_PASSWORD in .env"
+        }), 400
+    
+    try:
+        # Leggi parametri dal body (opzionali)
+        data = {}
+        if request.is_json:
+            data = request.get_json() or {}
+        elif request.data:
+            try:
+                data = request.get_json(force=True) or {}
+            except:
+                data = {}
+                
+        wait_after_login = data.get('wait_after_login', 3)
+        take_screenshot = data.get('take_screenshot', False)
+        
+        # Costruisci il test description
+        test_description = f"""
+Execute AMC login test with CLEAR STOPPING CONDITION:
+
+1. start_browser(headless=False)
+2. navigate_to_url("{AppConfig.AMC.URL}")
+3. wait_for_element("{AppConfig.AMC.USERNAME_SELECTOR}", state="visible", timeout=5000)
+4. fill_input("{AppConfig.AMC.USERNAME_SELECTOR}", "{AppConfig.AMC.USERNAME}")
+5. fill_input("{AppConfig.AMC.PASSWORD_SELECTOR}", "{AppConfig.AMC.PASSWORD}")
+6. click_element("{AppConfig.AMC.LOGIN_BUTTON_SELECTOR}")
+7. wait_for_element("body", state="visible", timeout={wait_after_login * 1000})
+8. get_page_info() to check current URL and title
+""".strip()
+
+        if take_screenshot:
+            test_description += "\n9. capture_screenshot('amc-dashboard.png', return_base64=False)"
+            test_description += "\n10. close_browser()"
+        else:
+            test_description += "\n9. close_browser()"
+
+        test_description += """
+
+IMPORTANT: After closing browser, STOP and report success. Do not continue with additional actions.
+If any step fails, report the error and close browser immediately.
+"""
+        
+        result = test_agent_mcp.run_test(test_description, verbose=False)
+        
+        return jsonify({
+            "status": "success",
+            "test_type": "amc_login",
+            "final_answer": result["final_answer"],
+            "passed": result["success"],
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+    
+@app.route('/api/test/amc/inspect', methods=['POST'])
+def test_amc_inspect():
+    """
+    Ispeziona il form di login AMC per trovare selettori corretti.
+    Utile per aggiornare i selettori in config/settings.py
+    """
+    if not AGENT_MCP_AVAILABLE:
+        return jsonify({
+            "status": "error",
+            "message": "AI Agent MCP non disponibile"
+        }), 503
+    
+    try:
+        test_description = f"""
+        Go to {AppConfig.AMC.URL}
+        Wait 3 seconds for page to load
+        Call inspect_page_structure to analyze the login form
+        Close browser
+        """
+        
+        print(f" Inspecting AMC login page structure...")
+        result = test_agent_mcp.run_test(test_description, verbose=False)
+        
+        return jsonify({
+            "status": "success",
+            "test_type": "amc_inspect",
+            "final_answer": result["final_answer"],
+            "note": "Use this info to update selectors in config/settings.py AMCConfig",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
 # ==================== AVVIO SERVER ====================
 
 if __name__ == '__main__':
     print("\n" + "=" * 80)
-    print("🤖 AI TEST AUTOMATION SERVER (MCP Edition)")
+    print("AI TEST AUTOMATION SERVER (MCP Edition)")
     print("=" * 80)
-    print("URL: http://localhost:5000")
-    print("\n📋 ENDPOINT DISPONIBILI:")
+    print(f"URL: http://{AppConfig.FLASK.HOST}:{AppConfig.FLASK.PORT}")
+    print(f"MCP Mode: {AppConfig.MCP.MODE}")
+
+    print("\n ENDPOINT DISPONIBILI:")
     print("\n[BASE]")
     print("   - GET  /                      → Server info")
     print("   - GET  /api/health            → Health check")
+
     print("\n[BROWSER - Diretti (senza MCP)]")
     print("   - POST /api/browser/start     → Avvia browser")
     print("   - POST /api/browser/navigate  → Naviga a URL")
@@ -318,18 +409,36 @@ if __name__ == '__main__':
     print("   - POST /api/browser/close     → Chiudi browser")
     
     if AGENT_MCP_AVAILABLE:
-        print("\n[AI AGENT MCP] ⭐")
+        print("\n[AI AGENT MCP]")
         print("   - POST /api/agent/mcp/test/run    → Esegui test con AI+MCP")
         print("   - GET  /api/agent/mcp/test/stream → Stream test real-time")
         print("   - GET  /api/mcp/info              → Info configurazione MCP")
-        print("\n   💡 MCP Mode: Locale (stdio) di default")
-        print("      Per usare remoto: avvia prima playwright_server_remote.py")
+        print(f"\n   MCP Mode: {AppConfig.MCP.MODE.upper()}")
+        if AppConfig.MCP.use_remote():
+            print(f"      Server remoto: {AppConfig.MCP.get_remote_url()}")
+            print("      (Assicurati che playwright_server_remote.py sia attivo)")
+        else:
+            print("      Server locale: stdio")
+
+        print("\n[AMC LOGIN TEST]")
+        print("   - POST /api/test/amc/inspect      → Ispeziona form login")
+        print("   - POST /api/test/amc/login        → Test login automatico")
+        
+        if AppConfig.AMC.validate():
+            print(f"  Credenziali configurate: {AppConfig.AMC.USERNAME}")
+        else:
+            print(f"  Credenziali NON configurate (aggiungi AMC_USERNAME/PASSWORD in .env)")
     else:
-        print("\n[AI AGENT MCP] ❌ Non disponibile")
+        print("\n[AI AGENT MCP] Non disponibile")
         print("   Installa: pip install mcp==1.12.3 langchain-mcp-adapters==0.1.7")
     
     print("\n" + "=" * 80)
     print("Premi CTRL+C per fermare il server")
     print("=" * 80 + "\n")
     
-    app.run(debug=True, port=5000, threaded=True)
+    app.run(
+        host=AppConfig.FLASK.HOST,
+        port=AppConfig.FLASK.PORT,
+        debug=AppConfig.FLASK.DEBUG,
+        threaded=True
+    )
