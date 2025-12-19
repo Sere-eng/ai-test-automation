@@ -271,13 +271,7 @@ def mcp_info():
 @app.route('/api/test/amc/login', methods=['POST'])
 def test_amc_login():
     """
-    Test automatico login AMC usando credenziali da config.
-    
-    Body JSON (opzionale):
-    {
-        "wait_after_login": 3,  // secondi da aspettare dopo login (default: 3)
-        "take_screenshot": true  // cattura screenshot finale (default: true)
-    }
+    Test automatico login AMC usando credenziali da config.    
     """
     if not AGENT_MCP_AVAILABLE:
         return jsonify({
@@ -302,34 +296,16 @@ def test_amc_login():
             except:
                 data = {}
                 
-        wait_after_login = data.get('wait_after_login', 3)
-        take_screenshot = data.get('take_screenshot', False)
-        
-        # Costruisci il test description
-        test_description = f"""
-Execute AMC login test with CLEAR STOPPING CONDITION:
+        # Costruzione descrizione del test
+        test_description = f"""Go to {AppConfig.AMC.URL}, fill the login form by inserting 
+        '{AppConfig.AMC.USERNAME}' in the field username and '{AppConfig.AMC.PASSWORD}' in the field password.
 
-1. start_browser(headless=False)
-2. navigate_to_url("{AppConfig.AMC.URL}")
-3. wait_for_element("{AppConfig.AMC.USERNAME_SELECTOR}", state="visible", timeout=5000)
-4. fill_input("{AppConfig.AMC.USERNAME_SELECTOR}", "{AppConfig.AMC.USERNAME}")
-5. fill_input("{AppConfig.AMC.PASSWORD_SELECTOR}", "{AppConfig.AMC.PASSWORD}")
-6. click_element("{AppConfig.AMC.LOGIN_BUTTON_SELECTOR}")
-7. wait_for_element("body", state="visible", timeout={wait_after_login * 1000})
-8. get_page_info() to check current URL and title
-""".strip()
+        After clicking login:
+        1. Wait for body element to be visible
+        2. Close browser
 
-        if take_screenshot:
-            test_description += "\n9. capture_screenshot('amc-dashboard.png', return_base64=False)"
-            test_description += "\n10. close_browser()"
-        else:
-            test_description += "\n9. close_browser()"
-
-        test_description += """
-
-IMPORTANT: After closing browser, STOP and report success. Do not continue with additional actions.
-If any step fails, report the error and close browser immediately.
-"""
+        IMPORTANT: After closing browser, STOP and report success. Do not continue with additional actions and iterations.
+        If any step fails, report the error and close browser immediately."""
         
         result = test_agent_mcp.run_test(test_description, verbose=False)
         

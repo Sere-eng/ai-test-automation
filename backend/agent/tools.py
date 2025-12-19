@@ -28,7 +28,14 @@ class PlaywrightTools:
             self.playwright = await async_playwright().start()
             self.browser = await self.playwright.chromium.launch(
                 headless=headless, # headless=True → Browser INVISIBILE (no interfaccia grafica)
-                args=['--disable-blink-features=AutomationControlled'] # Disabilita la proprietà navigator.webdriver -> Nasconde al sito web che il browser è controllato da automazione (Bypassa alcuni controlli anti-bot)
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins,site-per-process'
+                ] # Disabilita la proprietà navigator.webdriver -> Nasconde al sito web che il browser è controllato da automazione (Bypassa alcuni controlli anti-bot)
             )
 
             # SOLUZIONE COOKIE GOOGLE: Pre-imposta cookie di consenso
@@ -36,31 +43,6 @@ class PlaywrightTools:
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
                 locale='it-IT',
                 timezone_id='Europe/Rome',
-                # Storage state con Google consent già accettato
-                storage_state={
-                    'cookies': [
-                        {
-                            'name': 'CONSENT',
-                            'value': 'YES+cb.20241217-00-p0.it+FX+410',  # Consent accettato
-                            'domain': '.google.it',
-                            'path': '/',
-                            'expires': -1,  # Session cookie
-                            'httpOnly': False,
-                            'secure': True,
-                            'sameSite': 'Lax'
-                        },
-                        {
-                            'name': 'CONSENT',
-                            'value': 'YES+cb.20241217-00-p0.en+FX+410',
-                            'domain': '.google.com',
-                            'path': '/',
-                            'expires': -1,
-                            'httpOnly': False,
-                            'secure': True,
-                            'sameSite': 'Lax'
-                        }
-                    ]
-                },
                 viewport={'width': 1664, 'height': 1110}
             )
 
@@ -68,7 +50,7 @@ class PlaywrightTools:
             
             return {
                 "status": "success",
-                "message": "Browser avviato con successo (Google cookie consent pre-impostato)",
+                "message": "Browser avviato con successo (stealth mode)",
                 "headless": headless
             }
         except Exception as e:
@@ -475,7 +457,7 @@ class PlaywrightTools:
                         ]
                     })
                 except Exception as e:
-                    print(f"⚠️ Error inspecting input {idx}: {e}")
+                    print(f"Error inspecting input {idx}: {e}")
                     continue
             
             # Trova tutti i button
@@ -502,7 +484,7 @@ class PlaywrightTools:
                         ]
                     })
                 except Exception as e:
-                    print(f"⚠️ Error inspecting button {idx}: {e}")
+                    print(f"Error inspecting button {idx}: {e}")
                     continue
             
             # Trova form
@@ -522,7 +504,7 @@ class PlaywrightTools:
                         "id": form_id
                     })
                 except Exception as e:
-                    print(f"⚠️ Error inspecting form {idx}: {e}")
+                    print(f"Error inspecting form {idx}: {e}")
                     continue
             
             return {
@@ -541,5 +523,109 @@ class PlaywrightTools:
             return {
                 "status": "error",
                 "message": f"Errore nell'ispezione: {str(e)}"
-            }    
+            } 
+
+    async def handle_cookie_banner(self, strategies: list = None, timeout: int = 5000):
+        """
+        Gestisce automaticamente i banner dei cookie con strategie multiple
+        
+        Args:
+            strategies: Lista di strategie da provare (default: tutte)
+            timeout: Timeout per ogni tentativo in ms (default: 5000)
+        
+        Returns:
+            dict con status e strategia usata
+        
+        Strategies disponibili:
+            - "generic_accept": Bottoni generici "Accept"/"Accetta"
+            - "generic_agree": Bottoni generici "Agree"/"Acconsento"
+            - "reject_all": Bottoni "Reject all"/"Rifiuta tutto"
+        """
+        if not self.page:
+            return {
+                "status": "error",
+                "message": "Browser non avviato. Chiama start_browser() prima."
+            }
+        
+        # Default: prova tutte le strategie comuni
+        if strategies is None:
+            strategies = ["generic_accept", "generic_agree"]
+        
+        # Definizione selettori per ogni strategia
+        selectors_map = {
+            "generic_accept": [
+                "button:has-text('Accept')",
+                "button:has-text('Accetta')",
+                "button:has-text('Accepter')",
+                "button:has-text('Aceptar')",
+                "button:has-text('Akzeptieren')",
+                "a:has-text('Accept')",
+                "a:has-text('Accetta')"
+            ],
+            "generic_agree": [
+                "button:has-text('Agree')",
+                "button:has-text('Acconsento')",
+                "button:has-text('I agree')",
+                "button:has-text('Sono d\\'accordo')"
+            ],
+            "reject_all": [
+                "button:has-text('Reject all')",
+                "button:has-text('Rifiuta tutto')",
+                "button:has-text('Refuse')"
+            ]
+        }
+        
+        try:
+            # Aspetta la pagina carichi
+            await self.page.wait_for_timeout(1000)
+            
+            # Prova ogni strategia
+            for strategy in strategies:
+                if strategy not in selectors_map:
+                    continue
+                
+                selectors = selectors_map[strategy]
+                
+                for selector in selectors:
+                    try:
+                        # Controlla se elemento esiste ed è visibile
+                        element = self.page.locator(selector).first
+                        
+                        # Aspetta che sia visibile (con timeout breve)
+                        await element.wait_for(state="visible", timeout=timeout)
+                        
+                        # Clicca
+                        await element.click(timeout=timeout)
+                        
+                        # Aspetta che il banner sparisca
+                        await self.page.wait_for_timeout(1000)
+                        
+                        return {
+                            "status": "success",
+                            "message": f"Cookie banner gestito con strategia '{strategy}'",
+                            "strategy": strategy,
+                            "selector": selector,
+                            "clicked": True
+                        }
+                        
+                    except Exception:
+                        # Questo selettore non ha funzionato, prova il prossimo
+                        continue
+            
+            # Nessuna strategia ha funzionato
+            return {
+                "status": "success",
+                "message": "Nessun cookie banner trovato (o già accettato)",
+                "strategy": None,
+                "selector": None,
+                "clicked": False
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore durante gestione cookie banner: {str(e)}",
+                "strategy": None,
+                "clicked": False
+            }      
 

@@ -135,6 +135,22 @@ SCREENSHOT RULES:
   "show me the screenshot as base64" → use return_base64=True
   "I need the image data" → use return_base64=True
 
+SELECTOR DISCOVERY (CRITICAL):
+- NEVER guess selectors like #username, #password, #login-btn
+- When test says "fill username/password" without exact selectors:
+    1. Call inspect_page_structure() FIRST to discover page structure
+    2. Look in the output for input fields and their attributes
+    3. Use the suggested selectors from inspect_page_structure()
+- Example workflow for "login with user/pass":
+    * navigate_to_url("https://site.com")
+    * inspect_page_structure()  ← Discover selectors FIRST
+    * Read output: "input[name='username']", "input[name='password']"
+    * fill_input("input[name='username']", "myuser")
+    * fill_input("input[name='password']", "mypass")
+- Common selector patterns:
+    * input[name='fieldname'], input[type='email']
+    * button:has-text('Login'), a:has-text('Sign Up')
+
 STOPPING CONDITIONS:
 - When you see "STOP" or "After step X, STOP" in the test description
 - After close_browser() is called
@@ -157,7 +173,7 @@ Current date: {datetime.today().strftime('%Y-%m-%d')}
 
 Execute the test step by step and report the results clearly.
 """
-    
+        
     async def _initialize(self):
         """Inizializza il client MCP e l'agent"""
         if self._initialized:

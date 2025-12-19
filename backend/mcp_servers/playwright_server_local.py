@@ -4,6 +4,7 @@ MCP Server per Playwright Tools - ASYNC Version
 Comunicazione stdio (locale) compatibile con asyncio
 """
 
+import json
 from mcp.server.fastmcp import FastMCP
 import sys
 import os
@@ -166,6 +167,111 @@ async def get_page_info() -> str:
 - Viewport: {result['viewport']}"""
     else:
         return f"Errore: {result['message']}"
+
+@mcp.tool() 
+async def inspect_page_structure() -> str:
+    """
+    Inspects the current page structure to find selectors for forms, inputs, and buttons.
+    
+    This is extremely useful for debugging login forms or any interactive elements.
+    Returns detailed information about:
+    - All input fields (type, name, id, placeholder, suggested selectors)
+    - All buttons (text, type, id, suggested selectors)
+    - All forms (action, method, id)
+    
+    Use this when you need to figure out the correct selectors for a page you haven't seen before.
+    
+    Returns:
+        Detailed JSON structure with all page elements and suggested selectors
+    """
+    result = await playwright.inspect_page_structure()
+    
+    if result["status"] == "success":
+        # Formatta output in modo leggibile
+        output = f""" Page Structure Analysis Complete
+
+Page Info:
+   URL: {result['page_info']['url']}
+   Title: {result['page_info']['title']}
+
+INPUT FIELDS ({len(result['inputs'])}):
+"""
+        
+        for inp in result['inputs']:
+            output += f"\n   Input #{inp['index']}:"
+            output += f"\n      Type: {inp['type']}"
+            if inp['name']:
+                output += f"\n      Name: {inp['name']}"
+            if inp['id']:
+                output += f"\n      ID: {inp['id']}"
+            if inp['placeholder']:
+                output += f"\n      Placeholder: {inp['placeholder']}"
+            output += f"\n      Suggested selectors:"
+            for selector in inp['selector_suggestions']:
+                if selector:
+                    output += f"\n         - {selector}"
+            output += "\n"
+        
+        output += f"\n BUTTONS ({len(result['buttons'])}):\n"
+        
+        for btn in result['buttons']:
+            output += f"\n   Button #{btn['index']}:"
+            output += f"\n      Text: '{btn['text']}'"
+            if btn['type']:
+                output += f"\n      Type: {btn['type']}"
+            if btn['id']:
+                output += f"\n      ID: {btn['id']}"
+            output += f"\n      Suggested selectors:"
+            for selector in btn['selector_suggestions']:
+                if selector:
+                    output += f"\n         - {selector}"
+            output += "\n"
+        
+        if result['forms']:
+            output += f"\n FORMS ({len(result['forms'])}):\n"
+            for form in result['forms']:
+                output += f"\n   Form #{form['index']}:"
+                if form['action']:
+                    output += f"\n      Action: {form['action']}"
+                if form['method']:
+                    output += f"\n      Method: {form['method']}"
+                if form['id']:
+                    output += f"\n      ID: {form['id']}"
+                output += "\n"
+        
+        return output
+    else:
+        return f"Error: {result['message']}"
+
+
+@mcp.tool()
+async def handle_cookie_banner(
+    strategies: list[str] | None = None,
+    timeout: int = 5000
+) -> str:
+    """
+    Handles cookie consent banners automatically with multiple strategies.
+    
+    Args:
+        strategies: List of strategies to try (default: all common ones)
+                   Options: "google", "amazon", "generic_accept", "generic_agree", "reject_all"
+        timeout: Timeout per attempt in milliseconds (default: 5000)
+    
+    Returns:
+        JSON result with status and strategy used
+    
+    Example:
+        # Try all default strategies
+        handle_cookie_banner()
+        
+        # Try specific strategies only
+        handle_cookie_banner(strategies=["google", "amazon"])
+    """
+    result = await playwright.handle_cookie_banner(
+        strategies=strategies,
+        timeout=timeout
+    )
+    return json.dumps(result, indent=2)
 
 
 # Avvia il server MCP

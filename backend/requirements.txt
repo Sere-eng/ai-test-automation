@@ -10,6 +10,8 @@ flask-cors==5.0.0
 
 # Browser Automation
 playwright==1.49.1
+playwright-stealth==1.0.6  # Anti-bot detection
+setuptools>=65.0.0 # Per playwright-stealth
 
 # LangChain & LangGraph (AI Agent)
 langchain==0.3.21

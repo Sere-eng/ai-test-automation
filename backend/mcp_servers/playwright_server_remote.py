@@ -4,6 +4,7 @@ MCP Server per Playwright Tools - ASYNC Version
 Comunicazione HTTP (remoto) compatibile con asyncio
 """
 
+import json
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 import sys
@@ -251,6 +252,36 @@ INPUT FIELDS ({len(result['inputs'])}):
         return output
     else:
         return f"Error: {result['message']}"
+
+
+@mcp.tool()
+async def handle_cookie_banner(
+    strategies: list[str] | None = None,
+    timeout: int = 5000
+) -> str:
+    """
+    Handles cookie consent banners automatically with multiple strategies.
+    
+    Args:
+        strategies: List of strategies to try (default: all common ones)
+                   Options: "google", "amazon", "generic_accept", "generic_agree", "reject_all"
+        timeout: Timeout per attempt in milliseconds (default: 5000)
+    
+    Returns:
+        JSON result with status and strategy used
+    
+    Example:
+        # Try all default strategies
+        handle_cookie_banner()
+        
+        # Try specific strategies only
+        handle_cookie_banner(strategies=["google", "amazon"])
+    """
+    result = await playwright.handle_cookie_banner(
+        strategies=strategies,
+        timeout=timeout
+    )
+    return json.dumps(result, indent=2)
 
 
 # Avvia il server MCP su HTTP
