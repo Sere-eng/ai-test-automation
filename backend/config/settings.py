@@ -126,12 +126,12 @@ class AMCConfig:
     PASSWORD = os.getenv("AMC_PASSWORD", "")
     
     # Selettori verificati dall'ispezione
-    USERNAME_SELECTOR = "input[name='username']"
-    PASSWORD_SELECTOR = "input[name='password']"
-    LOGIN_BUTTON_SELECTOR = "button:has-text('Login')"  # Oppure 'Accedi'
+    # USERNAME_SELECTOR = "input[name='username']"
+    # PASSWORD_SELECTOR = "input[name='password']"
+    # LOGIN_BUTTON_SELECTOR = "button:has-text('Login')"  # Oppure 'Accedi'
     
     # Opzionale: checkbox profilo predefinito
-    USE_DEFAULT_PROFILE_CHECKBOX = "input[name='useDefaultProfiling']"
+    # USE_DEFAULT_PROFILE_CHECKBOX = "input[name='useDefaultProfiling']"
     
     @classmethod
     def validate(cls):

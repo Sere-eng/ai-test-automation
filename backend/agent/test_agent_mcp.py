@@ -151,6 +151,18 @@ SELECTOR DISCOVERY (CRITICAL):
     * input[name='fieldname'], input[type='email']
     * button:has-text('Login'), a:has-text('Sign Up')
 
+COOKIE CONSENT BANNERS:
+- Many sites show cookie consent banners (Google, Amazon, etc.)
+- Use the handle_cookie_banner() tool to handle these automatically
+- This tool tries multiple strategies: Google, Amazon, generic Accept buttons
+- RECOMMENDED WORKFLOW:
+1. navigate_to_url("https://example.com")
+2. handle_cookie_banner()  ← Call this right after navigation
+3. fill_input("textarea[name='q']", "AI test automation")
+4. press_key("Enter")
+5. wait_for_element("#search", state="visible")
+6. Continue with test actions (search, fill forms, etc.)
+
 STOPPING CONDITIONS:
 - When you see "STOP" or "After step X, STOP" in the test description
 - After close_browser() is called
@@ -159,14 +171,15 @@ STOPPING CONDITIONS:
 EXAMPLE WORKFLOW:
 1. start_browser(headless=False)
 2. navigate_to_url("https://example.com")
-3. click_element("#login-button")
-4. fill_input("#email", "test@test.com")
-5. fill_input("#password", "password123")
-6. click_element("#submit")
-7. wait_for_element(".success-message", state="visible")
-8. check_element_exists(".user-dashboard")
-9. capture_screenshot("test-result.png", , return_base64=False)
-10. close_browser()
+3. handle_cookie_banner()  if there is a cookie consent banner, otherwise skip and continue with step 4
+4. click_element("#login-button")
+5. fill_input("#email", "test@test.com")
+6. fill_input("#password", "password123")
+7. click_element("#submit")
+8. wait_for_element(".success-message", state="visible")
+9. check_element_exists(".user-dashboard")
+10. capture_screenshot("test-result.png", , return_base64=False)
+11. close_browser()
 → STOP HERE (do not continue after close_browser)
 
 Current date: {datetime.today().strftime('%Y-%m-%d')}

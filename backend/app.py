@@ -143,7 +143,7 @@ def agent_mcp_run_test():
         test_description = data['test_description']
         
         # Esegui il test con l'agent MCP (sincrono)
-        result = test_agent_mcp.run_test(test_description, verbose=False)
+        result = test_agent_mcp.run_test(test_description, verbose=True)
         
         response_data = {
             "status": "success",
@@ -297,17 +297,14 @@ def test_amc_login():
                 data = {}
                 
         # Costruzione descrizione del test
-        test_description = f"""Go to {AppConfig.AMC.URL}, fill the login form by inserting 
-        '{AppConfig.AMC.USERNAME}' in the field username and '{AppConfig.AMC.PASSWORD}' in the field password.
-
-        After clicking login:
-        1. Wait for body element to be visible
-        2. Close browser
+        test_description = f"""Go to {AppConfig.AMC.URL}, wait for the page to load, then fill the login form one field at a time: 
+        first enter '{AppConfig.AMC.USERNAME}' in the username field, then enter '{AppConfig.AMC.PASSWORD}' in the password field, then click the login button.
+        After login, wait for the page to load, then close the browser.
 
         IMPORTANT: After closing browser, STOP and report success. Do not continue with additional actions and iterations.
         If any step fails, report the error and close browser immediately."""
         
-        result = test_agent_mcp.run_test(test_description, verbose=False)
+        result = test_agent_mcp.run_test(test_description, verbose=True)
         
         return jsonify({
             "status": "success",
@@ -346,7 +343,7 @@ def test_amc_inspect():
         """
         
         print(f" Inspecting AMC login page structure...")
-        result = test_agent_mcp.run_test(test_description, verbose=False)
+        result = test_agent_mcp.run_test(test_description, verbose=True)
         
         return jsonify({
             "status": "success",

@@ -293,7 +293,7 @@ if __name__ == "__main__":
     print("  MCP Playwright Server (HTTP transport) - ASYNC Version")
     print("=" * 80)
     print(f"  Server URL: http://{host}:{port}/mcp/")
-    print(f"  Tool disponibili: 11")
+    print(f"  Tool disponibili: 13")
     print(f"  Per usarlo dall'agent, configura in config/settings.py:")
     print(f'  MCPConfig.MODE = "remote"')
     print(f'  MCPConfig.REMOTE_PORT = {port}')
