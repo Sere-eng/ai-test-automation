@@ -47,6 +47,8 @@ Questo sistema permette di:
 - ✅ **Smart Locators** per enterprise apps (Angular/React/Vue) con retry automatico
 - ✅ **Procedural Tools** per workflow complessi (iframe, navigation, search)
 - ✅ **AJAX handling** automatico per caricamenti dinamici
+- ✅ **Performance-optimized**: retry=1 + 3-level fallback (normale → force → JS click)
+- ✅ **Robust error handling**: AI agent con istruzioni prominenti per gestione fallimenti
 
 ---
 
@@ -109,6 +111,60 @@ Questo sistema permette di:
 │  - Page structure analysis                  │
 └─────────────────────────────────────────────┘
 ```
+
+---
+
+## ⚡ Performance Optimizations (v3.0)
+
+### Smart Retry Strategy
+
+**Problema**: Retry eccessivi rallentano i test (~18s per elemento con 3 retry × 3 strategie × 2s timeout)
+
+**Soluzione implementata**:
+- ✅ **max_retries = 1** (ridotto da 3) in `click_smart()` e `fill_smart()`
+- ✅ **3-level fallback** compenso: normale click → force click → JS click
+- ✅ **Active waiting** invece di retry loop: `wait_for_element(..., state="visible")`
+
+**Risultato**: ~6s per elemento (66% più veloce) mantenendo robustezza
+
+### Fallback Chain
+
+```python
+# Try 1: CLICK NORMALE con RETRY (preferito - più sicuro)
+await locator.click()  # Verifica visibilità, actionability, stabilità
+
+# Try 2: FORCE CLICK (bypassa actionability, serve visibilità)
+await locator.click(force=True)  # Per DIV con role="button" (Angular Material)
+
+# Try 3: JAVASCRIPT CLICK (bypassa TUTTO - last resort)
+await element.evaluate("el => el.click()")  # Per elementi off-viewport, opacity:0
+```
+
+### AI Agent Error Handling
+
+**System prompt ottimizzato** con istruzioni prominenti:
+
+```markdown
+⚠️ ERROR HANDLING (MANDATORY - READ FIRST):
+When ANY tool returns an error or timeout:
+1) IMMEDIATELY call capture_screenshot()
+2) IMMEDIATELY call close_browser()
+3) STOP - do NOT attempt alternative approaches
+```
+
+**Benefici**:
+- Browser sempre chiuso (no processi zombie)
+- Screenshot catturati su ogni errore (debugging)
+- Comportamento deterministico (no loop infiniti)
+
+### Playwright Native Waits
+
+Sostituiti `asyncio.sleep()` con `page.wait_for_timeout()` (7 posizioni):
+- ✅ Semanticamente corretto per operazioni browser
+- ✅ Gestito dal loop di Playwright (no blocking asyncio event loop)
+- ✅ Coerenza con altri wait methods (`wait_for_load_state`, `wait_for_element`)
+
+---
 
 ### Vantaggi di MCP
 
