@@ -1,6 +1,6 @@
 Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**, LLM (Large Language Models) e Playwright per automatizzare test di interfacce web con architettura enterprise-ready.
 
-![Tools](https://img.shields.io/badge/Playwright_Tools-21-blue)
+![Tools](https://img.shields.io/badge/Playwright_Tools-19-blue)
 ![Version](https://img.shields.io/badge/version-3.0.0--discovery-green)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![MCP](https://img.shields.io/badge/MCP-1.12.3-purple)
@@ -15,19 +15,23 @@ Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**
 - [Struttura del Progetto](#-struttura-del-progetto)
 - [Setup Completo](#-setup-completo)
 - [Configurazione LLM (OpenAI / Azure / OpenRouter)](#-configurazione-llm-openai--azure--openrouter)
-- [Tool Playwright Disponibili](#️-tool-playwright-disponibili)
-  - [1. start_browser](#1-start_browserheadless-bool--false)
-  - [2. navigate_to_url](#2-navigate_to_urlurl-str)
-  - [3. click_element](#3-click_elementselector-str-selector_type-str--css-timeout-int--30000)
-  - [4. fill_input](#4-fill_inputselector-str-value-str-selector_type-str--css-clear_first-bool--true)
-  - [5. wait_for_element](#5-wait_for_elementselector-str-state-str--visible-selector_type-str--css-timeout-int--30000)
-  - [6. get_text](#6-get_textselector-str-selector_type-str--css)
-  - [7. check_element_exists](#7-check_element_existsselector-str-selector_type-str--css)
-  - [8. press_key](#8-press_keykey-str)
-  - [9. capture_screenshot](#9-capture_screenshotfilename-str--none-return_base64-bool--false-)
-  - [10. close_browser](#10-close_browser)
-  - [11. get_page_info](#11-get_page_info)
-  - [12. inspect_page_structure](#12-inspect_page_structure-)
+- [Tool Playwright Disponibili (19 tools)](#️-tool-playwright-disponibili)
+  - [Discovery Tools](#-discovery-tools-discovery-first-workflow)
+    - [inspect_interactive_elements](#inspect_interactive_elements)
+  - [Smart Locators](#-smart-locators-enterprise-apps---retry-automatico)
+    - [click_smart](#click_smarttargets-listdict-timeout_per_try-int--2000)
+    - [fill_smart](#fill_smarttargets-listdict-value-str-timeout_per_try-int--2000)
+  - [Procedural Tools](#-procedural-tools-workflow-complessi)
+    - [get_frame](#get_frameselector-str--none-url_pattern-str--none-timeout-int--10000)
+    - [fill_and_search](#fill_and_searchinput_selector-str-search_value-str-verify_result_text-str--none-in_iframe-dict--none-timeout-int--10000)
+  - [Base Tools](#-base-tools)
+    - [start_browser, navigate_to_url, click_element, fill_input](#1-start_browserheadless-bool--false)
+    - [wait_for_element, wait_for_load_state, wait_for_text_content](#5-wait_for_elementselector-str-state-str--visible-selector_type-str--css-timeout-int--30000)
+    - [get_text, check_element_exists, press_key](#6-get_textselector-str-selector_type-str--css)
+    - [capture_screenshot, close_browser, get_page_info](#9-capture_screenshotfilename-str--none-return_base64-bool--false-)
+    - [handle_cookie_banner](#handle_cookie_bannerstrategies-liststr--none-timeout-int--5000)
+  - [Legacy Tools (Deprecati)](#-legacy-tools-deprecati)
+    - [inspect_page_structure](#inspect_page_structure)
 - [API Endpoints](#-api-endpoints)
 - [Esempi di Utilizzo](#-esempi-di-utilizzo)
 - [MCP: Locale vs Remoto](#-mcp-locale-vs-remoto)
@@ -536,11 +540,11 @@ OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
 
 ## 🛠️ Tool Playwright Disponibili
 
-Il sistema espone **21 tool async** tramite MCP Server, suddivisi in:
+Il sistema espone **19 tool async** tramite MCP Server, suddivisi in:
 - **Base Tools** (10): browser, navigation, interaction, assertions
-- **Discovery Tools** (2): inspect_interactive_elements, inspect_dom_changes
-- **Smart Locators** (2): click_smart, fill_smart (retry automatico)
-- **Procedural Tools** (3): get_frame, navigate_and_wait, fill_and_search
+- **Discovery Tools** (1): inspect_interactive_elements
+- **Smart Locators** (2): click_smart, fill_smart (retry automatico + fallback chain)
+- **Procedural Tools** (2): get_frame, fill_and_search
 - **Legacy** (1): inspect_page_structure (deprecato)
 
 ### \ud83d\udd0d Discovery Tools (DISCOVERY-FIRST WORKFLOW)
@@ -635,13 +639,13 @@ result = inspect_interactive_elements()
 username_field = [f for f in result['form_fields'] if 'username' in f['accessible_name'].lower()][0]
 login_button = [e for e in result['clickable_elements'] if 'login' in e['accessible_name'].lower()][0]
 
-# Step 4: COPY payload da playwright_suggestions (first = most reliable)
-user_strategy = username_field['playwright_suggestions'][0]['fill_smart']
-login_strategy = login_button['playwright_suggestions'][0]['click_smart']
+# Step 4: EXTRACT ALL strategies from playwright_suggestions (fallback chain)
+user_strategies = [s['fill_smart'] for s in username_field['playwright_suggestions']]
+login_strategies = [s['click_smart'] for s in login_button['playwright_suggestions']]
 
-# Step 5: USE payload (NO modifiche)
-fill_smart([user_strategy], "testuser")
-click_smart([login_strategy])
+# Step 5: USE ALL strategies (fallback automatico: prova tutte finché una funziona)
+fill_smart(user_strategies, "testuser")  # Prova: label → placeholder → role → css
+click_smart(login_strategies)  # Prova: role → text → css
 
 # Step 6: Dopo navigation, REPEAT (inspect again)
 wait_for_navigation()

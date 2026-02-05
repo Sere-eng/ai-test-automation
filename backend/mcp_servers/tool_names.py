@@ -15,7 +15,7 @@ TOOL_NAMES = [
     "click_smart",
     "fill_smart",
     "wait_for_text_content",
-    "inspect_dom_changes",
+    # "inspect_dom_changes",  # DEBUG ONLY - rimosso per evitare confusione AI
     # Procedural tools
     "get_frame",
     "fill_and_search"

@@ -1368,7 +1368,7 @@ class PlaywrightTools:
 
             # 2. Riempie campo
             await context.fill(input_selector, search_value)
-            await asyncio.sleep(1)  # Aspetta risultati
+            await context.wait_for_timeout(1000)  # Aspetta risultati
 
             # 3. Verifica risultato (se specificato)
             if verify_result_text:

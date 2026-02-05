@@ -50,7 +50,7 @@ class LLMConfig:
     
     # OpenRouter (priorità 1)
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")  # Default: Claude Sonnet per migliore reasoning
     
     # Azure OpenAI (priorità 2)
     AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
@@ -104,7 +104,7 @@ class PlaywrightConfig:
     
     HEADLESS = os.getenv("PLAYWRIGHT_HEADLESS", "false").lower() == "true"
     TIMEOUT = int(os.getenv("PLAYWRIGHT_TIMEOUT", "30000"))
-    VIEWPORT_WIDTH = int(os.getenv("PLAYWRIGHT_VIEWPORT_WIDTH", "1920"))
+    VIEWPORT_WIDTH = int(os.getenv("PLAYWRIGHT_VIEWPORT_WIDTH", "960"))
     VIEWPORT_HEIGHT = int(os.getenv("PLAYWRIGHT_VIEWPORT_HEIGHT", "1080"))
     LOCALE = os.getenv("PLAYWRIGHT_LOCALE", "it-IT")
     TIMEZONE = os.getenv("PLAYWRIGHT_TIMEZONE", "Europe/Rome")

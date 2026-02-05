@@ -308,7 +308,7 @@ async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive:
     return to_json(result)
 
 
-@mcp.tool()
+# @mcp.tool()  # DEBUG ONLY - disabilitato per evitare confusione AI
 async def inspect_dom_changes(click_target: dict, wait_after_click: int = 2000) -> str:
     """
     Ispeziona cosa cambia nel DOM dopo un click (diagnostico).

@@ -259,10 +259,13 @@ class TestAgentMCP:
     HOW TO USE inspect OUTPUT (CRITICAL - COPY EXACTLY):
     1. Call inspect_interactive_elements()
     2. Read the output to find your target element
-    3. COPY the payload from playwright_suggestions[0] (first strategy = most reliable)
-    4. Paste it directly into click_smart(targets=[...]) or fill_smart(targets=[...], value="...")
+    3. COPY **ALL** payloads from playwright_suggestions (not just [0]!)
+    4. Pass the complete list to click_smart(targets=[strategy1, strategy2, ...])
     
-    CRITICAL: targets is ALWAYS an array, even with one strategy!
+    ⚠️ CRITICAL: Use ALL strategies for robustness (fallback chain)
+    - DO NOT use only playwright_suggestions[0]
+    - Copy ALL items from the array: [strategy1, strategy2, strategy3, ...]
+    - click_smart will try them in order until one works
     
     EXAMPLE WORKFLOW (Login → Menu Navigation):
     ```
@@ -274,9 +277,16 @@ class TestAgentMCP:
     # Output shows:
     # form_fields[0]: {{"accessible_name": "Username", "playwright_suggestions": [{{"fill_smart": {{"by": "label", "label": "Username"}}}}]}}
     # form_fields[1]: {{"accessible_name": "Password", "playwright_suggestions": [{{"fill_smart": {{"by": "label", "label": "Password"}}}}]}}
-    # clickable_elements[0]: {{"accessible_name": "Login", "playwright_suggestions": [{{"click_smart": {{"by": "role", "role": "button", "name": "Login"}}}}]}}
+    # clickable_elements[5]: {{
+    #   "accessible_name": "Micrologistica",
+    #   "playwright_suggestions": [
+    #     {{"click_smart": {{"by": "role", "role": "button", "name": "Micrologistica"}}}},
+    #     {{"click_smart": {{"by": "text", "text": "Micrologistica"}}}},
+    #     {{"click_smart": {{"by": "css", "selector": "[aria-label='Micrologistica']"}}}}
+    #   ]
+    # }}
     
-    # Step 3: COPY payloads from inspect output (wrap in array!)
+    # Step 3: COPY **ALL** payloads (extract from suggestions array!)
     # ⚠️ Use the EXACT name from inspect - on AMC it's "Login", not "Accedi"
     fill_smart(targets=[{{"by": "label", "label": "Username"}}], value="user@example.com")
     fill_smart(targets=[{{"by": "label", "label": "Password"}}], value="password123")
@@ -284,11 +294,22 @@ class TestAgentMCP:
     
     # Step 4: After navigation, DISCOVER again
     inspect_interactive_elements()
-    # Output shows:
-    # clickable_elements[3]: {{"accessible_name": "Micrologistica", "playwright_suggestions": [{{"click_smart": {{"by": "role", "role": "button", "name": "Micrologistica"}}}}]}}
+    # Output shows multiple strategies for Micrologistica:
+    # clickable_elements[5]: {{
+    #   "accessible_name": "Micrologistica",
+    #   "playwright_suggestions": [
+    #     {{"click_smart": {{"by": "role", "role": "button", "name": "Micrologistica"}}}},
+    #     {{"click_smart": {{"by": "text", "text": "Micrologistica"}}}},
+    #     {{"click_smart": {{"by": "css", "selector": "[aria-label='Micrologistica']"}}}}
+    #   ]
+    # }}
     
-    # Step 5: COPY and use (always wrap in array!)
-    click_smart(targets=[{{"by": "role", "role": "button", "name": "Micrologistica"}}])
+    # Step 5: COPY **ALL 3 strategies** from suggestions array (fallback chain!)
+    click_smart(targets=[
+        {{"by": "role", "role": "button", "name": "Micrologistica"}},
+        {{"by": "text", "text": "Micrologistica"}},
+        {{"by": "css", "selector": "[aria-label='Micrologistica']"}}
+    ])
     ```
     
     STRATEGY PRIORITY (from inspect output - DO NOT REORDER):
