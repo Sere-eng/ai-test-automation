@@ -1,286 +1,293 @@
 # backend/mcp_servers/playwright_server_local.py
 """
-MCP Server per Playwright Tools - ASYNC Version
-Comunicazione stdio (locale) compatibile con asyncio
+MCP Server per Playwright Tools - ASYNC Version (LOCAL)
+Trasporto: stdio (subprocess)
+Output: JSON string uniforme per tutti i tool
 """
 
 import json
-from mcp.server.fastmcp import FastMCP
 import sys
 import os
+from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
+from tool_names import TOOL_NAMES
 
-# Aggiungi la cartella parent al path per importare tools
+load_dotenv()
+
+# Permette import da backend/
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agent.tools import PlaywrightTools
 
-# Crea il server MCP
+from agent.tools import PlaywrightTools  # noqa: E402
+from config.settings import AppConfig    # noqa: E402
+
+# MCP server (stdio)
 mcp = FastMCP("PlaywrightTools")
 
-# Istanza globale dei tool Playwright
+# Istanza globale tool Playwright (stato condiviso nella sessione MCP)
 playwright = PlaywrightTools()
 
 
+def to_json(result: dict) -> str:
+    """Standard output: sempre JSON string."""
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+# =========================
+# Tool base browser
+# =========================
+
 @mcp.tool()
 async def start_browser(headless: bool = False) -> str:
-    """Avvia il browser Chromium per i test."""
-    result = await playwright.start_browser(headless)
-    
-    if result["status"] == "success":
-        return f"Browser avviato con successo (headless={headless})"
-    else:
-        return f"Errore nell'avviare il browser: {result['message']}"
+    """Avvia browser Chromium."""
+    result = await playwright.start_browser(headless=headless)
+    return to_json(result)
 
 
 @mcp.tool()
 async def navigate_to_url(url: str) -> str:
-    """Naviga a un URL specifico e aspetta il caricamento della pagina."""
+    """Naviga verso un URL e aspetta il caricamento."""
     result = await playwright.navigate_to_url(url)
-    
-    if result["status"] == "success":
-        return f"Navigato a {result['url']}\nTitolo pagina: {result['page_title']}"
-    else:
-        return f"Errore nella navigazione: {result['message']}"
+    return to_json(result)
+
+@mcp.tool()
+async def wait_for_load_state(state: str = "domcontentloaded", timeout: int = 30000) -> str:
+    """Attende un load state Playwright (load/domcontentloaded/networkidle)."""
+    result = await playwright.wait_for_load_state(state=state, timeout=timeout)
+    return to_json(result)
 
 
 @mcp.tool()
-async def click_element(selector: str, selector_type: str = "css", timeout: int = 30000) -> str:
-    """Clicca su un elemento della pagina web."""
-    result = await playwright.click_element(selector, selector_type, timeout)
-    
-    if result["status"] == "success":
-        return f"Click eseguito su elemento: {selector} ({selector_type})"
-    else:
-        return f"Errore nel click: {result['message']}\nSelector: {selector}"
-
-
-@mcp.tool()
-async def fill_input(selector: str, value: str, selector_type: str = "css", clear_first: bool = True) -> str:
-    """Compila un campo input con del testo."""
-    result = await playwright.fill_input(selector, value, selector_type, clear_first)
-    
-    if result["status"] == "success":
-        display_value = "***" if "password" in selector.lower() else value
-        return f"Campo compilato: {selector} = {display_value}"
-    else:
-        return f"Errore nella compilazione: {result['message']}\nSelector: {selector}"
-
-
-@mcp.tool()
-async def wait_for_element(selector: str, state: str = "visible", selector_type: str = "css", timeout: int = 30000) -> str:
-    """Aspetta che un elemento appaia o scompaia dalla pagina. FONDAMENTALE per caricamenti AJAX!"""
-    result = await playwright.wait_for_element(selector, selector_type, state, timeout)
-    
-    if result["status"] == "success":
-        return f"Elemento {selector} è ora {state}"
-    else:
-        return f"Timeout: elemento {selector} non è diventato {state}\n{result['message']}"
-
-
-@mcp.tool()
-async def get_text(selector: str, selector_type: str = "css") -> str:
-    """Estrae il testo visibile da un elemento della pagina."""
-    result = await playwright.get_text(selector, selector_type)
-    
-    if result["status"] == "success":
-        return f"Testo estratto da {selector}:\n{result['text']}"
-    else:
-        return f"Errore nell'estrazione del testo: {result['message']}"
-
-
-@mcp.tool()
-async def check_element_exists(selector: str, selector_type: str = "css") -> str:
-    """Verifica se un elemento esiste ed è visibile nella pagina."""
-    result = await playwright.check_element_exists(selector, selector_type)
-    
-    if result["status"] == "success":
-        exists = result["exists"]
-        visible = result["is_visible"]
-        
-        if exists and visible:
-            return f"Elemento {selector} esiste ed è visibile"
-        elif exists and not visible:
-            return f"Elemento {selector} esiste ma NON è visibile"
-        else:
-            return f"Elemento {selector} NON esiste nella pagina"
-    else:
-        return f"Errore nella verifica: {result['message']}"
-
-
-@mcp.tool()
-async def press_key(key: str) -> str:
-    """Simula la pressione di un tasto speciale."""
-    result = await playwright.press_key(key)
-    
-    if result["status"] == "success":
-        return f"Tasto premuto: {key}"
-    else:
-        return f"Errore: {result['message']}"
-
-
-mcp.tool()
 async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
     """
-    Cattura uno screenshot full-page della pagina corrente.
-    
-    Args:
-        filename: Nome file per reference (opzionale)
-        return_base64: Se True, include il base64 nella risposta. 
-                       ATTENZIONE: aumenta i token! Usa solo se necessario.
-    
-    Returns:
-        Conferma con metadata. Se return_base64=True, include anche il base64.
+    Cattura screenshot full-page.
+    Se return_base64=True include base64 nel JSON (attenzione ai token).
     """
-    result = await playwright.capture_screenshot(filename, return_base64)
-    
-    if result["status"] == "success":
-        response = f"Screenshot catturato: {result['filename']} ({result['size_bytes']} bytes)"
-        
-        # Include base64 SOLO se richiesto
-        if return_base64 and "base64" in result:
-            response += f"\n\n SCREENSHOT_BASE64:\n{result['base64']}"
-        
-        return response
-    else:
-        return f"Errore nello screenshot: {result['message']}"
+    result = await playwright.capture_screenshot(filename=filename, return_base64=return_base64)
+    return to_json(result)
 
 
 @mcp.tool()
 async def close_browser() -> str:
-    """Chiude il browser e libera tutte le risorse."""
+    """Chiude il browser e libera risorse."""
     result = await playwright.close_browser()
-    
-    if result["status"] == "success":
-        return "Browser chiuso correttamente"
-    else:
-        return f"Errore nella chiusura: {result['message']}"
+    return to_json(result)
 
 
 @mcp.tool()
 async def get_page_info() -> str:
-    """Ottiene informazioni sulla pagina corrente (URL, titolo, viewport)."""
+    """Ritorna info sulla pagina corrente (url, title, viewport)."""
     result = await playwright.get_page_info()
-    
-    if result["status"] == "success":
-        return f"""Informazioni pagina corrente:
-- URL: {result['url']}
-- Titolo: {result['title']}
-- Viewport: {result['viewport']}"""
-    else:
-        return f"Errore: {result['message']}"
+    return to_json(result)
 
-@mcp.tool() 
-async def inspect_page_structure() -> str:
-    """
-    Inspects the current page structure to find selectors for forms, inputs, and buttons.
-    
-    This is extremely useful for debugging login forms or any interactive elements.
-    Returns detailed information about:
-    - All input fields (type, name, id, placeholder, suggested selectors)
-    - All buttons (text, type, id, suggested selectors)
-    - All forms (action, method, id)
-    
-    Use this when you need to figure out the correct selectors for a page you haven't seen before.
-    
-    Returns:
-        Detailed JSON structure with all page elements and suggested selectors
-    """
-    result = await playwright.inspect_page_structure()
-    
-    if result["status"] == "success":
-        # Formatta output in modo leggibile
-        output = f""" Page Structure Analysis Complete
 
-Page Info:
-   URL: {result['page_info']['url']}
-   Title: {result['page_info']['title']}
+# =========================
+# Tool interazione pagina
+# =========================
 
-INPUT FIELDS ({len(result['inputs'])}):
-"""
-        
-        for inp in result['inputs']:
-            output += f"\n   Input #{inp['index']}:"
-            output += f"\n      Type: {inp['type']}"
-            if inp['name']:
-                output += f"\n      Name: {inp['name']}"
-            if inp['id']:
-                output += f"\n      ID: {inp['id']}"
-            if inp['placeholder']:
-                output += f"\n      Placeholder: {inp['placeholder']}"
-            output += f"\n      Suggested selectors:"
-            for selector in inp['selector_suggestions']:
-                if selector:
-                    output += f"\n         - {selector}"
-            output += "\n"
-        
-        output += f"\n BUTTONS ({len(result['buttons'])}):\n"
-        
-        for btn in result['buttons']:
-            output += f"\n   Button #{btn['index']}:"
-            output += f"\n      Text: '{btn['text']}'"
-            if btn['type']:
-                output += f"\n      Type: {btn['type']}"
-            if btn['id']:
-                output += f"\n      ID: {btn['id']}"
-            output += f"\n      Suggested selectors:"
-            for selector in btn['selector_suggestions']:
-                if selector:
-                    output += f"\n         - {selector}"
-            output += "\n"
-        
-        if result['forms']:
-            output += f"\n FORMS ({len(result['forms'])}):\n"
-            for form in result['forms']:
-                output += f"\n   Form #{form['index']}:"
-                if form['action']:
-                    output += f"\n      Action: {form['action']}"
-                if form['method']:
-                    output += f"\n      Method: {form['method']}"
-                if form['id']:
-                    output += f"\n      ID: {form['id']}"
-                output += "\n"
-        
-        return output
-    else:
-        return f"Error: {result['message']}"
+@mcp.tool()
+async def click_element(selector: str, selector_type: str = "css", timeout: int = 30000) -> str:
+    """Click su elemento."""
+    result = await playwright.click_element(selector=selector, selector_type=selector_type, timeout=timeout)
+    return to_json(result)
 
 
 @mcp.tool()
-async def handle_cookie_banner(
-    strategies: list[str] | None = None,
-    timeout: int = 5000
+async def fill_input(
+    selector: str,
+    value: str,
+    selector_type: str = "css",
+    clear_first: bool = True
 ) -> str:
-    """
-    Handles cookie consent banners automatically with multiple strategies.
-    
-    Args:
-        strategies: List of strategies to try (default: all common ones)
-                   Options: "google", "amazon", "generic_accept", "generic_agree", "reject_all"
-        timeout: Timeout per attempt in milliseconds (default: 5000)
-    
-    Returns:
-        JSON result with status and strategy used
-    
-    Example:
-        # Try all default strategies
-        handle_cookie_banner()
-        
-        # Try specific strategies only
-        handle_cookie_banner(strategies=["google", "amazon"])
-    """
-    result = await playwright.handle_cookie_banner(
-        strategies=strategies,
+    """Compila un input."""
+    result = await playwright.fill_input(
+        selector=selector,
+        value=value,
+        selector_type=selector_type,
+        clear_first=clear_first
+    )
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_element(
+    selector: str,
+    state: str = "visible",
+    selector_type: str = "css",
+    timeout: int = 30000
+) -> str:
+    """Attende che un elemento diventi visible/hidden/attached/detached."""
+    result = await playwright.wait_for_element(
+        selector=selector,
+        selector_type=selector_type,
+        state=state,
         timeout=timeout
     )
-    return json.dumps(result, indent=2)
+    return to_json(result)
 
 
-# Avvia il server MCP
+@mcp.tool()
+async def get_text(selector: str, selector_type: str = "css") -> str:
+    """Estrae testo da elemento."""
+    result = await playwright.get_text(selector=selector, selector_type=selector_type)
+    return to_json(result)
+
+
+@mcp.tool()
+async def check_element_exists(selector: str, selector_type: str = "css") -> str:
+    """Verifica esistenza/visibilità di un elemento."""
+    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type)
+    return to_json(result)
+
+
+@mcp.tool()
+async def press_key(key: str) -> str:
+    """Premi un tasto (Enter/Escape/etc.)."""
+    result = await playwright.press_key(key=key)
+    return to_json(result)
+
+
+# =========================
+# Tool avanzati
+# =========================
+
+@mcp.tool()
+async def inspect_interactive_elements() -> str:
+    """
+    Ispeziona elementi interattivi (clickable, form fields, iframes).
+    Genera strategie pronte per click_smart e fill_smart.
+    """
+    result = await playwright.inspect_interactive_elements()
+    return to_json(result)
+
+
+@mcp.tool()
+async def handle_cookie_banner(strategies: list[str] | None = None, timeout: int = 5000) -> str:
+    """
+    Gestisce cookie banner con strategie multiple.
+    Output: JSON con strategia usata e selector cliccato (se trovato).
+    """
+    result = await playwright.handle_cookie_banner(strategies=strategies, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
+async def click_smart(targets: list[dict], timeout_per_try: int = 2000) -> str:
+    """
+    Click enterprise con strategie multiple.
+    Prova role → text → css_aria → tfa finché uno funziona.
+    targets: [{"by": "role", "role": "button", "name": "Login"}, ...]
+    """
+    result = await playwright.click_smart(targets=targets, timeout_per_try=timeout_per_try)
+    return to_json(result)
+
+
+@mcp.tool()
+async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 2000) -> str:
+    """
+    Fill enterprise con strategie multiple.
+    Prova label → placeholder → role → css → tfa finché uno funziona.
+    targets: [{"by": "label", "label": "Username"}, ...]
+    """
+    result = await playwright.fill_smart(targets=targets, value=value, timeout_per_try=timeout_per_try)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False) -> str:
+    """
+    Attende che un testo appaia nel DOM.
+    Utile per verificare stato della pagina dopo azioni.
+    """
+    result = await playwright.wait_for_text_content(text=text, timeout=timeout, case_sensitive=case_sensitive)
+    return to_json(result)
+
+
+@mcp.tool()
+async def inspect_dom_changes(click_target: dict, wait_after_click: int = 2000) -> str:
+    """
+    Click su elemento e ispeziona cambiamenti DOM (elementi aggiunti/rimossi).
+    Utile per debug di menu dinamici/modali.
+    click_target: {"by": "role", "role": "button", "name": "Menu"}
+    """
+    result = await playwright.inspect_dom_changes(click_target=click_target, wait_after_click=wait_after_click)
+    return to_json(result)
+
+
+# =========================
+# Tool procedurali (workflow complessi)
+# =========================
+
+@mcp.tool()
+async def get_frame(selector: str = None, url_pattern: str = None, timeout: int = 10000) -> str:
+    """
+    Accesso semplificato a iframe.
+    Usa selector CSS oppure url_pattern.
+    Ritorna SOLO metadata serializzabile (non l'oggetto Frame).
+    Per interagire dentro iframe, usa fill_and_search(..., in_iframe={...}).
+    """
+    result = await playwright.get_frame(selector=selector, url_pattern=url_pattern, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
+async def fill_and_search(
+    input_selector: str,
+    search_value: str,
+    verify_result_text: str = None,
+    in_iframe: dict = None,
+    timeout: int = 10000
+) -> str:
+    """
+    Fill + verifica risultato (procedural per ricerche).
+    in_iframe: {"url_pattern": "movementreason"} oppure {"selector": "iframe#app"}
+    verify_result_text: "CARMAG" (testo da cercare nel DOM dopo fill)
+    """
+    result = await playwright.fill_and_search(
+        input_selector=input_selector,
+        search_value=search_value,
+        verify_result_text=verify_result_text,
+        in_iframe=in_iframe,
+        timeout=timeout
+    )
+    return to_json(result)
+
+
+@mcp.tool()
+async def inspect_page_structure() -> str:
+    """
+    DEPRECATED: Usa inspect_interactive_elements() invece.
+    Mantenu per compatibilità con codice legacy.
+    """
+    result = await playwright.inspect_interactive_elements()
+    return to_json(result)
+
+
+@mcp.tool()
+async def handle_cookie_banner(strategies: list[str] | None = None, timeout: int = 5000) -> str:
+    """
+    Gestisce cookie banner con strategie multiple.
+    Output: JSON con strategia usata e selector cliccato (se trovato).
+    """
+    result = await playwright.handle_cookie_banner(strategies=strategies, timeout=timeout)
+    return to_json(result)
+
+
+# =========================
+# Avvio (stdio)
+# =========================
+
 if __name__ == "__main__":
     print("=" * 80)
-    print("MCP Playwright Server (stdio transport) - ASYNC Version")
+    print("  MCP Playwright Server (STDIO) - ASYNC Version")
     print("=" * 80)
-    print("   Questo server comunica tramite stdin/stdout")
-    print("   Tool disponibili: 11")
+    print("  Transport: stdio")
+    print(f"  MCP Mode (config): {AppConfig.MCP.MODE}")
+    print(f"  Tool disponibili: {len(TOOL_NAMES)}")
+    print("  Tool list:")
+    for name in TOOL_NAMES:
+        print(f"   - {name}")
     print("=" * 80)
-    
+
+    # Per stdio basta run() senza specificare transport (default stdio in FastMCP),
+    # ma lo esplicitiamo per chiarezza.
     mcp.run(transport="stdio")

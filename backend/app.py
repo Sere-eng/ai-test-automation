@@ -4,14 +4,14 @@ Flask API Server per AI Test Automation con MCP.
 Espone endpoint REST per l'AI Agent MCP e i tool Playwright.
 """
 
+import re
 from flask import Flask, jsonify, request, Response, stream_with_context
 from flask_cors import CORS
-from agent.tools import PlaywrightTools
+# from agent.tools import PlaywrightTools
 from config.settings import AppConfig
 import json
 import asyncio
 from datetime import datetime
-import re
 
 # Valida configurazione all'avvio
 AppConfig.validate_all()
@@ -21,7 +21,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Istanza globale dei tool Playwright (per endpoint diretti)
-playwright_tools = PlaywrightTools()
+# playwright_tools = PlaywrightTools()
 
 # Flag per indicare se l'AI Agent MCP è disponibile
 AGENT_MCP_AVAILABLE = False
@@ -42,6 +42,7 @@ except ImportError as e:
 
 # ==================== ENDPOINT BASE ====================
 
+
 @app.route('/')
 def home():
     return jsonify({
@@ -49,19 +50,22 @@ def home():
         "status": "online",
         "version": "2.0.0-mcp",
         "features": {
-            "playwright_tools": True,
+            "playwright_tools": "via_mcp",
+            "direct_browser_endpoints": "disabled",
             "ai_agent_mcp": AGENT_MCP_AVAILABLE,
             "mcp_protocol": "1.12.3"
         },
         "timestamp": datetime.now().isoformat()
     })
 
+
 @app.route('/api/health')
 def health():
     return jsonify({
         "status": "healthy",
         "service": "AI Test Automation Backend (MCP)",
-        "playwright": "ready",
+        "playwright_tools": "via_mcp",
+        "direct_browser_endpoints": "disabled",
         "agent_mcp": "ready" if AGENT_MCP_AVAILABLE else "not_available"
     })
 
@@ -69,61 +73,67 @@ def health():
 # Questi endpoint chiamano direttamente i tool Playwright
 # (senza passare per MCP - utile per testing diretto)
 
+
 @app.route('/api/browser/start', methods=['POST'])
 def start_browser():
     """Avvia il browser Chromium"""
     try:
-        data = request.get_json() or {}
-        headless = data.get('headless', False)
-        
-        result = playwright_tools.start_browser(headless=headless)
-        return jsonify(result)
+        return jsonify({
+            "status": "disabled",
+            "message": "This endpoint is disabled. Use /api/agent/mcp/test/run via MCP."
+        }), 410
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/browser/navigate', methods=['POST'])
 def navigate():
     """Naviga a un URL"""
     try:
-        data = request.get_json()
-        if not data or 'url' not in data:
-            return jsonify({"status": "error", "message": "URL mancante"}), 400
-        
-        result = playwright_tools.navigate_to_url(data['url'])
-        return jsonify(result)
+        return jsonify({
+            "status": "disabled",
+            "message": "This endpoint is disabled. Use /api/agent/mcp/test/run via MCP."
+        }), 410
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/browser/screenshot', methods=['GET'])
 def screenshot():
     """Cattura screenshot"""
     try:
-        result = playwright_tools.capture_screenshot()
-        return jsonify(result)
+        return jsonify({
+            "status": "disabled",
+            "message": "This endpoint is disabled. Use /api/agent/mcp/test/run via MCP."
+        }), 410
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/browser/close', methods=['POST'])
 def close_browser():
     """Chiude il browser"""
     try:
-        result = playwright_tools.close_browser()
-        return jsonify(result)
+        return jsonify({
+            "status": "disabled",
+            "message": "This endpoint is disabled. Use /api/agent/mcp/test/run via MCP."
+        }), 410
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==================== ENDPOINT AI AGENT MCP ====================
 
+
 @app.route('/api/agent/mcp/test/run', methods=['POST'])
 def agent_mcp_run_test():
     """
     Esegue un test usando l'AI Agent con MCP
-    
+
     Body JSON:
     {
         "test_description": "Go to google.com and search for 'AI testing'"
     }
-    
+
     Response include screenshots in base64!
     """
     if not AGENT_MCP_AVAILABLE:
@@ -131,7 +141,7 @@ def agent_mcp_run_test():
             "status": "error",
             "message": "AI Agent MCP non disponibile. Installare: pip install mcp langchain-mcp-adapters"
         }), 503
-    
+
     try:
         data = request.get_json()
         if not data or 'test_description' not in data:
@@ -139,27 +149,30 @@ def agent_mcp_run_test():
                 "status": "error",
                 "message": "test_description mancante"
             }), 400
-        
+
         test_description = data['test_description']
-        
+
         # Esegui il test con l'agent MCP (sincrono)
         result = test_agent_mcp.run_test(test_description, verbose=True)
-        
+
         response_data = {
             "status": "success",
+            "run_id": result.get("run_id"),
+            "final_answer": result.get("notes", ""),
+            "passed": result.get("passed", False),
+            "errors": result.get("errors", []),
+            "artifacts": result.get("artifacts", []),
             "test_description": result["test_description"],
-            "final_answer": result["final_answer"],
-            "passed": result["success"],
             "mcp_mode": AppConfig.MCP.MODE,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         # Non estrarre base64 da all_messages perché LangGraph satura il numero di token!
         # Se l'utente vuole base64, deve chiederlo esplicitamente nel test
         # e l'AI lo includerà nel final_answer
-        
+
         return jsonify(response_data)
-        
+
     except Exception as e:
         import traceback
         return jsonify({
@@ -168,11 +181,12 @@ def agent_mcp_run_test():
             "traceback": traceback.format_exc()
         }), 500
 
+
 @app.route('/api/agent/mcp/test/stream', methods=['GET'])
 def agent_mcp_stream_test():
     """
     Stream del test in tempo reale via MCP (Server-Sent Events)
-    
+
     Query params:
     ?description=Go to google.com
     &use_remote=false
@@ -182,21 +196,21 @@ def agent_mcp_stream_test():
             "status": "error",
             "message": "AI Agent MCP non disponibile"
         }), 503
-    
+
     test_description = request.args.get('description')
     if not test_description:
         return jsonify({
             "status": "error",
             "message": "description mancante"
         }), 400
-    
+
     use_remote = request.args.get('use_remote', 'false').lower() == 'true'
-    
+
     # Aggiorna configurazione se necessario
     if use_remote != test_agent_mcp.use_remote:
         test_agent_mcp.use_remote = use_remote
         test_agent_mcp._initialized = False
-    
+
     async def stream_events():
         """Generator async per SSE"""
         try:
@@ -206,7 +220,7 @@ def agent_mcp_stream_test():
                 yield f"data: {event_json}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
-    
+
     def generate():
         """Wrapper sincrono per il generator async"""
         loop = asyncio.new_event_loop()
@@ -221,7 +235,7 @@ def agent_mcp_stream_test():
                     break
         finally:
             loop.close()
-    
+
     return Response(
         stream_with_context(generate()),
         mimetype='text/event-stream',
@@ -233,6 +247,7 @@ def agent_mcp_stream_test():
 
 # ==================== ENDPOINT INFO MCP ====================
 
+
 @app.route('/api/mcp/info', methods=['GET'])
 def mcp_info():
     """Informazioni sulla configurazione MCP"""
@@ -241,11 +256,12 @@ def mcp_info():
             "status": "unavailable",
             "message": "MCP Agent not loaded"
         }), 503
-    
+
     return jsonify({
         "status": "available",
         "mcp_version": "1.12.3",
         "current_mode": "remote" if test_agent_mcp.use_remote else "local",
+        "config_mode": AppConfig.MCP.MODE,
         "servers": {
             "local": {
                 "transport": "stdio",
@@ -253,16 +269,17 @@ def mcp_info():
             },
             "remote": {
                 "transport": "streamable_http",
-                "url": "http://localhost:8001/mcp/",
+                "url": AppConfig.MCP.get_remote_url(),
                 "status": "requires_manual_start"
             }
         },
-        "tools_count": 12,
+        "tools_count": len(test_agent_mcp.tool_names) if test_agent_mcp.tool_names else 13,
         "tools": [
             "start_browser", "navigate_to_url", "click_element",
             "fill_input", "wait_for_element", "get_text",
             "check_element_exists", "press_key", "capture_screenshot",
-            "close_browser", "get_page_info"
+            "close_browser", "get_page_info", "inspect_page_structure",
+            "handle_cookie_banner"
         ]
     })
 
@@ -270,50 +287,84 @@ def mcp_info():
 
 @app.route('/api/test/amc/login', methods=['POST'])
 def test_amc_login():
-    """
-    Test automatico login AMC usando credenziali da config.    
-    """
+    """Test completo AMC: Login → Micrologistica → Anagrafiche → Causali (con discovery pattern)"""
+
     if not AGENT_MCP_AVAILABLE:
         return jsonify({
             "status": "error",
             "message": "AI Agent MCP non disponibile"
         }), 503
-    
+
     if not AppConfig.AMC.validate():
         return jsonify({
             "status": "error",
-            "message": "AMC credentials non configurate. Aggiungi AMC_USERNAME e AMC_PASSWORD in .env"
+            "message": "AMC credentials non configurate"
         }), 400
-    
+
     try:
-        # Leggi parametri dal body (opzionali)
         data = {}
         if request.is_json:
             data = request.get_json() or {}
-        elif request.data:
-            try:
-                data = request.get_json(force=True) or {}
-            except:
-                data = {}
-                
-        # Costruzione descrizione del test
-        test_description = f"""Go to {AppConfig.AMC.URL}, wait for the page to load, then fill the login form one field at a time: 
-        first enter '{AppConfig.AMC.USERNAME}' in the username field, then enter '{AppConfig.AMC.PASSWORD}' in the password field, then click the login button.
-        After login, wait for the page to load, then close the browser.
 
-        IMPORTANT: After closing browser, STOP and report success. Do not continue with additional actions and iterations.
-        If any step fails, report the error and close browser immediately."""
-        
+        take_screenshot = data.get('take_screenshot', False)
+
+        # WORKFLOW AMC - Natural language (AI decides tools based on system prompt)
+        test_description = (
+            f"Start the browser in non-headless mode and navigate to {AppConfig.AMC.URL}. "
+            f"Wait for the page to fully load.\n"
+            f"\n"
+            f"Login to the application:\n"
+            f"- Fill the username field with '{AppConfig.AMC.USERNAME}'\n"
+            f"- Fill the password field with '{AppConfig.AMC.PASSWORD}'\n"
+            f"- Submit the form by pressing the login button\n"
+            f"- Wait for the page to load completely\n"
+            f"\n"
+            f"Navigate to Micrologistica:\n"
+            f"- Find and click on the 'Micrologistica'\n"
+            f"- Wait for the page to load\n"
+            f"\n"
+            f"Open the Anagrafiche section:\n"
+            f"- Click on 'Anagrafiche' in the menu\n"
+            f"- Wait for the submenu to appear\n"
+            f"\n"
+            f"Open Causali:\n"
+            f"- Click on 'Causali' in the submenu\n"
+            f"- Wait for the page to load\n"
+            f"\n"
+            f"Perform a search for 'carm' and verify results appear.\n"
+            f"\n"
+            f"Close the browser.\n"
+        )
+
         result = test_agent_mcp.run_test(test_description, verbose=True)
-        
+
+        # Extract screenshots se presenti
+        screenshots = []
+        if take_screenshot:
+            pattern = r'🔑 SCREENSHOT_BASE64:\s*([A-Za-z0-9+/=]+)'
+            matches = re.findall(pattern, result["final_answer"])
+
+            for idx, base64_data in enumerate(matches):
+                screenshots.append({
+                    "filename": f"amc_causali_search_{idx+1}.png",
+                    "base64": base64_data,
+                    "size_bytes": len(base64_data) * 3 // 4,
+                    "source": "ai_agent_response"
+                })
+
         return jsonify({
             "status": "success",
-            "test_type": "amc_login",
-            "final_answer": result["final_answer"],
-            "passed": result["success"],
+            "test_type": "amc_full_workflow",
+            "username": AppConfig.AMC.USERNAME,
+            "notes": result.get("notes", "Test executed"),
+            "passed": result["passed"],
+            "screenshots": screenshots,
+            "screenshots_count": len(screenshots),
+            "workflow": "Login → Micrologistica → Anagrafiche → Causali → Search 'carm'",
+            "note": "Using discovery pattern with inspect_interactive_elements()",
             "timestamp": datetime.now().isoformat()
         })
-        
+
     except Exception as e:
         import traceback
         return jsonify({
@@ -321,7 +372,8 @@ def test_amc_login():
             "message": str(e),
             "traceback": traceback.format_exc()
         }), 500
-    
+
+
 @app.route('/api/test/amc/inspect', methods=['POST'])
 def test_amc_inspect():
     """
@@ -333,7 +385,7 @@ def test_amc_inspect():
             "status": "error",
             "message": "AI Agent MCP non disponibile"
         }), 503
-    
+
     try:
         test_description = f"""
         Go to {AppConfig.AMC.URL}
@@ -341,10 +393,10 @@ def test_amc_inspect():
         Call inspect_page_structure to analyze the login form
         Close browser
         """
-        
+
         print(f" Inspecting AMC login page structure...")
         result = test_agent_mcp.run_test(test_description, verbose=True)
-        
+
         return jsonify({
             "status": "success",
             "test_type": "amc_inspect",
@@ -352,7 +404,7 @@ def test_amc_inspect():
             "note": "Use this info to update selectors in config/settings.py AMCConfig",
             "timestamp": datetime.now().isoformat()
         })
-        
+
     except Exception as e:
         import traceback
         return jsonify({
@@ -362,6 +414,7 @@ def test_amc_inspect():
         }), 500
 
 # ==================== AVVIO SERVER ====================
+
 
 if __name__ == '__main__':
     print("\n" + "=" * 80)
@@ -375,12 +428,9 @@ if __name__ == '__main__':
     print("   - GET  /                      → Server info")
     print("   - GET  /api/health            → Health check")
 
-    print("\n[BROWSER - Diretti (senza MCP)]")
-    print("   - POST /api/browser/start     → Avvia browser")
-    print("   - POST /api/browser/navigate  → Naviga a URL")
-    print("   - GET  /api/browser/screenshot → Screenshot")
-    print("   - POST /api/browser/close     → Chiudi browser")
-    
+    print("\n[BROWSER]")
+    print("   - Direct endpoints: DISABLED (use MCP via AI Agent)")
+
     if AGENT_MCP_AVAILABLE:
         print("\n[AI AGENT MCP]")
         print("   - POST /api/agent/mcp/test/run    → Esegui test con AI+MCP")
@@ -396,19 +446,20 @@ if __name__ == '__main__':
         print("\n[AMC LOGIN TEST]")
         print("   - POST /api/test/amc/inspect      → Ispeziona form login")
         print("   - POST /api/test/amc/login        → Test login automatico")
-        
+
         if AppConfig.AMC.validate():
             print(f"  Credenziali configurate: {AppConfig.AMC.USERNAME}")
         else:
-            print(f"  Credenziali NON configurate (aggiungi AMC_USERNAME/PASSWORD in .env)")
+            print(
+                f"  Credenziali NON configurate (aggiungi AMC_USERNAME/PASSWORD in .env)")
     else:
         print("\n[AI AGENT MCP] Non disponibile")
         print("   Installa: pip install mcp==1.12.3 langchain-mcp-adapters==0.1.7")
-    
+
     print("\n" + "=" * 80)
     print("Premi CTRL+C per fermare il server")
     print("=" * 80 + "\n")
-    
+
     app.run(
         host=AppConfig.FLASK.HOST,
         port=AppConfig.FLASK.PORT,

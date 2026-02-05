@@ -16,7 +16,8 @@ class MCPConfig:
     # ======================================================
     # MCP MODE: "local" per stdio, "remote" per HTTP remoto
     # ======================================================
-    MODE: Literal["local", "remote"] = "remote" 
+    MODE: Literal["local", "remote"] = os.getenv("MCP_MODE", "remote").strip().lower()
+
     
     # Configurazione server remoto
     REMOTE_HOST = os.getenv("MCP_REMOTE_HOST", "localhost")
@@ -139,6 +140,9 @@ class AMCConfig:
         if not cls.USERNAME or not cls.PASSWORD:
             return False
         return True
+    
+class AgentConfig:
+    RECURSION_LIMIT: int = int(os.getenv("AGENT_RECURSION_LIMIT", "25"))
 
 
 class AppConfig:
@@ -149,6 +153,7 @@ class AppConfig:
     PLAYWRIGHT = PlaywrightConfig
     FLASK = FlaskConfig
     AMC = AMCConfig
+    AGENT = AgentConfig
     
     @classmethod
     def validate_all(cls):
@@ -166,5 +171,5 @@ class AppConfig:
 
 
 # Valida configurazione all'import quando il modulo viene importato da altri file
-if __name__ != "__main__":
-    AppConfig.validate_all()
+# if __name__ != "__main__":
+#     AppConfig.validate_all()
