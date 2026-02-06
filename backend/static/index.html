@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Test Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --bg-2: #151515;
+            --panel: #1a1a1a;
+            --panel-2: #0f0f0f;
+            --border: #2a2a2a;
+            --muted: #888;
+            --text: #ffffff;
+            --accent: #ff6b35;
+            --accent-2: #ff875a;
+            --success: #4ade80;
+            --error: #f87171;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            background: radial-gradient(1200px 600px at 80% -10%, #1f1f1f 0%, transparent 60%),
+                        radial-gradient(900px 500px at 0% 20%, #202020 0%, transparent 55%),
+                        var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 60px 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            max-width: 900px;
+        }
+        
+        .logo {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 40px;
+            letter-spacing: 1px;
+        }
+        
+        h1 {
+            font-size: 56px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 20px;
+            letter-spacing: -1px;
+        }
+        
+        h1 .highlight {
+            color: var(--accent);
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: var(--muted);
+            font-weight: 400;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        
+        .terminal-header {
+            background: var(--panel-2);
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            color: #666;
+            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            padding: 30px;
+            resize: vertical;
+            min-height: 200px;
+            outline: none;
+        }
+        
+        textarea::placeholder {
+            color: #444;
+        }
+        
+        .actions {
+            padding: 20px 30px;
+            border-top: 1px solid var(--border);
+            background: var(--panel-2);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        .btn {
+            padding: 12px 32px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-2);
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid #333;
+        }
+        
+        .btn-secondary:hover {
+            border-color: #555;
+            color: #aaa;
+        }
+        
+        .result {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 900px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .result-header {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .result.success .result-header {
+            color: var(--success);
+        }
+        
+        .result.error .result-header {
+            color: var(--error);
+        }
+        
+        .result-content {
+            color: #aaa;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 14px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 30px;
+            color: var(--muted);
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .examples {
+            margin-top: 40px;
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        .examples-title {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .example-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .example-item {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 14px;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        
+        .example-item:hover {
+            border-color: #3a3a3a;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">AI TEST AUTOMATION</div>
+        <h1>ENABLE AI TO <span class="highlight">TEST</span> THE WEB</h1>
+        <p class="subtitle">Describe your test in natural language</p>
+    </div>
+    
+    <div class="container">
+        <div class="terminal-header">USER@AI-TEST:~/NEW_TEST</div>
+        <textarea 
+            id="testDescription" 
+            placeholder="Describe your task..."
+            spellcheck="false"
+        ></textarea>
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="clearTest()">Clear</button>
+            <button class="btn btn-primary" id="runBtn" onclick="runTest()">Run Test</button>
+        </div>
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Running test...</p>
+    </div>
+    
+    <div class="result" id="result">
+        <div class="result-header" id="resultHeader"></div>
+        <div class="result-content" id="resultContent"></div>
+    </div>
+    
+    <div class="examples">
+        <div class="examples-title">Examples</div>
+        <div class="example-list">
+            <div class="example-item" onclick="loadExample(0)">
+                AMC Full Test: Login → Save Session → Navigate → Search
+            </div>
+            <div class="example-item" onclick="loadExample(1)">
+                AMC Focused: Starting from Dashboard → Navigate → Search
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const examples = [
+            `Start the browser in non-headless mode and navigate to https://amc.eng.it/multimodule/web/ and save session state as amc_session.json.
+Wait for the page to fully load.
+
+Login to the application:
+- Fill the username field with AMC-User
+- Fill the password field with Ls6P*JB21
+- Submit the form by pressing the login button
+- Wait for the page to load completely
+
+Navigate to Micrologistica:
+- Find and click on the 'Micrologistica'
+- Wait for the page to load
+
+Open the Anagrafiche section:
+- Click on 'Anagrafiche' in the menu
+- Wait for the submenu to appear
+
+Open Causali:
+- Click on 'Causali' in the submenu
+- Wait for the page to load
+
+Perform a search for 'carm' and verify results appear.
+
+Close the browser.`,
+            `Starting from Micrologistica Dashboard
+
+Open the Anagrafiche section:
+- Click on 'Anagrafiche' in the menu
+- Wait for the submenu to appear
+
+Open Causali:
+- Click on 'Causali' in the submenu
+- Wait for the page to load
+
+Perform a search for 'carm' and verify results appear.
+
+Close the browser.`
+        ];
+        
+        function loadExample(index) {
+            document.getElementById('testDescription').value = examples[index];
+        }
+        
+        function clearTest() {
+            document.getElementById('testDescription').value = '';
+            document.getElementById('result').classList.remove('show');
+        }
+
+        async function runTest() {
+            const description = document.getElementById('testDescription').value.trim();
+
+            if (!description) {
+                alert('Please enter a test description');
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const btn = document.getElementById('runBtn');
+
+            resultDiv.classList.remove('show');
+            loadingDiv.classList.add('show');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:5000/api/agent/mcp/test/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        test_description: description,
+                        keep_session: false
+                    })
+                });
+
+                const data = await response.json();
+
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+
+                if (data.status === 'success' && data.passed) {
+                    resultDiv.className = 'result success show';
+                    document.getElementById('resultHeader').textContent = 'TEST PASSED';
+                    document.getElementById('resultContent').textContent = data.final_answer;
+                } else {
+                    resultDiv.className = 'result error show';
+                    document.getElementById('resultHeader').textContent = 'TEST FAILED';
+                    document.getElementById('resultContent').textContent = data.final_answer || data.message || 'Unknown error';
+                }
+            } catch (error) {
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
+                document.getElementById('resultContent').textContent = `Could not connect to Flask server.\nMake sure it's running on http://localhost:5000\n\n${error.message}`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        document.getElementById('testDescription').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                runTest();
+            }
+        });
+    </script>
+</body>
+</html>
