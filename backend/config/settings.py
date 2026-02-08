@@ -50,8 +50,8 @@ class LLMConfig:
     
     # OpenRouter (priorità 1)
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")  # Default: Claude Sonnet per migliore reasoning
-    
+    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")  # Default: openai/gpt-4o-mini
+
     # Azure OpenAI (priorità 2)
     AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
     AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -123,16 +123,8 @@ class AMCConfig:
     """Configurazione per test login AMC"""
     
     URL = "https://amc.eng.it/multimodule/web/"
-    USERNAME = os.getenv("AMC_USERNAME", "")
-    PASSWORD = os.getenv("AMC_PASSWORD", "")
-    
-    # Selettori verificati dall'ispezione
-    # USERNAME_SELECTOR = "input[name='username']"
-    # PASSWORD_SELECTOR = "input[name='password']"
-    # LOGIN_BUTTON_SELECTOR = "button:has-text('Login')"  # Oppure 'Accedi'
-    
-    # Opzionale: checkbox profilo predefinito
-    # USE_DEFAULT_PROFILE_CHECKBOX = "input[name='useDefaultProfiling']"
+    USERNAME = os.getenv("AMC_USERNAME", "AMC-User")
+    PASSWORD = os.getenv("AMC_PASSWORD", "Ls6P*JB21")
     
     @classmethod
     def validate(cls):
@@ -142,7 +134,14 @@ class AMCConfig:
         return True
     
 class AgentConfig:
+    """Configurazione Agent LangGraph"""
+    
     RECURSION_LIMIT: int = int(os.getenv("AGENT_RECURSION_LIMIT", "25"))
+    
+    # Tool usage preferences
+    ALWAYS_INSPECT_AFTER_NAVIGATION = True
+    ALWAYS_WAIT_FOR_LOAD_STATE = True
+    DEFAULT_TIMEOUT_PER_TRY = 2000  # ms per ogni strategia in click_smart/fill_smart
 
 
 class AppConfig:
@@ -164,9 +163,11 @@ class AppConfig:
         
         cls.MCP.validate()
         cls.LLM.validate()
+        cls.AMC.validate()
         
         print(f"Flask: {cls.FLASK.HOST}:{cls.FLASK.PORT}")
         print(f"Playwright: headless={cls.PLAYWRIGHT.HEADLESS}")
+        print(f"Agent: recursion_limit={cls.AGENT.RECURSION_LIMIT}")
         print("=" * 80 + "\n")
 
 

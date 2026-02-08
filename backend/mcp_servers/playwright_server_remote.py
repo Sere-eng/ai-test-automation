@@ -6,6 +6,7 @@ Comunicazione HTTP (remoto) compatibile con asyncio
 
 import sys
 import os
+from typing import Dict, List
 from dotenv import load_dotenv
 
 # Aggiungi la cartella backend al path PRIMA di importare i moduli
@@ -219,7 +220,7 @@ async def handle_cookie_banner(strategies: list[str] | None = None, timeout: int
 
 
 @mcp.tool()
-async def click_smart(targets: list[dict], timeout_per_try: int = 2000) -> str:
+async def click_smart(targets: List[Dict[str, str]], timeout_per_try: int = 2000) -> str:
     """
     Click usando strategie multiple (fallback chain) - robusto per DOM complessi enterprise.
 
@@ -266,7 +267,7 @@ async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 200
          {"by": "placeholder", "placeholder": "Username"},
          {"by": "role", "role": "textbox", "name": "Username"}]
     """
-    print(f"\n🔧 [MCP] fill_smart called:")
+    print(f"\n [MCP] fill_smart called:")
     print(f"   Targets: {targets}")
     print(f"   Value: {'*' * len(value) if value else 'empty'}")
     print(f"   Timeout: {timeout_per_try}ms")

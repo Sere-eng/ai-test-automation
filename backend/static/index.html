@@ -292,17 +292,14 @@
         <div class="examples-title">Examples</div>
         <div class="example-list">
             <div class="example-item" onclick="loadExample(0)">
-                AMC Full Test: Login → Save Session → Navigate → Search
-            </div>
-            <div class="example-item" onclick="loadExample(1)">
-                AMC Focused: Starting from Dashboard → Navigate → Search
+                AMC Test: Login → Save Session → Navigate → Search
             </div>
         </div>
     </div>
 
     <script>
         const examples = [
-            `Start the browser in non-headless mode and navigate to https://amc.eng.it/multimodule/web/ and save session state as amc_session.json.
+            `Start the browser and navigate to https://amc.eng.it/multimodule/web/.
 Wait for the page to fully load.
 
 Login to the application:
@@ -314,19 +311,6 @@ Login to the application:
 Navigate to Micrologistica:
 - Find and click on the 'Micrologistica'
 - Wait for the page to load
-
-Open the Anagrafiche section:
-- Click on 'Anagrafiche' in the menu
-- Wait for the submenu to appear
-
-Open Causali:
-- Click on 'Causali' in the submenu
-- Wait for the page to load
-
-Perform a search for 'carm' and verify results appear.
-
-Close the browser.`,
-            `Starting from Micrologistica Dashboard
 
 Open the Anagrafiche section:
 - Click on 'Anagrafiche' in the menu
@@ -377,18 +361,69 @@ Close the browser.`
                 });
 
                 const data = await response.json();
+                
+                // Debug: verifica cosa arriva dal backend
+                console.log('Response data:', data);
+                console.log('Screenshot present:', !!data.screenshot);
+                if (data.screenshot) {
+                    console.log('Screenshot length:', data.screenshot.length);
+                }
 
                 loadingDiv.classList.remove('show');
                 resultDiv.classList.add('show');
 
+                const resultContent = document.getElementById('resultContent');
+                resultContent.innerHTML = ''; // Svuota contenuto precedente
+                
                 if (data.status === 'success' && data.passed) {
                     resultDiv.className = 'result success show';
-                    document.getElementById('resultHeader').textContent = 'TEST PASSED';
-                    document.getElementById('resultContent').textContent = data.final_answer;
+                    document.getElementById('resultHeader').textContent = '✓ SUCCESS';
+                    
+                    // Aggiungi testo
+                    const textNode = document.createElement('div');
+                    textNode.style.whiteSpace = 'pre-wrap';
+                    textNode.textContent = data.final_answer || 'Test completed successfully';
+                    resultContent.appendChild(textNode);
+                    
+                    // Aggiungi immagine se presente
+                    if (data.screenshot) {
+                        console.log('Creating image element...');
+                        console.log('First 100 chars of base64:', data.screenshot.substring(0, 100));
+                        
+                        const imgLabel = document.createElement('div');
+                        imgLabel.textContent = '📸 Final Screenshot:';
+                        imgLabel.style.marginTop = '20px';
+                        imgLabel.style.marginBottom = '10px';
+                        imgLabel.style.color = 'var(--success)';
+                        resultContent.appendChild(imgLabel);
+                        
+                        const img = document.createElement('img');
+                        // Rimuovi eventuali newlines o spazi dal base64
+                        const cleanBase64 = data.screenshot.replace(/\s/g, '');
+                        img.src = 'data:image/png;base64,' + cleanBase64;
+                        img.style.maxWidth = '100%';
+                        img.style.borderRadius = '6px';
+                        img.style.border = '1px solid var(--border)';
+                        img.style.display = 'block';
+                        img.onerror = function(e) {
+                            console.error('Failed to load image:', e);
+                            console.error('Image src length:', img.src.length);
+                            imgLabel.textContent = '❌ Failed to load screenshot (check console)';
+                            imgLabel.style.color = 'var(--error)';
+                        };
+                        img.onload = function() {
+                            console.log('✅ Screenshot loaded successfully!');
+                            console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+                        };
+                        resultContent.appendChild(img);
+                        console.log('Image element appended to DOM');
+                    } else {
+                        console.log('No screenshot in response data');
+                    }
                 } else {
                     resultDiv.className = 'result error show';
-                    document.getElementById('resultHeader').textContent = 'TEST FAILED';
-                    document.getElementById('resultContent').textContent = data.final_answer || data.message || 'Unknown error';
+                    document.getElementById('resultHeader').textContent = '✗ ERROR';
+                    resultContent.textContent = data.final_answer || data.message || 'Unknown error';
                 }
             } catch (error) {
                 loadingDiv.classList.remove('show');

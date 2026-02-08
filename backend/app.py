@@ -5,7 +5,7 @@ Espone endpoint REST per l'AI Agent MCP e i tool Playwright.
 """
 
 import re
-from flask import Flask, jsonify, request, Response, stream_with_context
+from flask import Flask, jsonify, request, Response, stream_with_context, send_from_directory
 from flask_cors import CORS
 # from agent.tools import PlaywrightTools
 from config.settings import AppConfig
@@ -45,6 +45,13 @@ except ImportError as e:
 
 @app.route('/')
 def home():
+    """Serve the HTML UI"""
+    return send_from_directory(app.static_folder, "index.html")
+
+
+@app.route('/api')
+def api_info():
+    """API server information"""
     return jsonify({
         "message": "AI Test Automation Server (MCP Edition)",
         "status": "online",
@@ -155,6 +162,44 @@ def agent_mcp_run_test():
         # Esegui il test con l'agent MCP (sincrono)
         result = test_agent_mcp.run_test(test_description, verbose=True)
 
+        # Estrai base64 screenshot dagli steps (se presente)
+        screenshot_base64 = None
+        print(f"\n🔍 DEBUG: Cerco screenshot in {len(result.get('steps', []))} steps")
+        
+        for i, step in enumerate(result.get("steps", [])):
+            # Debug ogni step
+            if isinstance(step, dict):
+                tool_name = step.get("tool", "NO_TOOL")
+                print(f"  Step {i}: tool={tool_name}")
+                
+                if tool_name == "capture_screenshot":
+                    output = step.get("output", {})
+                    print(f"    output type: {type(output)}")
+                    
+                    # Se è un ToolMessage di LangChain, estrai il .content
+                    if hasattr(output, 'content'):
+                        output = output.content
+                        print(f"    Extracted .content from ToolMessage")
+                    
+                    # L'output può essere una stringa JSON, devi parsarla!
+                    if isinstance(output, str):
+                        try:
+                            import json
+                            output = json.loads(output)
+                            print(f"    ✅ JSON parsed: keys={list(output.keys()) if isinstance(output, dict) else 'NOT_DICT'}")
+                        except Exception as e:
+                            print(f"    ❌ JSON parse failed: {e}")
+                            continue
+                    
+                    if isinstance(output, dict) and "base64" in output:
+                        screenshot_base64 = output.get("base64")
+                        print(f"✅ Screenshot base64 trovato: {len(screenshot_base64)} caratteri")
+            else:
+                print(f"  Step {i}: NOT A DICT - type={type(step)}")
+
+        if not screenshot_base64:
+            print("❌ Nessuno screenshot base64 trovato")
+
         response_data = {
             "status": "success",
             "run_id": result.get("run_id"),
@@ -162,6 +207,7 @@ def agent_mcp_run_test():
             "passed": result.get("passed", False),
             "errors": result.get("errors", []),
             "artifacts": result.get("artifacts", []),
+            "screenshot": screenshot_base64,
             "test_description": result["test_description"],
             "mcp_mode": AppConfig.MCP.MODE,
             "timestamp": datetime.now().isoformat()
@@ -341,7 +387,7 @@ def test_amc_login():
         # Extract screenshots se presenti
         screenshots = []
         if take_screenshot:
-            pattern = r'🔑 SCREENSHOT_BASE64:\s*([A-Za-z0-9+/=]+)'
+            pattern = r'SCREENSHOT_BASE64:\s*([A-Za-z0-9+/=]+)'
             matches = re.findall(pattern, result["final_answer"])
 
             for idx, base64_data in enumerate(matches):
