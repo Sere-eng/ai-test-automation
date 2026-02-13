@@ -226,19 +226,23 @@ ai-test-automation/
 │   │
 │   ├── agent/                        # AI Agent modules
 │   │   ├── __init__.py
-│   │   ├── tools.py                  # Playwright tools ASYNC (21 tools)
+│   │   ├── tools.py                  # Playwright tools ASYNC
 │   │   ├── utils.py                  # Utility functions
+│   │   ├── system_prompt.py          # System prompt AMC + LAB (unificati, regole strette)
+│   │   ├── lab_scenarios.py          # Definizione 4 scenari LAB (dopo login/org)
 │   │   └── test_agent_mcp.py        # Agent con MCP (multi-LLM, discovery-first)
 │   │
 │   ├── mcp_servers/                  # MCP Servers ASYNC
 │   │   ├── __init__.py
-│   │   ├── playwright_server_local.py    # Server locale (stdio) - 21 tools
-│   │   ├── playwright_server_remote.py   # Server remoto (HTTP) - 21 tools
+│   │   ├── playwright_server_local.py    # Server locale (stdio)
+│   │   ├── playwright_server_remote.py   # Server remoto (HTTP)
 │   │   └── tool_names.py            # Source of truth per tool list
 │   │
 │   └── tests/                        # Test scripts
 │       ├── test_mcp_remote.py
-│       └── test_webdriver_detection.py
+│       ├── test_webdriver_detection.py
+│       ├── test_amc_workflow_native.py   # Workflow AMC (chiamate dirette, no MCP)
+│       └── test_lab_workflow_native.py   # Workflow LAB (login → org → Laboratory → filtri)
 │
 └── frontend/                         # Frontend Angular
     └── (coming soon)
@@ -546,11 +550,11 @@ Il sistema espone **18 tool async** tramite MCP Server, suddivisi in:
 - **Procedural Tools** (1): get_frame
 - **Legacy** (2): inspect_page_structure, fill_and_search (deprecati)
 
-### \ud83d\udd0d Discovery Tools (DISCOVERY-FIRST WORKFLOW)
+### 🔍 Discovery Tools (DISCOVERY-FIRST WORKFLOW)
 
 #### `inspect_interactive_elements()`
 
-**\u2b50 STRUMENTO CHIAVE** per il discovery-first workflow. Scansiona **TUTTI** gli elementi interattivi della pagina usando standard WCAG.
+**⭐ STRUMENTO CHIAVE** per il discovery-first workflow. Scansiona **TUTTI** gli elementi interattivi della pagina usando standard WCAG.
 
 **Cosa scopre:**
 - **Iframes**: src, name, title per `get_frame()`
@@ -652,22 +656,22 @@ inspect_interactive_elements()  # Discover home page
 ```
 
 **QUANDO USARLO (CRITICAL):**
-- \u2705 **SEMPRE dopo navigate_to_url()** o navigate_and_wait()
-- \u2705 Dopo click che triggera navigation (menu, tabs)
-- \u2705 Prima di interagire con pagine enterprise (Angular/React/Vue)
-- \u2705 Per trovare iframe selectors prima di get_frame()
+- ✅ **SEMPRE dopo navigate_to_url()** o navigate_and_wait()
+- ✅ Dopo click che triggera navigation (menu, tabs)
+- ✅ Prima di interagire con pagine enterprise (Angular/React/Vue)
+- ✅ Per trovare iframe selectors prima di get_frame()
 
 **VANTAGGI vs HARDCODING:**
-- \u2705 **Nessun guessing**: selectors reali dalla pagina
-- \u2705 **Strategie pre-ordinate**: role > text > css > tfa (affidabilit\u00e0)
-- \u2705 **Payloads ready-to-use**: copy&paste in click_smart/fill_smart
-- \u2705 **WCAG compliance**: accessible_name standard W3C
+- ✅ **Nessun guessing**: selectors reali dalla pagina
+- ✅ **Strategie pre-ordinate**: role > text > css > tfa (affidabilità)
+- ✅ **Payloads ready-to-use**: copy&paste in click_smart/fill_smart
+- ✅ **WCAG compliance**: accessible_name standard W3C
 
 **FORBIDDEN PRACTICES:**
-- \u274c Hardcoding selectors senza inspect
-- \u274c Guess accessible_name senza vedere output
-- \u274c Modificare playwright_suggestions (usarli as-is)
-- \u274c Skippare inspect dopo navigation
+- ❌ Hardcoding selectors senza inspect
+- ❌ Guess accessible_name senza vedere output
+- ❌ Modificare playwright_suggestions (usarli as-is)
+- ❌ Skippare inspect dopo navigation
 
 ---
 
@@ -678,11 +682,11 @@ Click su elemento e analizza cambiamenti DOM (elementi aggiunti/rimossi).
 **Utile per:**
 - Debug menu dinamici (Angular/React)
 - Verificare cosa cambia dopo click
-- Capire perch\u00e9 elementi non appaiono
+- Capire perché elementi non appaiono
 
 **Esempio:**
 ```python
-# Debug: perch\u00e9 il menu non si apre dopo click?
+# Debug: perché il menu non si apre dopo click?
 result = inspect_dom_changes(
     click_target={"by": "role", "role": "button", "name": "Menu"},
     wait_after_click=2000
@@ -692,28 +696,28 @@ result = inspect_dom_changes(
 
 ---
 
-### \ud83c\udfaf Smart Locators (Enterprise Apps - Retry Automatico)
+### 🎯 Smart Locators (Enterprise Apps - Retry Automatico)
 
-Per enterprise apps (Angular/React/Vue) con DOM complesso, i **tool base falliscono**. Gli smart locators provano **strategie multiple** finch\u00e9 una non funziona.
+Per enterprise apps (Angular/React/Vue) con DOM complesso, i **tool base falliscono**. Gli smart locators provano **strategie multiple** finché una non funziona.
 
 #### `click_smart(targets: list[dict], timeout_per_try: int = 2000)`
 
-**Click enterprise con retry automatico**. Prova strategie in ordine finch\u00e9 una non ha successo.
+**Click enterprise con retry automatico**. Prova strategie in ordine finché una non ha successo.
 
 **Strategia di retry (3 livelli):**
 ```
 Try 1: Normal click (3 retry con backoff 500ms/1500ms/3000ms)
-  \u2193 fallisce
+  ↓ fallisce
 Try 2: Force click + is_visible() check (skips se hidden)
-  \u2193 fallisce o elemento hidden
+  ↓ fallisce o elemento hidden
 Try 3: JavaScript click (bypassa tutto, triggera eventi)
 ```
 
-**Strategie disponibili (in ordine di affidabilit\u00e0):**
-1. **role**: `{"by": "role", "role": "button", "name": "Login"}` \u2190 WCAG, pi\u00f9 robusto
+**Strategie disponibili (in ordine di affidabilità):**
+1. **role**: `{"by": "role", "role": "button", "name": "Login"}` ← WCAG, più robusto
 2. **text**: `{"by": "text", "text": "Click me"}`
 3. **css_aria**: `{"by": "css", "selector": "[aria-label='Submit']"}`
-4. **tfa**: `{"by": "tfa", "tfa": "submit_btn"}` \u2190 Test IDs (possono cambiare)
+4. **tfa**: `{"by": "tfa", "tfa": "submit_btn"}` ← Test IDs (possono cambiare)
 
 **Esempio (copy da inspect output):**
 ```python
@@ -742,17 +746,17 @@ click_smart([
 **Fill enterprise con retry automatico**. Stessa logica di click_smart ma per form fields.
 
 **Retry mechanism:**
-- 3 tentativi per strategia (backoff: 500ms \u2192 1500ms \u2192 3000ms)
+- 3 tentativi per strategia (backoff: 500ms → 1500ms → 3000ms)
 - Supporta `clear_first=True` (default)
 
 **Strategie disponibili (in ordine):**
-1. **label**: `{"by": "label", "label": "Username"}` \u2190 Pi\u00f9 affidabile
+1. **label**: `{"by": "label", "label": "Username"}` ← Più affidabile
 2. **placeholder**: `{"by": "placeholder", "placeholder": "Enter email"}`
 3. **role**: `{"by": "role", "role": "textbox", "name": "Search"}`
 4. **css_name**: `{"by": "css", "selector": "[name='email']"}`
 5. **css_id**: `{"by": "css", "selector": "#username"}`
 6. **css_aria**: `{"by": "css", "selector": "[aria-label='Email']"}`
-7. **tfa**: `{"by": "tfa", "tfa": "login_email"}` \u2190 Fragile (ultimo)
+7. **tfa**: `{"by": "tfa", "tfa": "login_email"}` ← Fragile (ultimo)
 
 **Esempio (copy da inspect output):**
 ```python
@@ -765,9 +769,9 @@ fill_smart([
 
 ---
 
-### \ud83d\ude80 Procedural Tools (Workflow Complessi)
+### 🚀 Procedural Tools (Workflow Complessi)
 
-Combinano pi\u00f9 operazioni per ridurre step e token LLM.
+Combinano più operazioni per ridurre step e token LLM.
 
 #### `get_frame(selector: str = None, url_pattern: str = None, timeout: int = 10000)`
 
@@ -775,7 +779,7 @@ Accesso semplificato a iframe. Usa selector CSS **oppure** URL pattern.
 
 **Esempi:**
 ```python
-# By URL pattern (pi\u00f9 robusto)
+# By URL pattern (più robusto)
 get_frame(url_pattern="movementreason", timeout=5000)
 
 # By CSS selector
@@ -840,7 +844,7 @@ wait_for_text_content(
 
 ---
 
-### \ud83d\udcdd Base Tools
+### 📝 Base Tools
 
 #### 1. `start_browser(headless: bool = False)`
 Avvia browser Chromium (async).
@@ -1451,7 +1455,16 @@ python mcp_servers/playwright_server_remote.py
 
 ## 📝 Changelog
 
-### v3.1.0-discovery-first (Current)
+### v3.2.0 (refactor prompts + LAB scenarios)
+- ✨ **NEW:** `backend/agent/system_prompt.py` — prompt AMC e LAB unificati con regole strette (NO GUESSED TEXT, check obbligatorio dopo ogni azione, gestione "attendi che la pagina sia caricata").
+- ✨ **NEW:** `backend/agent/lab_scenarios.py` — definizione strutturata dei 4 scenari LAB (creazione filtro, contatori, accesso tramite filtro, dettaglio campione).
+- 🔧 **CHANGED:** `navigate_to_url` usa `wait_until="domcontentloaded"` e timeout da config (niente più `networkidle` per evitare timeout su SPA).
+- 🔧 **CHANGED:** `click_and_wait_for_text` accetta `targets` opzionale; se mancante fa fallback a `wait_for_text_content`.
+- 🗑️ **REMOVED:** `backend/agent/amc_system_prompt.py` (sostituito da `system_prompt.py`).
+- 🗑️ **REMOVED:** `backend/tests/test_workflow_native.py` (sostituito da test AMC e LAB specifici).
+- 📚 **IMPROVED:** Sezione LAB SCENARIOS nel prompt; riferimento ai 4 flussi dopo la home.
+
+### v3.1.0-discovery-first
 - 🗑️ **DEPRECATED:** `fill_and_search()` (use `fill_smart()` + `wait_for_text_content()`)
 - 🔧 **CHANGED:** Iframe workflow now uses discovery-first approach (treat as external DOM)
 - 🔧 **CHANGED:** Tool count: 19 → 18
