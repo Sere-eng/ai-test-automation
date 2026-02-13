@@ -26,13 +26,13 @@ async def main():
     try:
         # STEP 1: Start browser
         print("\n🌐 STEP 1: Starting browser...")
-        result = await tools.start_browser(headless=False)
+        result = await tools.start_browser(headless=AppConfig.PLAYWRIGHT.HEADLESS)
         print(f"   {result['status']}: {result['message']}")
         
         # STEP 2: Navigate to login
         print("\n🌐 STEP 2: Navigating to AMC login...")
-        result = await tools.navigate_to_url("https://amc.eng.it/multimodule/web/")
-        print(f"   {result['status']}: {result['url']}")
+        result = await tools.navigate_to_url(AppConfig.AMC.URL)
+        print(f"   {result['status']}: {result.get('url', 'N/A')}")
         await tools.page.wait_for_timeout(2000)
         
         # STEP 3: Inspect login form (no need to wait for specific element)

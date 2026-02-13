@@ -151,12 +151,12 @@ async def press_key(key: str) -> str:
 # =========================
 
 @mcp.tool()
-async def inspect_interactive_elements() -> str:
+async def inspect_interactive_elements(in_iframe: dict | None = None) -> str:
     """
     Ispeziona elementi interattivi (clickable, form fields, iframes).
     Genera strategie pronte per click_smart e fill_smart.
     """
-    result = await playwright.inspect_interactive_elements()
+    result = await playwright.inspect_interactive_elements(in_iframe=in_iframe)
     return to_json(result)
 
 
@@ -193,12 +193,22 @@ async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 200
 
 
 @mcp.tool()
-async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False) -> str:
+async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False, in_iframe: dict = None) -> str:
     """
-    Attende che un testo appaia nel DOM.
-    Utile per verificare stato della pagina dopo azioni.
+    Attende che un testo appaia nel DOM (pagina principale o iframe).
+    Utile per verificare stato della pagina dopo azioni o risultati search in iframe.
+    
+    Args:
+        in_iframe: {"url_pattern": "..."} per cercare dentro iframe
+    
+    Example (iframe):
+        wait_for_text_content(
+            "CARMAG",
+            timeout=5000,
+            in_iframe={"url_pattern": "movementreason"}
+        )
     """
-    result = await playwright.wait_for_text_content(text=text, timeout=timeout, case_sensitive=case_sensitive)
+    result = await playwright.wait_for_text_content(text=text, timeout=timeout, case_sensitive=case_sensitive, in_iframe=in_iframe)
     return to_json(result)
 
 
@@ -223,13 +233,24 @@ async def get_frame(selector: str = None, url_pattern: str = None, timeout: int 
     Accesso semplificato a iframe.
     Usa selector CSS oppure url_pattern.
     Ritorna SOLO metadata serializzabile (non l'oggetto Frame).
-    Per interagire dentro iframe, usa fill_and_search(..., in_iframe={...}).
+    Per interagire dentro iframe, usa click_smart/fill_smart con in_iframe parameter.
+    
+    Example:
+        frame = get_frame(url_pattern="movementreason")
+        fill_smart(
+            targets=[
+                {"by": "placeholder", "placeholder": "Search"},
+                {"by": "label", "label": "Search"}
+            ],
+            value="carm",
+            in_iframe={"url_pattern": "movementreason"}
+        )
     """
     result = await playwright.get_frame(selector=selector, url_pattern=url_pattern, timeout=timeout)
     return to_json(result)
 
 
-@mcp.tool()
+# @mcp.tool()  # DEPRECATED - Use fill_smart + wait_for_text_content instead
 async def fill_and_search(
     input_selector: str,
     search_value: str,
@@ -238,9 +259,13 @@ async def fill_and_search(
     timeout: int = 10000
 ) -> str:
     """
-    Fill + verifica risultato (procedural per ricerche).
-    in_iframe: {"url_pattern": "movementreason"} oppure {"selector": "iframe#app"}
-    verify_result_text: "CARMAG" (testo da cercare nel DOM dopo fill)
+    ⚠️ DEPRECATED: Use fill_smart + wait_for_text_content instead.
+    
+    NEW RECOMMENDED WORKFLOW:
+        fill_smart(targets=[...], value="carm", in_iframe={...})
+        wait_for_text_content("CARMAG", timeout=5000)
+    
+    Kept for backward compatibility only.
     """
     result = await playwright.fill_and_search(
         input_selector=input_selector,

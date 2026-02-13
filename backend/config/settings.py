@@ -122,9 +122,13 @@ class FlaskConfig:
 class AMCConfig:
     """Configurazione per test login AMC"""
     
-    URL = "https://amc.eng.it/multimodule/web/"
-    USERNAME = os.getenv("AMC_USERNAME", "AMC-User")
-    PASSWORD = os.getenv("AMC_PASSWORD", "Ls6P*JB21")
+    # URL principale fornita nel test
+    URL = os.getenv(
+        "AMC_URL",
+        "https://amc.eng.it/multimodule/web/",
+    )
+    USERNAME = os.getenv("AMC_USERNAME", "")
+    PASSWORD = os.getenv("AMC_PASSWORD", "")
     
     @classmethod
     def validate(cls):
@@ -132,11 +136,33 @@ class AMCConfig:
         if not cls.USERNAME or not cls.PASSWORD:
             return False
         return True
+
+
+class LABConfig:
+    """Configurazione per test Laboratory / Clinical Laboratory"""
+
+    # URL principale fornita nel test
+    URL = os.getenv(
+        "LAB_URL",
+        "https://mdrsanitalab2.eng.it/multimodule/ELLIPSE_LAB/?ENGAPPCONFIGS=%7B%22ENG_APP_DISABLE_DATA_PROFILER%22%3Atrue%2C%22ENG_APP_DISABLE_ACTIVITY_PROFILER%22%3Atrue%2C%22ENG_APP_DISABLE_MENU_PROFILER%22%3Atrue%7D",
+    )
+
     
+    USERNAME = os.getenv("LAB_USERNAME", "")
+    PASSWORD = os.getenv("LAB_PASSWORD", "")
+
+    @classmethod
+    def validate(cls):
+        """Facoltativo: le credenziali LAB potrebbero non essere sempre configurate"""
+        if not cls.USERNAME or not cls.PASSWORD:
+            return False
+        return True
+
+
 class AgentConfig:
     """Configurazione Agent LangGraph"""
     
-    RECURSION_LIMIT: int = int(os.getenv("AGENT_RECURSION_LIMIT", "25"))
+    RECURSION_LIMIT: int = int(os.getenv("AGENT_RECURSION_LIMIT", "50"))
     
     # Tool usage preferences
     ALWAYS_INSPECT_AFTER_NAVIGATION = True
@@ -152,6 +178,7 @@ class AppConfig:
     PLAYWRIGHT = PlaywrightConfig
     FLASK = FlaskConfig
     AMC = AMCConfig
+    LAB = LABConfig
     AGENT = AgentConfig
     
     @classmethod

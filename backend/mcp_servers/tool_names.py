@@ -18,5 +18,5 @@ TOOL_NAMES = [
     # "inspect_dom_changes",  # DEBUG ONLY - rimosso per evitare confusione AI
     # Procedural tools
     "get_frame",
-    "fill_and_search"
+    # "fill_and_search"  # DEPRECATED - use fill_smart + wait_for_text_content
 ]

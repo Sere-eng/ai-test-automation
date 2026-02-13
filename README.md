@@ -1,6 +1,6 @@
 Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**, LLM (Large Language Models) e Playwright per automatizzare test di interfacce web con architettura enterprise-ready.
 
-![Tools](https://img.shields.io/badge/Playwright_Tools-19-blue)
+![Tools](https://img.shields.io/badge/Playwright_Tools-18-blue)
 ![Version](https://img.shields.io/badge/version-3.0.0--discovery-green)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![MCP](https://img.shields.io/badge/MCP-1.12.3-purple)
@@ -15,7 +15,7 @@ Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**
 - [Struttura del Progetto](#-struttura-del-progetto)
 - [Setup Completo](#-setup-completo)
 - [Configurazione LLM (OpenAI / Azure / OpenRouter)](#-configurazione-llm-openai--azure--openrouter)
-- [Tool Playwright Disponibili (19 tools)](#️-tool-playwright-disponibili)
+- [Tool Playwright Disponibili (18 tools)](#️-tool-playwright-disponibili)
   - [Discovery Tools](#-discovery-tools-discovery-first-workflow)
     - [inspect_interactive_elements](#inspect_interactive_elements)
   - [Smart Locators](#-smart-locators-enterprise-apps---retry-automatico)
@@ -23,7 +23,6 @@ Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**
     - [fill_smart](#fill_smarttargets-listdict-value-str-timeout_per_try-int--2000)
   - [Procedural Tools](#-procedural-tools-workflow-complessi)
     - [get_frame](#get_frameselector-str--none-url_pattern-str--none-timeout-int--10000)
-    - [fill_and_search](#fill_and_searchinput_selector-str-search_value-str-verify_result_text-str--none-in_iframe-dict--none-timeout-int--10000)
   - [Base Tools](#-base-tools)
     - [start_browser, navigate_to_url, click_element, fill_input](#1-start_browserheadless-bool--false)
     - [wait_for_element, wait_for_load_state, wait_for_text_content](#5-wait_for_elementselector-str-state-str--visible-selector_type-str--css-timeout-int--30000)
@@ -540,12 +539,12 @@ OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
 
 ## 🛠️ Tool Playwright Disponibili
 
-Il sistema espone **19 tool async** tramite MCP Server, suddivisi in:
+Il sistema espone **18 tool async** tramite MCP Server, suddivisi in:
 - **Base Tools** (10): browser, navigation, interaction, assertions
 - **Discovery Tools** (1): inspect_interactive_elements
 - **Smart Locators** (2): click_smart, fill_smart (retry automatico + fallback chain)
-- **Procedural Tools** (2): get_frame, fill_and_search
-- **Legacy** (1): inspect_page_structure (deprecato)
+- **Procedural Tools** (1): get_frame
+- **Legacy** (2): inspect_page_structure, fill_and_search (deprecati)
 
 ### \ud83d\udd0d Discovery Tools (DISCOVERY-FIRST WORKFLOW)
 
@@ -808,18 +807,13 @@ navigate_and_wait(
 
 ---
 
-#### `fill_and_search(input_selector: str, search_value: str, verify_result_text: str = None, in_iframe: dict = None, timeout: int = 10000)`
+#### ~~`fill_and_search(input_selector: str, search_value: str, verify_result_text: str = None, in_iframe: dict = None, timeout: int = 10000)`~~
 
-**Procedural**: Fill input + verifica risultato. Utile per ricerche in iframe.
+**⚠️ DEPRECATED**: Use `fill_smart()` + `wait_for_text_content()` instead for better resilience with fallback chain.
 
-**Combina:**
-- Switch to iframe (se `in_iframe` fornito)
-- `fill_input(input_selector, search_value)`
-- Verifica testo risultato appaia
-
-**Esempi:**
+**Migration Example:**
 ```python
-# Search in iframe
+# OLD (deprecated):
 fill_and_search(
     input_selector="input[type='text']",
     search_value="carm",
@@ -827,11 +821,20 @@ fill_and_search(
     in_iframe={"url_pattern": "movementreason"}
 )
 
-# Search senza iframe
-fill_and_search(
-    input_selector="#search-box",
-    search_value="test",
-    verify_result_text="Test Results"
+# NEW (recommended):
+fill_smart(
+    targets=[
+        {"by": "placeholder", "placeholder": "Search"},
+        {"by": "label", "label": "Search"},
+        {"by": "role", "role": "searchbox", "name": "Search"}
+    ],
+    value="carm",
+    in_iframe={"url_pattern": "movementreason"}
+)
+wait_for_text_content(
+    "CARMAG", 
+    timeout=5000,
+    in_iframe={"url_pattern": "movementreason"}
 )
 ```
 
@@ -957,9 +960,25 @@ Attende completamento navigazione (domcontentloaded). Utile dopo click su link/s
 
 ---
 
-#### 13. `wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False)`
+#### 13. `wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False, in_iframe: dict = None)`
 
-Attende che un testo appaia nel DOM. Utile per verificare stato pagina dopo azioni.
+Attende che un testo appaia nel DOM (pagina principale o dentro iframe). Utile per verificare stato pagina dopo azioni o risultati search in iframe.
+
+**Args:**
+- `in_iframe`: Dict per cercare dentro iframe (es: `{"url_pattern": "movementreason"}`)
+
+**Esempi:**
+```python
+# Main page (default)
+wait_for_text_content("Dashboard", timeout=10000)
+
+# Inside iframe (Causali search result)
+wait_for_text_content(
+    "CARMAG",
+    timeout=5000,
+    in_iframe={"url_pattern": "movementreason"}
+)
+```
 
 ---
 
@@ -1294,24 +1313,33 @@ navigate → inspect → discover → copy payload → click_smart → repeat
 
 ---
 
-### Esempio 3: Iframe Search (Procedural Tool)
+### Esempio 3: Iframe Search (Discovery-First + Smart Locators)
 
 ```bash
 curl -X POST http://localhost:5000/api/agent/mcp/test/run \
   -H "Content-Type: application/json" \
   -d '{
-    "test_description": "Navigate to dashboard, use fill_and_search to search for CARMAG inside iframe with URL pattern movementreason, verify result appears"
+    "test_description": "Navigate to Causali page, search for CARMAG inside iframe with URL pattern movementreason"
   }'
 ```
 
-**AI uses procedural tool:**
+**AI uses discovery-first pattern with iframe:**
 ```python
-fill_and_search(
-    input_selector="input[type='text']",
-    search_value="carm",
-    verify_result_text="CARMAG",
+# After navigating to Causali page
+wait_for_load_state(state="domcontentloaded", timeout=30000)
+wait_for_timeout(3000)  # Let iframe Angular initialize
+
+# Discovery-first for iframe (generic WCAG strategies)
+fill_smart(
+    targets=[
+        {"by": "placeholder", "placeholder": "Search"},
+        {"by": "label", "label": "Search"},
+        {"by": "role", "role": "searchbox", "name": "Search"}
+    ],
+    value="carm",
     in_iframe={"url_pattern": "movementreason"}
 )
+wait_for_text_content("CARMAG", timeout=5000)
 ```
 
 ---
@@ -1406,7 +1434,7 @@ python mcp_servers/playwright_server_remote.py
 
 - **inspect_interactive_elements:** Discovery-first workflow tool (vedi sezione Discovery Tools)
 - **click_smart / fill_smart:** Enterprise locators con retry (vedi sezione Smart Locators)
-- **Procedural tools:** get_frame, navigate_and_wait, fill_and_search (vedi sezione Procedural Tools)
+- **Procedural tools:** get_frame, navigate_and_wait
 - **Browser Config:** `backend/config/settings.py`
 
 ### Best Practices
@@ -1423,14 +1451,21 @@ python mcp_servers/playwright_server_remote.py
 
 ## 📝 Changelog
 
-### v3.0.0-discovery (Current)
+### v3.1.0-discovery-first (Current)
+- 🗑️ **DEPRECATED:** `fill_and_search()` (use `fill_smart()` + `wait_for_text_content()`)
+- 🔧 **CHANGED:** Iframe workflow now uses discovery-first approach (treat as external DOM)
+- 🔧 **CHANGED:** Tool count: 19 → 18
+- 📚 **IMPROVED:** System prompt with iframe-as-external-DOM philosophy
+- 📚 **IMPROVED:** Complete migration guide for fill_and_search → fill_smart
+
+### v3.0.0-discovery
 - ✨ **NEW:** `inspect_interactive_elements()` - Discovery-first workflow
 - ✨ **NEW:** `click_smart()` / `fill_smart()` - Enterprise smart locators
-- ✨ **NEW:** Procedural tools: `get_frame()`, `navigate_and_wait()`, `fill_and_search()`
+- ✨ **NEW:** Procedural tools: `get_frame()`, `navigate_and_wait()`
 - ✨ **NEW:** Retry mechanism (3 levels: normal → force → JS click)
 - ✨ **NEW:** `playwright_suggestions` in inspect output (ready-to-use payloads)
 - ✨ **NEW:** WCAG-compliant `accessible_name` extraction
-- 🔧 **CHANGED:** Tool count: 12 → 21
+- 🔧 **CHANGED:** Tool count: 12 → 19
 - 🔧 **CHANGED:** System prompt: discovery-first workflow
 - 🗑️ **DEPRECATED:** `inspect_page_structure()` (use `inspect_interactive_elements()`)
 

@@ -5,7 +5,7 @@ Supporta sia OpenAI che Azure OpenAI.
 """
 
 from agent.utils import extract_final_json, safe_json_loads
-from agent.amc_system_prompt import AMC_SYSTEM_PROMPT_2
+from agent.system_prompt import get_amc_optimized_prompt, get_lab_optimized_prompt
 from config.settings import AppConfig
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langgraph.prebuilt import create_react_agent
@@ -27,7 +27,7 @@ class TestAgentMCP:
         use_remote: Se True, usa MCP server remoto. Se False, usa locale (stdio)
     """
 
-    def __init__(self, custom_prompt=AMC_SYSTEM_PROMPT_2):
+    def __init__(self, custom_prompt=get_lab_optimized_prompt()):
         """
         Inizializza l'agent MCP con configurazione centralizzata.
         
@@ -126,8 +126,8 @@ class TestAgentMCP:
  
     def _build_system_message(self):
         """Build system prompt - usa custom se fornito, altrimenti default AMC"""
-        prompt_template = self.custom_prompt if self.custom_prompt else AMC_SYSTEM_PROMPT
-        return prompt_template.format(current_date=datetime.today().strftime('%Y-%m-%d'))
+        prompt_template = self.custom_prompt if self.custom_prompt else get_lab_optimized_prompt()
+        return prompt_template
 
     async def _initialize(self):
         """Inizializza il client MCP e l'agent"""
@@ -268,11 +268,15 @@ class TestAgentMCP:
                 # Artifact: screenshot -> un artefatto è una prova concreta prodotta dal test.
                 if tool_name == "capture_screenshot" and isinstance(output_obj, dict):
                     if output_obj.get("status") == "success" and output_obj.get("filename"):
-                        artifacts.append({
+                        artifact = {
                             "type": "screenshot",
                             "filename": output_obj.get("filename"),
                             "size_bytes": output_obj.get("size_bytes"),
-                        })
+                        }
+                        # Include base64 if present (when return_base64=True)
+                        if output_obj.get("base64"):
+                            artifact["base64"] = output_obj.get("base64")
+                        artifacts.append(artifact)
 
             # Tool error: eccezioni durante tool execution
             elif event_type == "on_tool_error":
