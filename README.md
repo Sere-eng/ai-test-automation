@@ -47,12 +47,13 @@ L’obiettivo è avere un **tester virtuale** che, dato un requisito funzionale 
 
 ## 🧱 Architettura ad alto livello
 
+```
 User / Tester
    |
    |  (HTTP JSON: test_description)
    v
 Flask API  ───────────────► LangGraph Agent (ReAct)
-                        (LLM multi‑provider: OpenRouter / OpenAI / Azure)
+                        (LLM multi-provider: OpenRouter / OpenAI / Azure)
    |                                  |
    |                                  | MCP Protocol
    |                                  v
@@ -65,3 +66,4 @@ JSON response                MCP Server Playwright (async)
                                      |
                                      v
                                Chromium Headless
+```
