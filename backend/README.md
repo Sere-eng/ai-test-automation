@@ -1,6 +1,6 @@
 Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**, LLM (Large Language Models) e Playwright per automatizzare test di interfacce web con architettura enterprise-ready.
 
-![Tools](https://img.shields.io/badge/Playwright_Tools-18-blue)
+![Tools](https://img.shields.io/badge/Playwright_Tools-20-blue)
 ![Version](https://img.shields.io/badge/version-3.0.0--discovery-green)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![MCP](https://img.shields.io/badge/MCP-1.12.3-purple)
@@ -15,7 +15,7 @@ Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**
 - [Struttura del Progetto](#-struttura-del-progetto)
 - [Setup Completo](#-setup-completo)
 - [Configurazione LLM (OpenAI / Azure / OpenRouter)](#-configurazione-llm-openai--azure--openrouter)
-- [Tool Playwright Disponibili (18 tools)](#️-tool-playwright-disponibili)
+- [Tool Playwright Disponibili (20 tools)](#️-tool-playwright-disponibili)
   - [Discovery Tools](#-discovery-tools-discovery-first-workflow)
     - [inspect_interactive_elements](#inspect_interactive_elements)
   - [Smart Locators](#-smart-locators-enterprise-apps---retry-automatico)
@@ -98,10 +98,10 @@ Questo sistema permette di:
                    ▼
 ┌─────────────────────────────────────────────┐
 │    MCP SERVER (Playwright Tools)            │
-│  - Exposes 21 async tools                   │
+│  - Exposes 20 async tools                   │
 │  - Discovery: inspect_interactive_elements  │
 │  - Smart Locators: click_smart, fill_smart  │
-│  - Procedural: get_frame, navigate_and_wait │
+│  - Procedural: get_frame                    │
 │  - Isolated process                         │
 │  - Returns base64 screenshots               │
 └──────────────────┬──────────────────────────┘
@@ -543,12 +543,14 @@ OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
 
 ## 🛠️ Tool Playwright Disponibili
 
-Il sistema espone **18 tool async** tramite MCP Server, suddivisi in:
-- **Base Tools** (10): browser, navigation, interaction, assertions
-- **Discovery Tools** (1): inspect_interactive_elements
-- **Smart Locators** (2): click_smart, fill_smart (retry automatico + fallback chain)
-- **Procedural Tools** (1): get_frame
-- **Legacy** (2): inspect_page_structure, fill_and_search (deprecati)
+Il sistema espone **20 tool async** tramite MCP Server (lista in `mcp_servers/tool_names.py`):
+
+- **Browser / navigazione**: start_browser, navigate_to_url, wait_for_load_state, close_browser
+- **Pagina / interazione base**: get_page_info, wait_for_element, get_text, check_element_exists, press_key, handle_cookie_banner
+- **Discovery**: inspect_interactive_elements
+- **Smart Locators**: click_smart, fill_smart (retry + fallback chain)
+- **Wait / procedural avanzati**: wait_for_text_content, get_frame, wait_for_clickable_by_name, wait_for_control_by_name_and_type, wait_for_field_by_name, click_and_wait_for_text
+- **Artifact**: capture_screenshot
 
 ### 🔍 Discovery Tools (DISCOVERY-FIRST WORKFLOW)
 
@@ -656,7 +658,7 @@ inspect_interactive_elements()  # Discover home page
 ```
 
 **QUANDO USARLO (CRITICAL):**
-- ✅ **SEMPRE dopo navigate_to_url()** o navigate_and_wait()
+- ✅ **SEMPRE dopo navigate_to_url()**
 - ✅ Dopo click che triggera navigation (menu, tabs)
 - ✅ Prima di interagire con pagine enterprise (Angular/React/Vue)
 - ✅ Per trovare iframe selectors prima di get_frame()
@@ -790,9 +792,9 @@ get_frame(selector="iframe#app-frame", timeout=5000)
 
 ---
 
-#### `navigate_and_wait(click_target: dict, wait_for_text: str = None, wait_timeout: int = 10000, force_click: bool = False)`
+#### `navigate_and_wait(...)` *(non esposto)*
 
-**Procedural**: Click + wait navigation + wait text. Riduce 3 step a 1.
+**Procedural**: Click + wait navigation + wait text. Non è tra i 15 tool attualmente esposti dal server MCP; equivalente: `click_smart` + `wait_for_load_state` / `wait_for_text_content`.
 
 **Combina:**
 - `click_smart(click_target)`
@@ -839,6 +841,74 @@ wait_for_text_content(
     "CARMAG", 
     timeout=5000,
     in_iframe={"url_pattern": "movementreason"}
+)
+```
+
+---
+
+### 🧠 Advanced Wait Tools (Name-based)
+
+Questi tool usano **polling su `inspect_interactive_elements()`** per trovare elementi a partire dal loro nome/logical type, e restituiscono payload già pronti per `click_smart` / `fill_smart`.
+
+#### `wait_for_clickable_by_name(name_substring: str, timeout: int | None = None, case_insensitive: bool = True)`
+
+Aspetta che compaia un **elemento cliccabile** (bottoni, link, tiles) il cui `accessible_name` o testo visibile contenga `name_substring`.
+
+- Usa in polling `inspect_interactive_elements()["clickable_elements"]`.
+- Restituisce: `status`, `message`, `element` completo e `targets` per `click_smart`.
+
+**Esempio (tile LAB):**
+```python
+res = await wait_for_clickable_by_name("Laboratorio Analisi", timeout=20000)
+if res["status"] == "success":
+    await click_smart(res["targets"])
+```
+
+#### `wait_for_control_by_name_and_type(name_substring: str, control_type: str, timeout: int | None = None, case_insensitive: bool = True)`
+
+Aspetta che compaia un **controllo interattivo** specifico (combobox, tab, checkbox, switch), cercando in `inspect_interactive_elements()["interactive_controls"]`.
+
+- `control_type` è il tipo logico (es. `"combobox"`, `"checkbox"`, `"tab"`).
+- Restituisce: `status`, `message`, `element` e `targets` per `click_smart`.
+
+**Esempio (selettore organizzazione LAB):**
+```python
+res = await wait_for_control_by_name_and_type(
+    "Seleziona Organizzazione",
+    control_type="combobox",
+    timeout=15000,
+)
+if res["status"] == "success":
+    await click_smart(res["targets"])
+```
+
+#### `wait_for_field_by_name(name_substring: str, timeout: int | None = None, case_insensitive: bool = True)`
+
+Aspetta che compaia un **campo form** (input/textarea/select) leggendo `inspect_interactive_elements()["form_fields"]`.
+
+- Match su `accessible_name`, `placeholder` o `name` che contengono `name_substring`.
+- Restituisce: `status`, `message`, `element` e `targets` per `fill_smart` (con fallback a CSS id/name).
+
+**Esempio (campo Username):**
+```python
+res = await wait_for_field_by_name("Username", timeout=10000)
+if res["status"] == "success":
+    await fill_smart(res["targets"], "test-user")
+```
+
+#### `click_and_wait_for_text(targets: list[dict], text: str, timeout_per_try: int = AppConfig.AGENT.DEFAULT_TIMEOUT_PER_TRY, text_timeout: int = 30000, in_iframe: dict = None)`
+
+Tool **procedurale composto**: esegue `click_smart(targets)` e poi `wait_for_text_content(text, ...)` (stessa firma di `wait_for_text_content`, con supporto `in_iframe`).
+
+- Utile per step critici dove click + testo atteso vanno sempre insieme (login OK, “Continua”, apertura modulo).
+- Restituisce: `status`, `message`, `click` (risultato di `click_smart`), `text_check` (risultato di `wait_for_text_content`).
+
+**Esempio (click “Login” e attesa testo “Preanalitica”):**
+```python
+await click_and_wait_for_text(
+    targets=login_button_targets,
+    text="Preanalitica",
+    text_timeout=30000,
 )
 ```
 
@@ -909,6 +979,26 @@ await fill_input("input[name='username']", "testuser")
 **Esempio:**
 ```python
 await wait_for_element("#search-results", "visible")
+```
+
+---
+
+#### `wait_for_load_state(state: str = "load", timeout: int = 30000)`
+
+Aspetta che la **pagina nel suo complesso** raggiunga un certo stato di caricamento (equivalente a `page.wait_for_load_state` di Playwright).
+
+**States consigliati:**
+- `"domcontentloaded"` – DOM pronto (più veloce, usato per la maggior parte delle navigazioni).
+- `"load"` – risorse principali caricate.
+- `"networkidle"` – nessuna richiesta in corso (può andare in timeout su SPA con polling).
+
+**Esempi:**
+```python
+# Dopo login o click su "Continua"
+await wait_for_load_state("domcontentloaded", timeout=15000)
+
+# Dopo apertura di una dashboard pesante
+await wait_for_load_state("networkidle", timeout=30000)
 ```
 
 ---
@@ -1438,8 +1528,9 @@ python mcp_servers/playwright_server_remote.py
 
 - **inspect_interactive_elements:** Discovery-first workflow tool (vedi sezione Discovery Tools)
 - **click_smart / fill_smart:** Enterprise locators con retry (vedi sezione Smart Locators)
-- **Procedural tools:** get_frame, navigate_and_wait
+- **Procedural tools:** get_frame
 - **Browser Config:** `backend/config/settings.py`
+- **Guida agentic ai tool Playwright MCP:** `backend/agent/TOOLS.md` (spiegazione per ogni tool con esempi di input/output e note d'uso nei flussi AMC/LAB)
 
 ### Best Practices
 
@@ -1474,7 +1565,7 @@ python mcp_servers/playwright_server_remote.py
 ### v3.0.0-discovery
 - ✨ **NEW:** `inspect_interactive_elements()` - Discovery-first workflow
 - ✨ **NEW:** `click_smart()` / `fill_smart()` - Enterprise smart locators
-- ✨ **NEW:** Procedural tools: `get_frame()`, `navigate_and_wait()`
+- ✨ **NEW:** Procedural tools: `get_frame()`
 - ✨ **NEW:** Retry mechanism (3 levels: normal → force → JS click)
 - ✨ **NEW:** `playwright_suggestions` in inspect output (ready-to-use payloads)
 - ✨ **NEW:** WCAG-compliant `accessible_name` extraction

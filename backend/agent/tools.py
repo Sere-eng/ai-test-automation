@@ -13,7 +13,14 @@ from config.settings import AppConfig
 
 class PlaywrightTools:
     """
-    Classe che contiene i tool per interagire con il browser tramite Playwright (ASYNC)
+    Classe che contiene i tool per interagire con il browser tramite Playwright (ASYNC).
+
+    Ordine dei tool (raw → advanced):
+    - RAW: lifecycle (start/close/navigate), pagina (info, screenshot), elementi (press_key, get_text, wait_for_element), load_state, get_frame
+    - MEDIUM: wait_for_text_content
+    - SMART LOCATORS: click_smart, fill_smart (fallback chain)
+    - INSPECTION: inspect_interactive_elements (scansione per smart/advanced)
+    - ADVANCED: wait_for_clickable_by_name, wait_for_control_by_name_and_type, wait_for_field_by_name, handle_cookie_banner, click_and_wait_for_text
     """
 
     def __init__(self):
@@ -24,7 +31,560 @@ class PlaywrightTools:
         self.page = None
 
     # =====================================================================
-    # SMART LOCATORS - Nuovi Tool Robusti
+    # RAW - Lifecycle & pagina
+    # =====================================================================
+
+    async def start_browser(self, headless=False):
+        """
+        Avvia il browser Chromium con cookie consent pre-impostato per Google
+        """
+        try:
+            self.playwright = await async_playwright().start()
+            
+            # Args: disabilitano rilevamento automazione (navigator.webdriver, feature detection)
+            browser_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+            ]
+            
+            self.browser = await self.playwright.chromium.launch(
+                headless=headless,
+                args=browser_args
+            )
+
+            # SOLUZIONE COOKIE GOOGLE: Pre-imposta cookie di consenso
+            self.context = await self.browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+                locale=AppConfig.PLAYWRIGHT.LOCALE,
+                timezone_id=AppConfig.PLAYWRIGHT.TIMEZONE,
+                viewport={'width': AppConfig.PLAYWRIGHT.VIEWPORT_WIDTH,
+                          'height': AppConfig.PLAYWRIGHT.VIEWPORT_HEIGHT}
+            )
+
+            self.page = await self.context.new_page()
+
+            return {
+                "status": "success",
+                "message": "Browser avviato con successo (stealth mode)",
+                "headless": headless
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore nell'avviare il browser: {str(e)}"
+            }
+
+    async def close_browser(self):
+        """
+        Chiude il browser e pulisce le risorse (ASYNC)
+        """
+        try:
+            if self.page:
+                await self.page.close()
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+
+            self.page = None
+            self.context = None
+            self.browser = None
+            self.playwright = None
+
+            return {
+                "status": "success",
+                "message": "Browser chiuso correttamente"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore nella chiusura: {str(e)}"
+            }
+
+    async def navigate_to_url(self, url):
+        """
+        Naviga a un URL specifico (ASYNC)
+        """
+        try:
+            if not self.page:
+                return {
+                    "status": "error",
+                    "message": "Browser non avviato. Chiama prima start_browser()"
+                }
+
+            # Importante: NON usare più "networkidle" come default.
+            # Molte app moderne (SPA, polling, WebSocket) non raggiungono mai
+            # uno stato di rete completamente idle e causano timeout inutili.
+            # Per la LAB URL e in generale per questi workflow usiamo
+            # "domcontentloaded", che è sufficiente per iniziare ad
+            # interagire con la pagina.
+            await self.page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=AppConfig.PLAYWRIGHT.TIMEOUT,
+            )
+
+            page_title = await self.page.title()
+            current_url = self.page.url
+
+            return {
+                "status": "success",
+                "message": f"Navigato a {url}",
+                "url": current_url,
+                "page_title": page_title
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore nella navigazione: {str(e)}"
+            }
+
+    async def get_page_info(self):
+        """
+        Ottiene informazioni sulla pagina corrente (ASYNC)
+        """
+        try:
+            if not self.page:
+                return {
+                    "status": "error",
+                    "message": "Browser non avviato"
+                }
+
+            return {
+                "status": "success",
+                "url": self.page.url,
+                "title": await self.page.title(),
+                "viewport": self.page.viewport_size
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore: {str(e)}"
+            }
+
+    async def capture_screenshot(self, filename=None, return_base64=False):
+        """
+        Cattura uno screenshot della pagina corrente (ASYNC)
+
+        Args:
+            filename: Nome file per reference (non viene salvato)
+            return_base64: Se True, include base64 nella risposta. Default False.
+
+        Returns:
+            dict con status e opzionalmente base64
+        """
+        try:
+            if not self.page:
+                return {
+                    "status": "error",
+                    "message": "Browser non avviato"
+                }
+
+            if not filename:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"screenshot_{timestamp}.png"
+
+            # Cattura screenshot come bytes
+            screenshot_bytes = await self.page.screenshot(full_page=True)
+
+            result = {
+                "status": "success",
+                "message": f"Screenshot catturato: {filename}",
+                "filename": filename,
+                "size_bytes": len(screenshot_bytes)
+            }
+
+            # Include base64 SOLO se richiesto
+            if return_base64:
+                screenshot_base64 = base64.b64encode(
+                    screenshot_bytes).decode('utf-8')
+                result["base64"] = screenshot_base64
+
+            return result
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore nel catturare screenshot: {str(e)}"
+            }
+
+    # =====================================================================
+    # RAW - Elementi, tastiera, load state, iframe
+    # =====================================================================
+
+    async def press_key(self, key):
+        """
+        Simula la pressione di un tasto (ASYNC)
+        """
+        try:
+            if not self.page:
+                return {
+                    "status": "error",
+                    "message": "Browser non avviato"
+                }
+
+            await self.page.keyboard.press(key)
+
+            return {
+                "status": "success",
+                "message": f"Tasto premuto: {key}",
+                "key": key
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore: {str(e)}",
+                "key": key
+            }
+
+    async def get_text(self, selector, selector_type="css"):
+        """
+        Estrae il testo da un elemento (ASYNC)
+        """
+        try:
+            if not self.page:
+                return {
+                    "status": "error",
+                    "message": "Browser non avviato"
+                }
+
+            if selector_type == "css":
+                locator = self.page.locator(selector)
+            elif selector_type == "xpath":
+                locator = self.page.locator(f"xpath={selector}")
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Tipo selector non supportato: {selector_type}"
+                }
+
+            text = await locator.inner_text()
+
+            return {
+                "status": "success",
+                "message": "Testo estratto con successo",
+                "selector": selector,
+                "text": text
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore nell'estrazione: {str(e)}",
+                "selector": selector
+            }
+
+    async def wait_for_element(self, selector, selector_type="css", state="visible", timeout=30000):
+        """
+        Aspetta che un elemento appaia/scompaia dalla pagina (ASYNC)
+        """
+        try:
+            if not self.page:
+                return {
+                    "status": "error",
+                    "message": "Browser non avviato"
+                }
+
+            if selector_type == "css":
+                locator = self.page.locator(selector)
+            elif selector_type == "xpath":
+                locator = self.page.locator(f"xpath={selector}")
+            elif selector_type == "text":
+                locator = self.page.get_by_text(selector)
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Tipo selector non supportato: {selector_type}"
+                }
+
+            await locator.wait_for(state=state, timeout=timeout)
+
+            return {
+                "status": "success",
+                "message": f"Elemento {selector} è ora {state}",
+                "selector": selector,
+                "state": state
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Timeout o errore: {str(e)}",
+                "selector": selector
+            }
+
+    async def wait_for_load_state(
+        self,
+        state: Literal["load", "domcontentloaded", "networkidle"] = "domcontentloaded",
+        timeout: int = 30000,
+    ) -> dict:
+        """Attende uno specifico load state di Playwright.
+        Nota: su SPA spesso il load event è già avvenuto; questo tool è utile
+        soprattutto dopo navigazioni vere (login redirect, cambio pagina, refresh).
+        """
+        if not self.page:
+            return {
+                "status": "error",
+                "message": "Browser non avviato",
+            }
+
+        try:
+            await self.page.wait_for_load_state(state=state, timeout=timeout)
+            return {
+                "status": "success",
+                "message": f"Load state '{state}' raggiunto",
+                "state": state,
+                "timeout_ms": timeout,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Timeout waiting for load state '{state}'",
+                "state": state,
+                "timeout_ms": timeout,
+                "error": str(e),
+            }
+
+    async def get_frame(
+        self,
+        selector: str = None,
+        url_pattern: str = None,
+        iframe_path: list = None,
+        timeout: int = 10000,
+        return_frame: bool = False,
+    ):
+        """
+        Accede al contenuto di un iframe (anche annidati).
+
+        Args:
+            selector: CSS selector dell'iframe (es: 'iframe[src*="movementreason"]')
+            url_pattern: Pattern dell'URL dell'iframe (alternativa a selector)
+            iframe_path: Lista di dict per iframe annidati (es: [{"url_pattern": "dashboard"}, {"selector": "iframe#widget"}])
+            timeout: Timeout in ms per ogni livello
+            return_frame: Se True, include oggetto Frame per uso interno
+
+        Returns:
+            dict JSON-serializzabile con metadata iframe/frame.
+            Se return_frame=True include anche l'oggetto Frame (NON serializzabile) per uso interno.
+
+        Examples:
+            # Iframe singolo
+            frame = await get_frame(url_pattern="registry/movementreason")
+            
+            # Iframe annidati (dashboard → payment widget → form)
+            frame = await get_frame(iframe_path=[
+                {"url_pattern": "dashboard"},
+                {"selector": "iframe#payment-widget"},
+                {"url_pattern": "checkout-form"}
+            ])
+        """
+        if not self.page:
+            return {"status": "error", "message": "Browser non avviato"}
+
+        try:
+            # Determina strategia: iframe_path (annidati) o selector singolo
+            if iframe_path:
+                # Navigazione multi-livello per iframe annidati
+                context = self.page
+                selectors_used = []
+                frame_urls = []
+                
+                for level_idx, level_spec in enumerate(iframe_path):
+                    level_selector = None
+                    if "selector" in level_spec:
+                        level_selector = level_spec["selector"]
+                    elif "url_pattern" in level_spec:
+                        level_selector = f'iframe[src*="{level_spec["url_pattern"]}"]'
+                    else:
+                        level_selector = 'iframe'
+                    
+                    selectors_used.append(level_selector)
+                    
+                    # Trova iframe nel context corrente (page o frame parent)
+                    iframe_element = await context.wait_for_selector(level_selector, timeout=timeout)
+                    
+                    # Accedi al content_frame
+                    frame = await iframe_element.content_frame()
+                    if frame is None:
+                        return {
+                            "status": "error",
+                            "message": f"Iframe livello {level_idx + 1} trovato ma content_frame() è None",
+                            "iframe_path": iframe_path,
+                            "selectors_used": selectors_used,
+                            "failed_at_level": level_idx + 1,
+                        }
+                    
+                    await frame.wait_for_load_state('load', timeout=timeout)
+                    frame_urls.append(getattr(frame, "url", None))
+                    
+                    # Il frame diventa il nuovo context per il prossimo livello
+                    context = frame
+                
+                # context ora è il frame più profondo
+                result = {
+                    "status": "success",
+                    "message": f"Frame annidato trovato ({len(iframe_path)} livelli)",
+                    "iframe_path": iframe_path,
+                    "selectors_used": selectors_used,
+                    "frame_urls": frame_urls,
+                    "final_frame_url": frame_urls[-1] if frame_urls else None,
+                    "levels": len(iframe_path),
+                    "timeout_ms": timeout,
+                }
+                if return_frame:
+                    result["frame"] = context  # frame più profondo
+                return result
+                
+            else:
+                # Singolo iframe (backward compatibility)
+                iframe_selector_used = None
+                if selector:
+                    iframe_selector_used = selector
+                elif url_pattern:
+                    iframe_selector_used = f'iframe[src*="{url_pattern}"]'
+                else:
+                    iframe_selector_used = 'iframe'
+
+                # Prova prima con il selector specifico; se non trova nulla e avevamo
+                # un url_pattern, fai fallback al primo iframe generico invece di
+                # andare in timeout per 60s.
+                try:
+                    iframe_element = await self.page.wait_for_selector(iframe_selector_used, timeout=timeout)
+                except Exception as e:
+                    if url_pattern:
+                        # Fallback: primo iframe disponibile
+                        iframe_selector_used = 'iframe'
+                        iframe_element = await self.page.wait_for_selector(iframe_selector_used, timeout=timeout)
+                    else:
+                        raise
+
+                # Accedi al frame content
+                frame = await iframe_element.content_frame()
+                if frame is None:
+                    return {
+                        "status": "error",
+                        "message": "Iframe trovato ma content_frame() è None",
+                        "iframe_selector": iframe_selector_used,
+                        "timeout_ms": timeout,
+                    }
+
+                await frame.wait_for_load_state('load', timeout=timeout)
+
+                result = {
+                    "status": "success",
+                    "message": "Frame trovato e caricato",
+                    "iframe_selector": iframe_selector_used,
+                    "url_pattern": url_pattern,
+                    "frame_url": getattr(frame, "url", None),
+                    "timeout_ms": timeout,
+                }
+                if return_frame:
+                    result["frame"] = frame
+                return result
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore accesso iframe: {str(e)}"
+            }
+
+    # =====================================================================
+    # MEDIUM - Wait per testo
+    # =====================================================================
+
+    async def wait_for_text_content(
+        self,
+        text: str,
+        timeout: int = 30000,
+        case_sensitive: bool = False,
+        in_iframe: dict = None
+    ):
+        """
+        Aspetta che un testo specifico appaia OVUNQUE nella pagina o dentro un iframe.
+        Utile per verificare messaggi di successo, titoli, nomi elementi dopo azioni AJAX.
+
+        Args:
+            text: Testo da cercare
+            timeout: Timeout in ms (default: 30000)
+            case_sensitive: Se True, match esatto (default: False)
+            in_iframe: Dict per cercare dentro iframe (opzionale)
+                {"url_pattern": "movementreason"} - iframe singolo
+                {"iframe_path": [{...}, {...}]} - iframe annidati
+
+        Returns:
+            dict con status e informazioni sul testo trovato
+
+        Example:
+            # Dopo login, aspetta che appaia "Dashboard" (pagina principale)
+            await wait_for_text_content("Dashboard", timeout=10000)
+
+            # Dopo search in iframe Causali, aspetta risultato dentro iframe
+            await wait_for_text_content(
+                "CARMAG", 
+                timeout=5000,
+                in_iframe={"url_pattern": "movementreason"}
+            )
+        """
+        if not self.page:
+            return {
+                "status": "error",
+                "message": "Browser non avviato"
+            }
+        try:
+            # Determina il contesto (page o frame)
+            context = self.page
+            if in_iframe:
+                # Naviga al frame target (stessa semantica di inspect_interactive_elements)
+                frame_result = await self.get_frame(
+                    selector=in_iframe.get("selector"),
+                    url_pattern=in_iframe.get("url_pattern"),
+                    iframe_path=in_iframe.get("iframe_path"),
+                    timeout=timeout,
+                    return_frame=True,
+                )
+                if frame_result.get("status") == "error":
+                    return frame_result
+                # Usa direttamente l'oggetto frame restituito
+                context = frame_result.get("frame", self.page)
+            
+            # Costruisci selector Playwright per text
+            if case_sensitive:
+                selector = f"text={text}"
+            else:
+                # Case-insensitive con regex
+                selector = f"text=/{text}/i"
+
+            # Aspetta che l'elemento con quel testo sia visibile
+            await context.wait_for_selector(
+                selector,
+                timeout=timeout,
+                state="visible",
+            )
+
+            return {
+                "status": "success",
+                "message": f"Testo '{text}' trovato e visibile",
+                "text": text,
+                "case_sensitive": case_sensitive
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Testo '{text}' non trovato dopo {timeout}ms",
+                "text": text,
+                "timeout_ms": timeout
+            }
+
+    # =====================================================================
+    # SMART LOCATORS - Click/Fill con fallback chain
     # =====================================================================
     async def click_smart(
         self,
@@ -132,10 +692,10 @@ class PlaywrightTools:
                     tfa = target.get("tfa")
                     locator = context.locator(f'[data-tfa="{tfa}"]')
 
-                # Strategy 6: CSS selector (fallback)
-                elif by == "css":
+                # Strategy 6: CSS selector (fallback; accept css_name/css_id from model)
+                elif by in ("css", "css_name", "css_id"):
                     selector = target.get("selector")
-                    locator = context.locator(selector)
+                    locator = context.locator(selector) if selector else None
 
                 # Strategy 7: XPath (last resort)
                 elif by == "xpath":
@@ -309,8 +869,9 @@ class PlaywrightTools:
                 elif by == "tfa":
                     locator = context.locator(
                         f'[data-tfa="{target.get("tfa")}"]')
-                elif by == "css":
-                    locator = context.locator(target.get("selector"))
+                elif by in ("css", "css_name", "css_id"):
+                    selector = target.get("selector")
+                    locator = context.locator(selector) if selector else None
                 elif by == "xpath":
                     locator = context.locator(f"xpath={target.get('xpath')}")
                 
@@ -365,101 +926,36 @@ class PlaywrightTools:
         }
 
     # =====================================================================
-    # TOOL ORIGINALI (mantieni compatibilità)
+    # INSPECTION - Scansione elementi interattivi (per smart/advanced)
     # =====================================================================
 
-    async def start_browser(self, headless=False):
+    async def inspect_interactive_elements(self, in_iframe: dict = None):
         """
-        Avvia il browser Chromium con cookie consent pre-impostato per Google
-        """
-        try:
-            self.playwright = await async_playwright().start()
-            
-            # Args: disabilitano rilevamento automazione (navigator.webdriver, feature detection)
-            browser_args = [
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
-            ]
-            
-            self.browser = await self.playwright.chromium.launch(
-                headless=headless,
-                args=browser_args
-            )
+        Scansiona TUTTI gli elementi interattivi della pagina usando solo standard web.
+        Trova: iframe, button, link, input, select, textarea, checkbox, radio, switch, tabs + ARIA roles.
+        Estrae: accessible_name, aria-label, role, testo visibile, checked state, options.
 
-            # SOLUZIONE COOKIE GOOGLE: Pre-imposta cookie di consenso
-            self.context = await self.browser.new_context(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-                locale=AppConfig.PLAYWRIGHT.LOCALE,
-                timezone_id=AppConfig.PLAYWRIGHT.TIMEZONE,
-                viewport={'width': AppConfig.PLAYWRIGHT.VIEWPORT_WIDTH,
-                          'height': AppConfig.PLAYWRIGHT.VIEWPORT_HEIGHT}
-            )
-
-            self.page = await self.context.new_page()
-
-            return {
-                "status": "success",
-                "message": "Browser avviato con successo (stealth mode)",
-                "headless": headless
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore nell'avviare il browser: {str(e)}"
-            }
-
-    async def navigate_to_url(self, url):
-        """
-        Naviga a un URL specifico (ASYNC)
-        """
-        try:
-            if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato. Chiama prima start_browser()"
-                }
-
-            # Importante: NON usare più "networkidle" come default.
-            # Molte app moderne (SPA, polling, WebSocket) non raggiungono mai
-            # uno stato di rete completamente idle e causano timeout inutili.
-            # Per la LAB URL e in generale per questi workflow usiamo
-            # "domcontentloaded", che è sufficiente per iniziare ad
-            # interagire con la pagina.
-            await self.page.goto(
-                url,
-                wait_until="domcontentloaded",
-                timeout=AppConfig.PLAYWRIGHT.TIMEOUT,
-            )
-
-            page_title = await self.page.title()
-            current_url = self.page.url
-
-            return {
-                "status": "success",
-                "message": f"Navigato a {url}",
-                "url": current_url,
-                "page_title": page_title
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore nella navigazione: {str(e)}"
-            }
-
-    async def capture_screenshot(self, filename=None, return_base64=False):
-        """
-        Cattura uno screenshot della pagina corrente (ASYNC)
+        Preferisce standard WCAG (role/label/text). Se presente, include anche `data-tfa`
+        come fallback "test id" (utile in app corporate) ma con priorità più bassa.
 
         Args:
-            filename: Nome file per reference (non viene salvato)
-            return_base64: Se True, include base64 nella risposta. Default False.
+            in_iframe: opzionale dict per ispezionare l'interno di un iframe invece
+                       della pagina principale. Stessa semantica usata da altri tool:
+                       {"url_pattern": "..."} oppure {"selector": "..."} oppure
+                       {"iframe_path": [{...}, {...}]} per iframe annidati.
 
         Returns:
-            dict con status e opzionalmente base64
+            dict con:
+            - iframes: Liste iframe con src/name
+            - clickable_elements: Button, link, menu items → click_smart strategies
+            - interactive_controls: Checkbox, radio, switch, tabs, select → click_smart strategies
+            - form_fields: Text input, password, email, textarea → fill_smart strategies
+            - page_info: URL, title
+
+        Example:
+            result = await inspect_interactive_elements()
+            # Returns: {"iframes": [...], "clickable_elements": [...],
+            #           "interactive_controls": [...], "form_fields": [...]}
         """
         try:
             if not self.page:
@@ -468,189 +964,325 @@ class PlaywrightTools:
                     "message": "Browser non avviato"
                 }
 
-            if not filename:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"screenshot_{timestamp}.png"
+            # Determina il contesto: pagina principale o iframe selezionato
+            context = self.page
+            page_url = self.page.url
+            page_title = await self.page.title()
 
-            # Cattura screenshot come bytes
-            screenshot_bytes = await self.page.screenshot(full_page=True)
+            if in_iframe:
+                # Usa get_frame per individuare il frame corretto (singolo o annidato)
+                frame_result = await self.get_frame(
+                    selector=in_iframe.get("selector"),
+                    url_pattern=in_iframe.get("url_pattern"),
+                    iframe_path=in_iframe.get("iframe_path"),
+                    timeout=AppConfig.PLAYWRIGHT.TIMEOUT,
+                    return_frame=True,
+                )
+                if frame_result.get("status") == "error":
+                    return frame_result
 
-            result = {
+                context = frame_result.get("frame")
+                # Aggiorna info pagina con URL del frame, se disponibile
+                page_url = frame_result.get("frame_url") or getattr(context, "url", page_url)
+                try:
+                    page_title = await context.title()
+                except Exception:
+                    # Alcuni frame potrebbero non avere titolo accessibile
+                    pass
+
+            # === 1. IFRAME (nel contesto corrente) ===
+            iframes = await context.locator("iframe").all()
+            iframe_info = []
+
+            for idx, iframe in enumerate(iframes):
+                try:
+                    src = await iframe.get_attribute("src") or ""
+                    title = await iframe.get_attribute("title") or ""
+                    name = await iframe.get_attribute("name") or ""
+
+                    iframe_info.append({
+                        "index": idx,
+                        "src": src,
+                        "title": title,
+                        "name": name,
+                        "selector": f"iframe[src*='{src.split('/')[-1][:30]}']" if src else f"iframe >> nth={idx}"
+                    })
+                except Exception as e:
+                    print(f"Error inspecting iframe {idx}: {e}")
+                    continue
+
+            # === 2. ELEMENTI CLICCABILI ===
+            clickable_selector = (
+                "button, a, input[type='submit'], input[type='button'], "
+                "[role='button'], [role='link'], [role='menuitem'], [role='option'], "
+                "div.ds-tab-navigation-link-container, div.ds-tab-navigation-link-text, "
+                "div.ds-tool-card-wrapper, div.filter-wrapper.pointer, div.ds-add-button-container"
+            )
+            clickables = await context.locator(clickable_selector).all()
+            clickable_info = []
+
+            for idx, elem in enumerate(clickables):
+                try:
+                    tag = await elem.evaluate("el => el.tagName.toLowerCase()")
+                    accessible_name = await elem.evaluate("""
+                        el => {
+                            if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
+                            if (el.getAttribute('aria-labelledby')) {
+                                const labelId = el.getAttribute('aria-labelledby');
+                                const labelEl = document.getElementById(labelId);
+                                if (labelEl) return labelEl.textContent.trim();
+                            }
+                            if (el.textContent && el.textContent.trim()) return el.textContent.trim();
+                            if (el.title) return el.title;
+                            if (el.value) return el.value;
+                            return null;
+                        }
+                    """)
+                    role = await elem.get_attribute("role")
+                    aria_label = await elem.get_attribute("aria-label")
+                    data_tfa = await elem.get_attribute("data-tfa")
+                    effective_role = role if role else {
+                        'button': 'button', 'a': 'link', 'input': 'button'
+                    }.get(tag, None)
+                    visible_text = ""
+                    try:
+                        visible_text = await elem.inner_text()
+                        visible_text = visible_text.strip()[:100]
+                    except Exception:
+                        pass
+                    suggestions = []
+                    if effective_role and accessible_name:
+                        suggestions.append({
+                            "strategy": "role",
+                            "click_smart": {"by": "role", "role": effective_role, "name": accessible_name}
+                        })
+                    if aria_label:
+                        suggestions.append({
+                            "strategy": "css_aria",
+                            "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
+                        })
+                    if visible_text:
+                        suggestions.append({
+                            "strategy": "text",
+                            "click_smart": {"by": "text", "text": visible_text}
+                        })
+                    if data_tfa:
+                        suggestions.append({
+                            "strategy": "tfa",
+                            "click_smart": {"by": "tfa", "tfa": data_tfa}
+                        })
+                    clickable_info.append({
+                        "index": idx, "tag": tag, "role": effective_role,
+                        "accessible_name": accessible_name, "text": visible_text,
+                        "aria_label": aria_label, "data_tfa": data_tfa,
+                        "playwright_suggestions": suggestions
+                    })
+                except Exception as e:
+                    print(f"Error inspecting clickable {idx}: {e}")
+                    continue
+
+            # === 3. FORM FIELDS ===
+            form_fields = await context.locator("input, select, textarea").all()
+            field_info = []
+            for idx, field in enumerate(form_fields):
+                try:
+                    tag = await field.evaluate("el => el.tagName.toLowerCase()")
+                    field_type = await field.get_attribute("type") if tag == "input" else tag
+                    accessible_name = await field.evaluate("""
+                        el => {
+                            if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
+                            if (el.id) {
+                                const label = document.querySelector(`label[for="${el.id}"]`);
+                                if (label) return label.textContent.trim();
+                            }
+                            if (el.placeholder) return el.placeholder;
+                            if (el.name) return el.name;
+                            return null;
+                        }
+                    """)
+                    aria_label = await field.get_attribute("aria-label")
+                    placeholder = await field.get_attribute("placeholder") or ""
+                    name = await field.get_attribute("name") or ""
+                    input_id = await field.get_attribute("id") or ""
+                    suggestions = []
+                    if accessible_name:
+                        suggestions.append({
+                            "strategy": "label",
+                            "fill_smart": {"by": "label", "label": accessible_name}
+                        })
+                    if placeholder:
+                        suggestions.append({
+                            "strategy": "placeholder",
+                            "fill_smart": {"by": "placeholder", "placeholder": placeholder}
+                        })
+                    if field_type:
+                        role_map = {
+                            "text": "textbox", "email": "textbox", "password": "textbox",
+                            "search": "searchbox", "tel": "textbox", "url": "textbox",
+                            "select": "combobox", "textarea": "textbox"
+                        }
+                        role_name = role_map.get(field_type)
+                        if role_name and accessible_name:
+                            suggestions.append({
+                                "strategy": "role",
+                                "fill_smart": {"by": "role", "role": role_name, "name": accessible_name}
+                            })
+                    if name:
+                        suggestions.append({
+                            "strategy": "css_name",
+                            "fill_smart": {"by": "css", "selector": f'[name="{name}"]'}
+                        })
+                    if input_id:
+                        suggestions.append({
+                            "strategy": "css_id",
+                            "fill_smart": {"by": "css", "selector": f'#{input_id}'}
+                        })
+                    if aria_label:
+                        suggestions.append({
+                            "strategy": "css_aria",
+                            "fill_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
+                        })
+                    data_tfa = await field.get_attribute("data-tfa")
+                    if data_tfa:
+                        suggestions.append({
+                            "strategy": "tfa",
+                            "fill_smart": {"by": "tfa", "tfa": data_tfa}
+                        })
+                    field_info.append({
+                        "index": idx, "tag": tag, "type": field_type,
+                        "accessible_name": accessible_name, "aria_label": aria_label,
+                        "placeholder": placeholder, "name": name, "id": input_id,
+                        "playwright_suggestions": suggestions
+                    })
+                except Exception as e:
+                    print(f"Error inspecting field {idx}: {e}")
+                    continue
+
+            # === 4. INTERACTIVE CONTROLS ===
+            interactive_selector = """
+                input[type='checkbox'], input[type='radio'], select, input[type='file'],
+                input[type='range'], input[type='color'],
+                [role='checkbox'], [role='radio'], [role='switch'], [role='tab'], [role='combobox']
+            """
+            interactives = await context.locator(interactive_selector).all()
+            interactive_info = []
+            for idx, elem in enumerate(interactives):
+                try:
+                    tag = await elem.evaluate("el => el.tagName.toLowerCase()")
+                    elem_type = await elem.get_attribute("type") if tag == "input" else tag
+                    role = await elem.get_attribute("role")
+                    effective_type = role if role else elem_type
+                    accessible_name = await elem.evaluate("""
+                        el => {
+                            if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
+                            if (el.id) {
+                                const label = document.querySelector(`label[for="${el.id}"]`);
+                                if (label) return label.textContent.trim();
+                            }
+                            if (el.getAttribute('aria-labelledby')) {
+                                const labelId = el.getAttribute('aria-labelledby');
+                                const labelEl = document.getElementById(labelId);
+                                if (labelEl) return labelEl.textContent.trim();
+                            }
+                            if (el.title) return el.title;
+                            if (el.name) return el.name;
+                            return null;
+                        }
+                    """)
+                    aria_label = await elem.get_attribute("aria-label")
+                    name = await elem.get_attribute("name") or ""
+                    elem_id = await elem.get_attribute("id") or ""
+                    data_tfa = await elem.get_attribute("data-tfa")
+                    checked = None
+                    if effective_type in ["checkbox", "radio", "switch"]:
+                        checked = await elem.is_checked()
+                    selected = None
+                    if effective_type == "tab":
+                        selected = await elem.get_attribute("aria-selected") == "true"
+                    options = []
+                    if tag == "select":
+                        option_elements = await elem.locator("option").all()
+                        for opt in option_elements:
+                            opt_text = await opt.inner_text()
+                            opt_value = await opt.get_attribute("value")
+                            options.append({"text": opt_text.strip(), "value": opt_value})
+                    suggestions = []
+                    if effective_type in ["checkbox", "radio", "switch", "tab"]:
+                        if accessible_name:
+                            suggestions.append({
+                                "strategy": "role",
+                                "click_smart": {"by": "role", "role": effective_type, "name": accessible_name}
+                            })
+                        if accessible_name and tag == "input":
+                            suggestions.append({
+                                "strategy": "label",
+                                "click_smart": {"by": "label", "label": accessible_name}
+                            })
+                        if accessible_name:
+                            suggestions.append({
+                                "strategy": "text",
+                                "click_smart": {"by": "text", "text": accessible_name}
+                            })
+                        if aria_label:
+                            suggestions.append({
+                                "strategy": "css_aria",
+                                "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
+                            })
+                        if name:
+                            suggestions.append({
+                                "strategy": "css_name",
+                                "click_smart": {"by": "css", "selector": f'[name="{name}"]'}
+                            })
+                        if data_tfa:
+                            suggestions.append({
+                                "strategy": "tfa",
+                                "click_smart": {"by": "tfa", "tfa": data_tfa}
+                            })
+                    elif tag == "select":
+                        suggestions.append({
+                            "strategy": "note", "action": "select_option",
+                            "message": "Use fill_smart with value, or click_smart to open dropdown then click option"
+                        })
+                    elif elem_type == "file":
+                        suggestions.append({
+                            "strategy": "note", "action": "set_input_files",
+                            "message": "File upload requires dedicated tool (not yet implemented)"
+                        })
+                    elif elem_type in ["range", "color"] and accessible_name:
+                        suggestions.append({
+                            "strategy": "fill",
+                            "fill_smart": {"by": "label", "label": accessible_name}
+                        })
+                    interactive_info.append({
+                        "index": idx, "tag": tag, "type": effective_type,
+                        "accessible_name": accessible_name, "aria_label": aria_label,
+                        "name": name, "id": elem_id, "data_tfa": data_tfa,
+                        "checked": checked, "selected": selected,
+                        "options": options if options else None,
+                        "playwright_suggestions": suggestions
+                    })
+                except Exception as e:
+                    print(f"Error inspecting interactive {idx}: {e}")
+                    continue
+
+            return {
                 "status": "success",
-                "message": f"Screenshot catturato: {filename}",
-                "filename": filename,
-                "size_bytes": len(screenshot_bytes)
+                "message": f"Found: {len(iframe_info)} iframes, {len(clickable_info)} clickable, {len(interactive_info)} interactive controls, {len(field_info)} form fields",
+                "page_info": {"url": page_url, "title": page_title},
+                "iframes": iframe_info,
+                "clickable_elements": clickable_info,
+                "interactive_controls": interactive_info,
+                "form_fields": field_info
             }
-
-            # Include base64 SOLO se richiesto
-            if return_base64:
-                screenshot_base64 = base64.b64encode(
-                    screenshot_bytes).decode('utf-8')
-                result["base64"] = screenshot_base64
-
-            return result
-
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Errore nel catturare screenshot: {str(e)}"
+                "message": f"Error inspecting page: {str(e)}"
             }
 
-    async def close_browser(self):
-        """
-        Chiude il browser e pulisce le risorse (ASYNC)
-        """
-        try:
-            if self.page:
-                await self.page.close()
-            if self.context:
-                await self.context.close()
-            if self.browser:
-                await self.browser.close()
-            if self.playwright:
-                await self.playwright.stop()
-
-            self.page = None
-            self.context = None
-            self.browser = None
-            self.playwright = None
-
-            return {
-                "status": "success",
-                "message": "Browser chiuso correttamente"
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore nella chiusura: {str(e)}"
-            }
-
-    async def get_page_info(self):
-        """
-        Ottiene informazioni sulla pagina corrente (ASYNC)
-        """
-        try:
-            if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
-
-            return {
-                "status": "success",
-                "url": self.page.url,
-                "title": await self.page.title(),
-                "viewport": self.page.viewport_size
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore: {str(e)}"
-            }
-
-    # ==================== TOOL AVANZATI ASYNC ====================
-
-    async def wait_for_element(self, selector, selector_type="css", state="visible", timeout=30000):
-        """
-        Aspetta che un elemento appaia/scompaia dalla pagina (ASYNC)
-        """
-        try:
-            if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
-
-            if selector_type == "css":
-                locator = self.page.locator(selector)
-            elif selector_type == "xpath":
-                locator = self.page.locator(f"xpath={selector}")
-            elif selector_type == "text":
-                locator = self.page.get_by_text(selector)
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Tipo selector non supportato: {selector_type}"
-                }
-
-            await locator.wait_for(state=state, timeout=timeout)
-
-            return {
-                "status": "success",
-                "message": f"Elemento {selector} è ora {state}",
-                "selector": selector,
-                "state": state
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Timeout o errore: {str(e)}",
-                "selector": selector
-            }
-
-    async def get_text(self, selector, selector_type="css"):
-        """
-        Estrae il testo da un elemento (ASYNC)
-        """
-        try:
-            if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
-
-            if selector_type == "css":
-                locator = self.page.locator(selector)
-            elif selector_type == "xpath":
-                locator = self.page.locator(f"xpath={selector}")
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Tipo selector non supportato: {selector_type}"
-                }
-
-            text = await locator.inner_text()
-
-            return {
-                "status": "success",
-                "message": "Testo estratto con successo",
-                "selector": selector,
-                "text": text
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore nell'estrazione: {str(e)}",
-                "selector": selector
-            }
-
-    async def press_key(self, key):
-        """
-        Simula la pressione di un tasto (ASYNC)
-        """
-        try:
-            if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
-
-            await self.page.keyboard.press(key)
-
-            return {
-                "status": "success",
-                "message": f"Tasto premuto: {key}",
-                "key": key
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore: {str(e)}",
-                "key": key
-            }
+    # =====================================================================
+    # ADVANCED - Wait by name, cookie banner, composed
+    # =====================================================================
 
     async def wait_for_clickable_by_name(
         self,
@@ -1007,487 +1639,6 @@ class PlaywrightTools:
             ),
         }
 
-
-    async def inspect_interactive_elements(self, in_iframe: dict = None):
-        """
-        Scansiona TUTTI gli elementi interattivi della pagina usando solo standard web.
-        Trova: iframe, button, link, input, select, textarea, checkbox, radio, switch, tabs + ARIA roles.
-        Estrae: accessible_name, aria-label, role, testo visibile, checked state, options.
-
-        Preferisce standard WCAG (role/label/text). Se presente, include anche `data-tfa`
-        come fallback "test id" (utile in app corporate) ma con priorità più bassa.
-
-        Args:
-            in_iframe: opzionale dict per ispezionare l'interno di un iframe invece
-                       della pagina principale. Stessa semantica usata da altri tool:
-                       {"url_pattern": "..."} oppure {"selector": "..."} oppure
-                       {"iframe_path": [{...}, {...}]} per iframe annidati.
-
-        Returns:
-            dict con:
-            - iframes: Liste iframe con src/name
-            - clickable_elements: Button, link, menu items → click_smart strategies
-            - interactive_controls: Checkbox, radio, switch, tabs, select → click_smart strategies
-            - form_fields: Text input, password, email, textarea → fill_smart strategies
-            - page_info: URL, title
-
-        Example:
-            result = await inspect_interactive_elements()
-            # Returns: {"iframes": [...], "clickable_elements": [...], 
-            #           "interactive_controls": [...], "form_fields": [...]}
-        """
-        try:
-            if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
-
-            # Determina il contesto: pagina principale o iframe selezionato
-            context = self.page
-            page_url = self.page.url
-            page_title = await self.page.title()
-
-            if in_iframe:
-                # Usa get_frame per individuare il frame corretto (singolo o annidato)
-                frame_result = await self.get_frame(
-                    selector=in_iframe.get("selector"),
-                    url_pattern=in_iframe.get("url_pattern"),
-                    iframe_path=in_iframe.get("iframe_path"),
-                    timeout=AppConfig.PLAYWRIGHT.TIMEOUT,
-                    return_frame=True,
-                )
-                if frame_result.get("status") == "error":
-                    return frame_result
-
-                context = frame_result.get("frame")
-                # Aggiorna info pagina con URL del frame, se disponibile
-                page_url = frame_result.get("frame_url") or getattr(context, "url", page_url)
-                try:
-                    page_title = await context.title()
-                except Exception:
-                    # Alcuni frame potrebbero non avere titolo accessibile
-                    pass
-
-            # === 1. IFRAME (nel contesto corrente) ===
-            iframes = await context.locator("iframe").all()
-            iframe_info = []
-
-            for idx, iframe in enumerate(iframes):
-                try:
-                    src = await iframe.get_attribute("src") or ""
-                    title = await iframe.get_attribute("title") or ""
-                    name = await iframe.get_attribute("name") or ""
-
-                    iframe_info.append({
-                        "index": idx,
-                        "src": src,
-                        "title": title,
-                        "name": name,
-                        "selector": f"iframe[src*='{src.split('/')[-1][:30]}']" if src else f"iframe >> nth={idx}"
-                    })
-                except Exception as e:
-                    print(f"Error inspecting iframe {idx}: {e}")
-                    continue
-
-            # === 2. ELEMENTI CLICCABILI ===
-            # Selector bilanciato tra copertura e precisione:
-            # - HTML nativi: button, a, input[submit/button] (semantici, standard)
-            # - ARIA roles: [role='button/link/menuitem/option'] (framework moderni - Angular/React/Material)
-            # - Componenti custom ENG/DS: link di navigazione tab-based (es. "Filters")
-            #   resi come DIV con classi specifiche → li includiamo esplicitamente.
-            # INCLUSIONI: copre 99% UI moderne, trova Micrologistica (DIV con role="button"),
-            #             le opzioni dei mat-select (role="option") e le tab "Filters" / "Instruments".
-            # ESCLUSIONI: NO div/span generici senza role/class (troppi falsi positivi), NO [onclick] (deprecato)
-            clickable_selector = (
-                "button, a, input[type='submit'], input[type='button'], "
-                "[role='button'], [role='link'], [role='menuitem'], [role='option'], "
-                "div.ds-tab-navigation-link-container, div.ds-tab-navigation-link-text, "
-                "div.ds-tool-card-wrapper, div.filter-wrapper.pointer, div.ds-add-button-container"
-            )
-            clickables = await context.locator(clickable_selector).all()
-            clickable_info = []
-
-            for idx, elem in enumerate(clickables):
-                try:
-                    tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-
-                    # Accessible name (WCAG standard) - RICHIEDE JAVASCRIPT:
-                    # 1. aria-labelledby richiede DOM traversal (getElementById) - impossibile da Python
-                    # 2. Algoritmo prioritario condizionale (aria-label → aria-labelledby → text → title → value)
-                    # 3. Python get_attribute() restituirebbe solo stringhe grezze, non il "nome computato"
-                    # Spec: https://www.w3.org/TR/accname-1.1/
-                    accessible_name = await elem.evaluate("""
-                        el => {
-                            if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
-                            if (el.getAttribute('aria-labelledby')) {
-                                const labelId = el.getAttribute('aria-labelledby');
-                                const labelEl = document.getElementById(labelId);
-                                if (labelEl) return labelEl.textContent.trim();
-                            }
-                            if (el.textContent && el.textContent.trim()) return el.textContent.trim();
-                            if (el.title) return el.title;
-                            if (el.value) return el.value;
-                            return null;
-                        }
-                    """)
-
-                    # ARIA attributes
-                    role = await elem.get_attribute("role")
-                    aria_label = await elem.get_attribute("aria-label")
-                    
-                    # Test automation ID
-                    data_tfa = await elem.get_attribute("data-tfa")
-
-                    # Effective role (se non esplicito, deduci dal tag)
-                    effective_role = role if role else {
-                        'button': 'button',
-                        'a': 'link',
-                        'input': 'button'
-                    }.get(tag, None)
-
-                    # Testo visibile
-                    visible_text = ""
-                    try:
-                        visible_text = await elem.inner_text()
-                        visible_text = visible_text.strip()[:100]
-                    except:
-                        pass
-
-                    # Playwright locator suggestions (TUTTE le strategie supportate da click_smart)
-                    # Ordine di preferenza (WCAG-first + fallback): role > css_aria > text > tfa
-                    suggestions = []
-                    
-                    # 1. Role (WCAG - più robusto, disambigua meglio i duplicati)
-                    if effective_role and accessible_name:
-                        suggestions.append({
-                            "strategy": "role",
-                            "click_smart": {"by": "role", "role": effective_role, "name": accessible_name}
-                        })
-
-                    # 2. Aria-label via CSS (fallback per icone Angular senza role chiaro)
-                    if aria_label:
-                        suggestions.append({
-                            "strategy": "css_aria",
-                            "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                        })
-                    
-                    # 3. Text content (fallback se aria/role mancanti)
-                    if visible_text:
-                        suggestions.append({
-                            "strategy": "text",
-                            "click_smart": {"by": "text", "text": visible_text}
-                        })
-                    
-                    # 4. Data-tfa (ultima - IDs possono cambiare con refactoring)
-                    if data_tfa:
-                        suggestions.append({
-                            "strategy": "tfa",
-                            "click_smart": {"by": "tfa", "tfa": data_tfa}
-                        })
-
-                    clickable_info.append({
-                        "index": idx,
-                        "tag": tag,
-                        "role": effective_role,
-                        "accessible_name": accessible_name,
-                        "text": visible_text,
-                        "aria_label": aria_label,
-                        "data_tfa": data_tfa,
-                        "playwright_suggestions": suggestions
-                    })
-                except Exception as e:
-                    print(f"Error inspecting clickable {idx}: {e}")
-                    continue
-
-            # === 3. FORM FIELDS ===
-            form_fields = await context.locator("input, select, textarea").all()
-            field_info = []
-
-            for idx, field in enumerate(form_fields):
-                try:
-                    tag = await field.evaluate("el => el.tagName.toLowerCase()")
-                    field_type = await field.get_attribute("type") if tag == "input" else tag
-
-                    # Accessible name per input
-                    accessible_name = await field.evaluate("""
-                        el => {
-                            if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
-                            if (el.id) {
-                                const label = document.querySelector(`label[for="${el.id}"]`);
-                                if (label) return label.textContent.trim();
-                            }
-                            if (el.placeholder) return el.placeholder;
-                            if (el.name) return el.name;
-                            return null;
-                        }
-                    """)
-
-                    aria_label = await field.get_attribute("aria-label")
-                    placeholder = await field.get_attribute("placeholder") or ""
-                    name = await field.get_attribute("name") or ""
-                    input_id = await field.get_attribute("id") or ""
-
-                    # Playwright locator suggestions (TUTTE le strategie supportate da fill_smart)
-                    # Ordine di preferenza: label > placeholder > role > CSS fallback > tfa (ultima)
-                    suggestions = []
-                    
-                    # 1. Label (form best practice)
-                    if accessible_name:
-                        suggestions.append({
-                            "strategy": "label",
-                            "fill_smart": {"by": "label", "label": accessible_name}
-                        })
-                    
-                    # 2. Placeholder (visual hint)
-                    if placeholder:
-                        suggestions.append({
-                            "strategy": "placeholder",
-                            "fill_smart": {"by": "placeholder", "placeholder": placeholder}
-                        })
-                    
-                    # 3. Role (ARIA)
-                    if field_type:
-                        role_map = {
-                            "text": "textbox",
-                            "email": "textbox",
-                            "password": "textbox",
-                            "search": "searchbox",
-                            "tel": "textbox",
-                            "url": "textbox",
-                            "select": "combobox",
-                            "textarea": "textbox"
-                        }
-                        role_name = role_map.get(field_type)
-                        if role_name and accessible_name:
-                            suggestions.append({
-                                "strategy": "role",
-                                "fill_smart": {"by": "role", "role": role_name, "name": accessible_name}
-                            })
-                    
-                    # 4. CSS fallback - name attribute
-                    if name:
-                        suggestions.append({
-                            "strategy": "css_name",
-                            "fill_smart": {"by": "css", "selector": f'[name="{name}"]'}
-                        })
-                    
-                    # 5. CSS fallback - id attribute
-                    if input_id:
-                        suggestions.append({
-                            "strategy": "css_id",
-                            "fill_smart": {"by": "css", "selector": f'#{input_id}'}
-                        })
-                    
-                    # 6. CSS fallback - aria-label
-                    if aria_label:
-                        suggestions.append({
-                            "strategy": "css_aria",
-                            "fill_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                        })
-                    
-                    # 7. Data-tfa (ultima - IDs possono cambiare con refactoring)
-                    data_tfa = await field.get_attribute("data-tfa")
-                    if data_tfa:
-                        suggestions.append({
-                            "strategy": "tfa",
-                            "fill_smart": {"by": "tfa", "tfa": data_tfa}
-                        })
-
-                    field_info.append({
-                        "index": idx,
-                        "tag": tag,
-                        "type": field_type,
-                        "accessible_name": accessible_name,
-                        "aria_label": aria_label,
-                        "placeholder": placeholder,
-                        "name": name,
-                        "id": input_id,
-                        "playwright_suggestions": suggestions
-                    })
-                except Exception as e:
-                    print(f"Error inspecting field {idx}: {e}")
-                    continue
-
-            # === 4. INTERACTIVE CONTROLS (checkbox, radio, switch, tabs, select, file) ===
-            # Elementi che richiedono click o azioni speciali (non fill testuale)
-            interactive_selector = """
-                input[type='checkbox'], 
-                input[type='radio'], 
-                select,
-                input[type='file'],
-                input[type='range'],
-                input[type='color'],
-                [role='checkbox'], 
-                [role='radio'], 
-                [role='switch'],
-                [role='tab'],
-                [role='combobox']
-            """
-            interactives = await context.locator(interactive_selector).all()
-            interactive_info = []
-
-            for idx, elem in enumerate(interactives):
-                try:
-                    tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-                    elem_type = await elem.get_attribute("type") if tag == "input" else tag
-                    role = await elem.get_attribute("role")
-
-                    # Determina tipo effettivo
-                    effective_type = role if role else elem_type
-
-                    # Accessible name
-                    accessible_name = await elem.evaluate("""
-                        el => {
-                            if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
-                            if (el.id) {
-                                const label = document.querySelector(`label[for="${el.id}"]`);
-                                if (label) return label.textContent.trim();
-                            }
-                            if (el.getAttribute('aria-labelledby')) {
-                                const labelId = el.getAttribute('aria-labelledby');
-                                const labelEl = document.getElementById(labelId);
-                                if (labelEl) return labelEl.textContent.trim();
-                            }
-                            if (el.title) return el.title;
-                            if (el.name) return el.name;
-                            return null;
-                        }
-                    """)
-
-                    aria_label = await elem.get_attribute("aria-label")
-                    name = await elem.get_attribute("name") or ""
-                    elem_id = await elem.get_attribute("id") or ""
-                    data_tfa = await elem.get_attribute("data-tfa")
-
-                    # Stato per checkbox/radio/switch
-                    checked = None
-                    if effective_type in ["checkbox", "radio", "switch"]:
-                        checked = await elem.is_checked()
-
-                    # Selected per tab
-                    selected = None
-                    if effective_type == "tab":
-                        selected = await elem.get_attribute("aria-selected") == "true"
-
-                    # Options per select
-                    options = []
-                    if tag == "select":
-                        option_elements = await elem.locator("option").all()
-                        for opt in option_elements:
-                            opt_text = await opt.inner_text()
-                            opt_value = await opt.get_attribute("value")
-                            options.append({"text": opt_text.strip(), "value": opt_value})
-
-                    # Playwright locator suggestions
-                    suggestions = []
-                    
-                    # Checkbox, Radio, Switch, Tab → click_smart strategies
-                    if effective_type in ["checkbox", "radio", "switch", "tab"]:
-                        # 1. Role + accessible_name (WCAG - best practice)
-                        if accessible_name:
-                            suggestions.append({
-                                "strategy": "role",
-                                "click_smart": {"by": "role", "role": effective_type, "name": accessible_name}
-                            })
-                        
-                        # 2. Label (for native inputs with <label>)
-                        if accessible_name and tag == "input":
-                            suggestions.append({
-                                "strategy": "label",
-                                "click_smart": {"by": "label", "label": accessible_name}
-                            })
-
-                        # 3. Text fallback (Angular Material often hides the real <input>)
-                        # Clicking visible label text is frequently the most reliable way to toggle.
-                        if accessible_name:
-                            suggestions.append({
-                                "strategy": "text",
-                                "click_smart": {"by": "text", "text": accessible_name}
-                            })
-                        
-                        # 4. CSS fallback - aria-label
-                        if aria_label:
-                            suggestions.append({
-                                "strategy": "css_aria",
-                                "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                            })
-                        
-                        # 5. CSS fallback - name attribute
-                        if name:
-                            suggestions.append({
-                                "strategy": "css_name",
-                                "click_smart": {"by": "css", "selector": f'[name="{name}"]'}
-                            })
-
-                        # 6. Data-tfa (test id) - last resort
-                        if data_tfa:
-                            suggestions.append({
-                                "strategy": "tfa",
-                                "click_smart": {"by": "tfa", "tfa": data_tfa}
-                            })
-                    
-                    # Select → note che serve select_option (non implementato ancora)
-                    elif tag == "select":
-                        suggestions.append({
-                            "strategy": "note",
-                            "action": "select_option",
-                            "message": "Use fill_smart with value, or click_smart to open dropdown then click option"
-                        })
-                    
-                    # File upload → note che serve set_input_files (non implementato)
-                    elif elem_type == "file":
-                        suggestions.append({
-                            "strategy": "note",
-                            "action": "set_input_files",
-                            "message": "File upload requires dedicated tool (not yet implemented)"
-                        })
-                    
-                    # Range, Color → fill_smart with special value
-                    elif elem_type in ["range", "color"]:
-                        if accessible_name:
-                            suggestions.append({
-                                "strategy": "fill",
-                                "fill_smart": {"by": "label", "label": accessible_name}
-                            })
-
-                    interactive_info.append({
-                        "index": idx,
-                        "tag": tag,
-                        "type": effective_type,
-                        "accessible_name": accessible_name,
-                        "aria_label": aria_label,
-                        "name": name,
-                        "id": elem_id,
-                        "data_tfa": data_tfa,
-                        "checked": checked,
-                        "selected": selected,
-                        "options": options if options else None,
-                        "playwright_suggestions": suggestions
-                    })
-                except Exception as e:
-                    print(f"Error inspecting interactive {idx}: {e}")
-                    continue
-
-            return {
-                "status": "success",
-                "message": f"Found: {len(iframe_info)} iframes, {len(clickable_info)} clickable, {len(interactive_info)} interactive controls, {len(field_info)} form fields",
-                "page_info": {
-                    "url": page_url,
-                    "title": page_title
-                },
-                "iframes": iframe_info,
-                "clickable_elements": clickable_info,
-                "interactive_controls": interactive_info,
-                "form_fields": field_info
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Error inspecting page: {str(e)}"
-            }
-
     async def handle_cookie_banner(self, strategies: list = None, timeout: int = 5000):
         """
         Gestisce automaticamente i banner dei cookie con strategie multiple
@@ -1592,90 +1743,6 @@ class PlaywrightTools:
                 "clicked": False
             }
 
-    async def wait_for_text_content(
-        self,
-        text: str,
-        timeout: int = 30000,
-        case_sensitive: bool = False,
-        in_iframe: dict = None
-    ):
-        """
-        Aspetta che un testo specifico appaia OVUNQUE nella pagina o dentro un iframe.
-        Utile per verificare messaggi di successo, titoli, nomi elementi dopo azioni AJAX.
-
-        Args:
-            text: Testo da cercare
-            timeout: Timeout in ms (default: 30000)
-            case_sensitive: Se True, match esatto (default: False)
-            in_iframe: Dict per cercare dentro iframe (opzionale)
-                {"url_pattern": "movementreason"} - iframe singolo
-                {"iframe_path": [{...}, {...}]} - iframe annidati
-
-        Returns:
-            dict con status e informazioni sul testo trovato
-
-        Example:
-            # Dopo login, aspetta che appaia "Dashboard" (pagina principale)
-            await wait_for_text_content("Dashboard", timeout=10000)
-
-            # Dopo search in iframe Causali, aspetta risultato dentro iframe
-            await wait_for_text_content(
-                "CARMAG", 
-                timeout=5000,
-                in_iframe={"url_pattern": "movementreason"}
-            )
-        """
-        if not self.page:
-            return {
-                "status": "error",
-                "message": "Browser non avviato"
-            }
-        try:
-            # Determina il contesto (page o frame)
-            context = self.page
-            if in_iframe:
-                # Naviga al frame target (stessa semantica di inspect_interactive_elements)
-                frame_result = await self.get_frame(
-                    selector=in_iframe.get("selector"),
-                    url_pattern=in_iframe.get("url_pattern"),
-                    iframe_path=in_iframe.get("iframe_path"),
-                    timeout=timeout,
-                    return_frame=True,
-                )
-                if frame_result.get("status") == "error":
-                    return frame_result
-                # Usa direttamente l'oggetto frame restituito
-                context = frame_result.get("frame", self.page)
-            
-            # Costruisci selector Playwright per text
-            if case_sensitive:
-                selector = f"text={text}"
-            else:
-                # Case-insensitive con regex
-                selector = f"text=/{text}/i"
-
-            # Aspetta che l'elemento con quel testo sia visibile
-            await context.wait_for_selector(
-                selector,
-                timeout=timeout,
-                state="visible",
-            )
-
-            return {
-                "status": "success",
-                "message": f"Testo '{text}' trovato e visibile",
-                "text": text,
-                "case_sensitive": case_sensitive
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Testo '{text}' non trovato dopo {timeout}ms",
-                "text": text,
-                "timeout_ms": timeout
-            }
-
     async def click_and_wait_for_text(
         self,
         targets: List[Dict],
@@ -1685,25 +1752,8 @@ class PlaywrightTools:
         in_iframe: dict = None,
     ) -> dict:
         """
-        Helper di alto livello: esegue un click tramite click_smart e poi verifica
-        che un certo testo compaia nella pagina (o dentro un iframe).
-
-        Utile per passaggi critici (login, "Continua", apertura moduli) dove non
-        basta che il click sia "success", ma vogliamo conferma che la UI sia davvero
-        passata allo stato atteso.
-
-        Args:
-            targets: strategie per click_smart (da inspect_interactive_elements)
-            text: testo da attendere dopo il click (es. "Laboratorio", "Filtri")
-            timeout_per_try: timeout per singola strategia di click
-            text_timeout: timeout complessivo per la comparsa del testo
-            in_iframe: opzionale, se sia il click sia la verifica avvengono in un iframe
-
-        Returns:
-            dict con:
-              - status: "success" | "error"
-              - click: risultato di click_smart
-              - text_check: risultato di wait_for_text_content
+        Esegue click_smart con targets e poi wait_for_text_content per text.
+        Utile per step critici (login, Continua, apertura moduli).
         """
         click_result = await self.click_smart(
             targets=targets,
@@ -1717,14 +1767,12 @@ class PlaywrightTools:
                 "click": click_result,
                 "text_check": None,
             }
-
         text_result = await self.wait_for_text_content(
             text=text,
             timeout=text_timeout,
             case_sensitive=False,
             in_iframe=in_iframe,
         )
-
         overall_status = "success" if text_result.get("status") == "success" else "error"
         return {
             "status": overall_status,
@@ -1733,443 +1781,3 @@ class PlaywrightTools:
             "text_check": text_result,
         }
 
-    async def wait_for_load_state(
-        self,
-        state: Literal["load", "domcontentloaded", "networkidle"] = "domcontentloaded",
-        timeout: int = 30000,
-    ) -> dict:
-        """Attende uno specifico load state di Playwright.
-
-        Nota: su SPA spesso il load event è già avvenuto; questo tool è utile
-        soprattutto dopo navigazioni vere (login redirect, cambio pagina, refresh).
-        """
-        if not self.page:
-            return {
-                "status": "error",
-                "message": "Browser non avviato",
-            }
-
-        try:
-            await self.page.wait_for_load_state(state=state, timeout=timeout)
-            return {
-                "status": "success",
-                "message": f"Load state '{state}' raggiunto",
-                "state": state,
-                "timeout_ms": timeout,
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Timeout waiting for load state '{state}'",
-                "state": state,
-                "timeout_ms": timeout,
-                "error": str(e),
-            }
-
-    async def inspect_dom_changes(
-        self,
-        click_target: dict,
-        wait_after_click: int = 2000
-    ):
-        """
-        Ispeziona cosa cambia nel DOM dopo un click.
-        Utile per capire se un click apre menu, submenu, popup, nuove sezioni.
-
-        Args:
-            click_target: Target da cliccare (formato click_smart)
-            wait_after_click: Millisecondi da aspettare dopo click (default: 2000)
-
-        Returns:
-            dict con:
-            - elements_added: nuovi elementi apparsi
-            - elements_removed: elementi scomparsi
-            - visibility_changed: elementi che hanno cambiato visibilità
-            - recommendations: suggerimenti su cosa fare dopo
-
-        Example:
-            # Scopri cosa succede dopo click su "Micrologistica"
-            changes = await inspect_dom_changes(
-                click_target={"by": "text", "text": "Micrologistica"},
-                wait_after_click=3000
-            )
-        """
-        if not self.page:
-            return {"status": "error", "message": "Browser non avviato"}
-
-        try:
-            # 1. Cattura stato PRIMA del click
-            before_state = await self.page.evaluate("""
-                () => {
-                    const state = {
-                        interactive: [],
-                        visible_text: []
-                    };
-                    
-                    // Cattura tutti gli elementi interattivi visibili
-                    const selectors = ['button', 'a', '[role="button"]', '[role="menuitem"]', '[role="tab"]'];
-                    selectors.forEach(sel => {
-                        document.querySelectorAll(sel).forEach(el => {
-                            const rect = el.getBoundingClientRect();
-                            if (rect.width > 0 && rect.height > 0) {
-                                const text = el.textContent?.trim().substring(0, 50) || '';
-                                const id = el.id || '';
-                                const classes = el.className || '';
-                                
-                                state.interactive.push({
-                                    tag: el.tagName.toLowerCase(),
-                                    text: text,
-                                    id: id,
-                                    classes: classes,
-                                    role: el.getAttribute('role') || '',
-                                    signature: `${el.tagName}:${text}:${id}`
-                                });
-                            }
-                        });
-                    });
-                    
-                    return state;
-                }
-            """)
-
-            # 2. Esegui il click
-            result = await self.click_smart([click_target])
-
-            if result["status"] != "success":
-                return {
-                    "status": "error",
-                    "message": f"Click fallito: {result['message']}"
-                }
-
-            # 3. Aspetta dopo click
-            await self.page.wait_for_timeout(wait_after_click)
-
-            # 4. Cattura stato DOPO il click
-            after_state = await self.page.evaluate("""
-                () => {
-                    const state = {
-                        interactive: [],
-                        visible_text: []
-                    };
-                    
-                    const selectors = ['button', 'a', '[role="button"]', '[role="menuitem"]', '[role="tab"]'];
-                    selectors.forEach(sel => {
-                        document.querySelectorAll(sel).forEach(el => {
-                            const rect = el.getBoundingClientRect();
-                            if (rect.width > 0 && rect.height > 0) {
-                                const text = el.textContent?.trim().substring(0, 50) || '';
-                                const id = el.id || '';
-                                const classes = el.className || '';
-                                
-                                state.interactive.push({
-                                    tag: el.tagName.toLowerCase(),
-                                    text: text,
-                                    id: id,
-                                    classes: classes,
-                                    role: el.getAttribute('role') || '',
-                                    signature: `${el.tagName}:${text}:${id}`
-                                });
-                            }
-                        });
-                    });
-                    
-                    return state;
-                }
-            """)
-
-            # 5. Confronta stati
-            before_sigs = set(el['signature']
-                              for el in before_state['interactive'])
-            after_sigs = set(el['signature']
-                             for el in after_state['interactive'])
-
-            # Nuovi elementi
-            added_sigs = after_sigs - before_sigs
-            elements_added = [
-                el for el in after_state['interactive'] if el['signature'] in added_sigs]
-
-            # Elementi rimossi
-            removed_sigs = before_sigs - after_sigs
-            elements_removed = [
-                el for el in before_state['interactive'] if el['signature'] in removed_sigs]
-
-            # Genera raccomandazioni
-            recommendations = []
-
-            if elements_added:
-                # Nuovi elementi -> probabilmente menu/submenu
-                menu_items = [
-                    el for el in elements_added if 'menu' in el.get('role', '').lower()]
-                buttons = [
-                    el for el in elements_added if el['tag'] == 'button']
-                links = [el for el in elements_added if el['tag'] == 'a']
-
-                if menu_items:
-                    recommendations.append({
-                        "type": "submenu_detected",
-                        "message": f"Rilevato submenu con {len(menu_items)} item",
-                        "action": f"Clicca su uno dei menu item: {[m['text'] for m in menu_items[:3]]}"
-                    })
-
-                if buttons:
-                    recommendations.append({
-                        "type": "new_buttons",
-                        "message": f"{len(buttons)} nuovi button apparsi",
-                        "action": f"Prova a cliccare: {[b['text'] for b in buttons[:3]]}"
-                    })
-
-                if links:
-                    recommendations.append({
-                        "type": "new_links",
-                        "message": f"{len(links)} nuovi link apparsi",
-                        "action": f"Naviga a: {[l['text'] for l in links[:3]]}"
-                    })
-            else:
-                # Nessun nuovo elemento -> forse navigazione o stato interno
-                recommendations.append({
-                    "type": "no_visible_changes",
-                    "message": "Nessun nuovo elemento visibile apparso",
-                    "action": "Potrebbe essere: 1) navigazione SPA (URL non cambia), 2) serve doppio click, 3) serve più tempo"
-                })
-
-            return {
-                "status": "success",
-                "click_performed": True,
-                "elements_added": elements_added[:10],  # max 10 per brevità
-                "elements_removed": elements_removed[:10],
-                "count_added": len(elements_added),
-                "count_removed": len(elements_removed),
-                "recommendations": recommendations
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore durante ispezione: {str(e)}"
-            }
-
-    # =====================================================================
-    # IFRAME SUPPORT
-    # =====================================================================
-    async def get_frame(
-        self,
-        selector: str = None,
-        url_pattern: str = None,
-        iframe_path: list = None,
-        timeout: int = 10000,
-        return_frame: bool = False,
-    ):
-        """
-        Accede al contenuto di un iframe (anche annidati).
-
-        Args:
-            selector: CSS selector dell'iframe (es: 'iframe[src*="movementreason"]')
-            url_pattern: Pattern dell'URL dell'iframe (alternativa a selector)
-            iframe_path: Lista di dict per iframe annidati (es: [{"url_pattern": "dashboard"}, {"selector": "iframe#widget"}])
-            timeout: Timeout in ms per ogni livello
-            return_frame: Se True, include oggetto Frame per uso interno
-
-        Returns:
-            dict JSON-serializzabile con metadata iframe/frame.
-            Se return_frame=True include anche l'oggetto Frame (NON serializzabile) per uso interno.
-
-        Examples:
-            # Iframe singolo
-            frame = await get_frame(url_pattern="registry/movementreason")
-            
-            # Iframe annidati (dashboard → payment widget → form)
-            frame = await get_frame(iframe_path=[
-                {"url_pattern": "dashboard"},
-                {"selector": "iframe#payment-widget"},
-                {"url_pattern": "checkout-form"}
-            ])
-        """
-        if not self.page:
-            return {"status": "error", "message": "Browser non avviato"}
-
-        try:
-            # Determina strategia: iframe_path (annidati) o selector singolo
-            if iframe_path:
-                # Navigazione multi-livello per iframe annidati
-                context = self.page
-                selectors_used = []
-                frame_urls = []
-                
-                for level_idx, level_spec in enumerate(iframe_path):
-                    level_selector = None
-                    if "selector" in level_spec:
-                        level_selector = level_spec["selector"]
-                    elif "url_pattern" in level_spec:
-                        level_selector = f'iframe[src*="{level_spec["url_pattern"]}"]'
-                    else:
-                        level_selector = 'iframe'
-                    
-                    selectors_used.append(level_selector)
-                    
-                    # Trova iframe nel context corrente (page o frame parent)
-                    iframe_element = await context.wait_for_selector(level_selector, timeout=timeout)
-                    
-                    # Accedi al content_frame
-                    frame = await iframe_element.content_frame()
-                    if frame is None:
-                        return {
-                            "status": "error",
-                            "message": f"Iframe livello {level_idx + 1} trovato ma content_frame() è None",
-                            "iframe_path": iframe_path,
-                            "selectors_used": selectors_used,
-                            "failed_at_level": level_idx + 1,
-                        }
-                    
-                    await frame.wait_for_load_state('load', timeout=timeout)
-                    frame_urls.append(getattr(frame, "url", None))
-                    
-                    # Il frame diventa il nuovo context per il prossimo livello
-                    context = frame
-                
-                # context ora è il frame più profondo
-                result = {
-                    "status": "success",
-                    "message": f"Frame annidato trovato ({len(iframe_path)} livelli)",
-                    "iframe_path": iframe_path,
-                    "selectors_used": selectors_used,
-                    "frame_urls": frame_urls,
-                    "final_frame_url": frame_urls[-1] if frame_urls else None,
-                    "levels": len(iframe_path),
-                    "timeout_ms": timeout,
-                }
-                if return_frame:
-                    result["frame"] = context  # frame più profondo
-                return result
-                
-            else:
-                # Singolo iframe (backward compatibility)
-                iframe_selector_used = None
-                if selector:
-                    iframe_selector_used = selector
-                elif url_pattern:
-                    iframe_selector_used = f'iframe[src*="{url_pattern}"]'
-                else:
-                    iframe_selector_used = 'iframe'
-
-                # Prova prima con il selector specifico; se non trova nulla e avevamo
-                # un url_pattern, fai fallback al primo iframe generico invece di
-                # andare in timeout per 60s.
-                try:
-                    iframe_element = await self.page.wait_for_selector(iframe_selector_used, timeout=timeout)
-                except Exception as e:
-                    if url_pattern:
-                        # Fallback: primo iframe disponibile
-                        iframe_selector_used = 'iframe'
-                        iframe_element = await self.page.wait_for_selector(iframe_selector_used, timeout=timeout)
-                    else:
-                        raise
-
-                # Accedi al frame content
-                frame = await iframe_element.content_frame()
-                if frame is None:
-                    return {
-                        "status": "error",
-                        "message": "Iframe trovato ma content_frame() è None",
-                        "iframe_selector": iframe_selector_used,
-                        "timeout_ms": timeout,
-                    }
-
-                await frame.wait_for_load_state('load', timeout=timeout)
-
-                result = {
-                    "status": "success",
-                    "message": "Frame trovato e caricato",
-                    "iframe_selector": iframe_selector_used,
-                    "url_pattern": url_pattern,
-                    "frame_url": getattr(frame, "url", None),
-                    "timeout_ms": timeout,
-                }
-                if return_frame:
-                    result["frame"] = frame
-                return result
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore accesso iframe: {str(e)}"
-            }
-
-    # =====================================================================
-    # LEGACY TOOLS (Deprecated - Use discovery-first approach instead)
-    # =====================================================================
-    async def fill_and_search(
-        self,
-        input_selector: str,
-        search_value: str,
-        verify_result_text: str = None,
-        in_iframe: dict = None,
-        timeout: int = 10000,
-    ):
-        """
-        ⚠️ DEPRECATED: Use fill_smart + wait_for_text_content instead.
-        
-        Riempie campo input e verifica risultati (approccio procedurale legacy).
-        Supporta iframe automaticamente.
-        
-        DEPRECATED WORKFLOW:
-            fill_and_search("input[type='text']", "carm", "CARMAG", in_iframe={...})
-        
-        NEW RECOMMENDED WORKFLOW (discovery-first):
-            fill_smart(
-                targets=[
-                    {"by": "placeholder", "placeholder": "Search"},
-                    {"by": "label", "label": "Search"},
-                    {"by": "role", "role": "searchbox", "name": "Search"}
-                ],
-                value="carm",
-                in_iframe={"url_pattern": "movementreason"}
-            )
-            wait_for_text_content("CARMAG", timeout=5000)
-
-        Args:
-            input_selector: Selettore CSS del campo input (hardcoded - non robusto!)
-            search_value: Valore da inserire
-            verify_result_text: Testo da verificare nei risultati (opzionale)
-            in_iframe: {"selector": "..."} o {"url_pattern": "..."} se dentro iframe
-
-        Returns:
-            dict con status
-        """
-        try:
-            # 1. Accedi al contesto (page o iframe)
-            context = self.page
-
-            if in_iframe:
-                frame_result = await self.get_frame(**in_iframe, timeout=timeout, return_frame=True)
-                if frame_result["status"] == "error":
-                    return frame_result
-                context = frame_result["frame"]
-
-            # 2. Riempie campo
-            await context.fill(input_selector, search_value)
-            await asyncio.sleep(1)  # Aspetta risultati
-
-            # 3. Verifica risultato (se specificato)
-            if verify_result_text:
-                count = await context.locator(f"text={verify_result_text}").count()
-                if count == 0:
-                    return {
-                        "status": "warning",
-                        "message": f"Campo riempito ma risultato '{verify_result_text}' non trovato"
-                    }
-
-                return {
-                    "status": "success",
-                    "message": f"Ricerca OK - {count} risultati trovati",
-                    "results_count": count
-                }
-
-            return {
-                "status": "success",
-                "message": "Campo riempito correttamente"
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore fill_and_search: {str(e)}"
-            }

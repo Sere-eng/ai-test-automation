@@ -256,31 +256,115 @@
             border-color: #3a3a3a;
             color: #aaa;
         }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel-2);
+        }
+        .tab {
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--muted);
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-family: inherit;
+            border-bottom: 2px solid transparent;
+        }
+        .tab:hover { color: #aaa; }
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            background: var(--panel);
+        }
+        .panel { display: none; padding: 24px 30px; }
+        .panel.active { display: block; }
+        .panel .panel-desc {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+        .lab-select-wrap { margin-bottom: 20px; }
+        .lab-select-wrap label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        select.lab-scenario-select {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+        }
+        select.lab-scenario-select option { background: var(--panel); color: var(--text); }
+        .lab-steps {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-2);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="logo">AI TEST AUTOMATION</div>
         <h1>ENABLE AI TO <span class="highlight">TEST</span> THE WEB</h1>
-        <p class="subtitle">Describe your test in natural language</p>
+        <p class="subtitle">Describe your test in natural language or run a predefined LAB scenario</p>
     </div>
     
     <div class="container">
-        <div class="terminal-header">USER@AI-TEST:~/NEW_TEST</div>
-        <textarea 
-            id="testDescription" 
-            placeholder="Describe your task..."
-            spellcheck="false"
-        ></textarea>
-        <div class="actions">
-            <button class="btn btn-secondary" onclick="clearTest()">Clear</button>
-            <button class="btn btn-primary" id="runBtn" onclick="runTest()">Run Test</button>
+        <div class="tabs">
+            <button class="tab active" data-tab="custom" onclick="switchTab('custom')">Custom test</button>
+            <button class="tab" data-tab="lab" onclick="switchTab('lab')">LAB scenario</button>
+        </div>
+        <div id="panel-custom" class="panel active">
+            <div class="terminal-header">USER@AI-TEST:~/NEW_TEST</div>
+            <textarea 
+                id="testDescription" 
+                placeholder="Describe your task..."
+                spellcheck="false"
+            ></textarea>
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="clearTest()">Clear</button>
+                <button class="btn btn-primary" id="runBtn" onclick="runTest()">Run Test</button>
+            </div>
+        </div>
+        <div id="panel-lab" class="panel">
+            <p class="panel-desc">
+                Run a full LAB flow: <strong>login → organization → tile</strong> are executed automatically, then the selected scenario runs. You only choose which scenario to run; the steps are predefined.
+            </p>
+            <div class="lab-select-wrap">
+                <label for="labScenarioSelect">Scenario</label>
+                <select id="labScenarioSelect" class="lab-scenario-select">
+                    <option value="">Loading scenarios…</option>
+                </select>
+            </div>
+            <div id="labStepsPreview" class="lab-steps" style="display:none;"></div>
+            <div class="actions">
+                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full LAB test</button>
+            </div>
         </div>
     </div>
     
     <div class="loading" id="loading">
         <div class="spinner"></div>
-        <p>Running test...</p>
+        <p id="loadingText">Running test...</p>
     </div>
     
     <div class="result" id="result">
@@ -289,7 +373,7 @@
     </div>
     
     <div class="examples">
-        <div class="examples-title">Examples</div>
+        <div class="examples-title">Examples (Custom test)</div>
         <div class="example-list">
             <div class="example-item" onclick="loadExample(0)">
                 AMC Test: Login → Save Session → Navigate → Search
@@ -298,6 +382,95 @@
     </div>
 
     <script>
+        const API_BASE = 'http://localhost:5000';
+        let labScenarios = [];
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelector('.tab[data-tab="' + tabId + '"]').classList.add('active');
+            document.getElementById('panel-' + tabId).classList.add('active');
+            if (tabId === 'lab' && labScenarios.length === 0) loadLabScenarios();
+        }
+
+        async function loadLabScenarios() {
+            const select = document.getElementById('labScenarioSelect');
+            select.innerHTML = '<option value="">Loading…</option>';
+            try {
+                const r = await fetch(API_BASE + '/api/test/lab/scenarios');
+                const data = await r.json();
+                labScenarios = (data.scenarios || []);
+                if (labScenarios.length === 0) {
+                    select.innerHTML = '<option value="">No scenarios (server unavailable?)</option>';
+                    return;
+                }
+                select.innerHTML = '<option value="">Choose a scenario…</option>' +
+                    labScenarios.map(s => '<option value="' + s.id + '">' + (s.name || s.id) + '</option>').join('');
+                select.onchange = function() {
+                    const id = select.value;
+                    const preview = document.getElementById('labStepsPreview');
+                    if (!id) { preview.style.display = 'none'; return; }
+                    const s = labScenarios.find(x => x.id === id);
+                    if (s && s.execution_steps && s.execution_steps.length) {
+                        preview.textContent = 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
+                        preview.style.display = 'block';
+                    } else { preview.style.display = 'none'; }
+                };
+            } catch (e) {
+                select.innerHTML = '<option value="">Failed to load (check server)</option>';
+            }
+        }
+
+        async function runLabTest() {
+            const scenarioId = document.getElementById('labScenarioSelect').value;
+            if (!scenarioId) {
+                alert('Select a scenario');
+                return;
+            }
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const btn = document.getElementById('runLabBtn');
+            document.getElementById('loadingText').textContent = 'Running LAB test (prefix + scenario)…';
+            resultDiv.classList.remove('show');
+            loadingDiv.classList.add('show');
+            btn.disabled = true;
+            try {
+                const response = await fetch(API_BASE + '/api/test/lab/full', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenario_id: scenarioId })
+                });
+                const data = await response.json();
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                const resultContent = document.getElementById('resultContent');
+                resultContent.innerHTML = '';
+                if (data.status === 'success') {
+                    resultDiv.className = 'result ' + (data.passed ? 'success' : 'error') + ' show';
+                    document.getElementById('resultHeader').textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
+                    const parts = [];
+                    if (data.prefix && data.prefix.final_answer) parts.push('Prefix: ' + data.prefix.final_answer);
+                    if (data.scenario && data.scenario.final_answer) parts.push('Scenario: ' + data.scenario.final_answer);
+                    if (data.phase) parts.push('Phase: ' + data.phase);
+                    if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
+                    if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
+                    resultContent.textContent = parts.join('\n\n') || 'Done.';
+                } else {
+                    resultDiv.className = 'result error show';
+                    document.getElementById('resultHeader').textContent = 'ERROR';
+                    resultContent.textContent = data.message || JSON.stringify(data);
+                }
+            } catch (error) {
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
+                document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         const examples = [
             `Start the browser and navigate to https://amc.eng.it/multimodule/web/.
 Wait for the page to fully load.
@@ -351,7 +524,7 @@ Close the browser.`
             btn.disabled = true;
 
             try {
-                const response = await fetch('http://localhost:5000/api/agent/mcp/test/run', {
+                const response = await fetch(API_BASE + '/api/agent/mcp/test/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

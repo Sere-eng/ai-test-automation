@@ -29,9 +29,9 @@ LAB_SCENARIOS: List[LabScenario] = [
             "(es. appartenenza a uno o più piani di lavoro, range temporale).",
         ],
         execution_steps=[
-            "Accedere alla dashboard di interesse selezionandola dal dropdown menu "
-            "(se è presente solo una dashboard questa è valorizzata di default).",
-            "Accedere alla funzionalità 'Modifica'.",
+            "Apri la sezione del submenu Laboratory.",
+            "Accedere alla dashboard di interesse selezionandola dal dropdown menu (se è presente solo una dashboard questa è valorizzata di default).",
+            "Accedere alla funzionalità \"Modifica\".",
             "Creare un nuovo elemento (gruppo).",
             "Inserire il titolo del gruppo (obbligatorio) e successivamente creare un nuovo filtro.",
             "Inserire almeno il titolo del filtro (obbligatorio) e salvare.",

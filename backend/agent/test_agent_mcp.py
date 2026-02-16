@@ -1,21 +1,30 @@
 # backend/agent/test_agent_mcp.py
 """
 AI Test Automation Agent usando LangGraph e MCP (Model Context Protocol).
-Supporta sia OpenAI che Azure OpenAI.
+Supporta OpenRouter, Azure OpenAI, OpenAI.
 """
 
-from agent.utils import extract_final_json, safe_json_loads
-from agent.system_prompt import get_amc_optimized_prompt, get_lab_optimized_prompt
-from config.settings import AppConfig
-from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from langgraph.prebuilt import create_react_agent
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from datetime import datetime
+import asyncio
 import os
 import sys
-import asyncio
+import time
+import uuid
 
-# Import della configurazione centralizzata
+from agent.setup import create_llm, create_mcp_config
+from agent.system_prompt import get_lab_optimized_prompt
+from agent.utils import export_agent_graph
+from agent.evaluation import (
+    parse_tool_output,
+    step_from_tool_end,
+    error_from_tool_output,
+    artifact_from_screenshot,
+    extract_final_answer_from_event,
+    evaluate_passed,
+)
+from config.settings import AppConfig
+from langgraph.prebuilt import create_react_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -27,105 +36,26 @@ class TestAgentMCP:
         use_remote: Se True, usa MCP server remoto. Se False, usa locale (stdio)
     """
 
-    def __init__(self, custom_prompt=get_lab_optimized_prompt()):
+    def __init__(self, custom_prompt=None):
         """
-        Inizializza l'agent MCP con configurazione centralizzata.
-        
-        Args:
-            custom_prompt: System prompt personalizzato (opzionale).
-                          Se None, usa AMC_SYSTEM_PROMPT di default.
-        
-        1. Setup LLM (OpenRouter, Azure o OpenAI) da AppConfig      
-        2. Setup MCP (remoto o locale) da AppConfig
-        3. Costruisce il system prompt per l'agent
-        4. Inizializza il client MCP e l'agent (async)
+        Inizializza l'agent MCP con configurazione da AppConfig.
+        custom_prompt: system prompt (opzionale); se None usa get_lab_optimized_prompt().
         """
-        # Setup LLM da configurazione
-        self.llm = self._setup_llm()
-
-        # Setup MCP da configurazione
+        self.llm = create_llm()
         self.use_remote = AppConfig.MCP.use_remote()
-        self.mcp_config = self._setup_mcp_config()
-
-        # System prompt per l'agent (custom o default)
+        self.mcp_config = create_mcp_config(self.use_remote)
         self.custom_prompt = custom_prompt
         self.system_message = self._build_system_message()
 
-        # Inizializza il client MCP e l'agent (async)
         self.client = None
         self.agent = None
         self._initialized = False
-
         self.tools = []
         self.tools_count = 0
         self.tool_names = []
 
-    def _setup_llm(self):
-        """
-        Setup LLM da configurazione centralizzata.
-
-        Returns:
-            ChatOpenAI o AzureChatOpenAI instance
-        """
-        provider = AppConfig.LLM.get_provider()
-
-        if provider == "openrouter":
-            return ChatOpenAI(
-                model=AppConfig.LLM.OPENROUTER_MODEL,
-                api_key=AppConfig.LLM.OPENROUTER_API_KEY,
-                base_url="https://openrouter.ai/api/v1",
-                temperature=AppConfig.LLM.TEMPERATURE,
-                max_tokens=AppConfig.LLM.MAX_TOKENS,
-            )
-
-        elif provider == "azure":
-            return AzureChatOpenAI(
-                azure_endpoint=AppConfig.LLM.AZURE_ENDPOINT,
-                azure_deployment=AppConfig.LLM.AZURE_DEPLOYMENT,
-                api_version=AppConfig.LLM.AZURE_API_VERSION,
-                api_key=AppConfig.LLM.AZURE_API_KEY,
-                temperature=AppConfig.LLM.TEMPERATURE,
-                max_tokens=AppConfig.LLM.MAX_TOKENS,
-            )
-
-        else:  # openai
-            return ChatOpenAI(
-                model=AppConfig.LLM.OPENAI_MODEL,
-                api_key=AppConfig.LLM.OPENAI_API_KEY,
-                temperature=AppConfig.LLM.TEMPERATURE,
-                max_tokens=AppConfig.LLM.MAX_TOKENS,
-            )
-
-    def _setup_mcp_config(self):
-        """Setup MCP configuration da settings"""
-        if self.use_remote:
-            # Usa server remoto HTTP
-            return {
-                "playwright": {
-                    "url": AppConfig.MCP.get_remote_url(),
-                    "transport": "streamable_http",
-                }
-            }
-        else:
-            # Usa server locale stdio
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            server_path = os.path.join(
-                os.path.dirname(script_dir),
-                "mcp_servers",
-                "playwright_server_local.py"
-            )
-
-            return {
-                "playwright": {
-                    "command": sys.executable,
-                    "args": [server_path],
-                    "transport": "stdio",
-                }
-            }
-
- 
     def _build_system_message(self):
-        """Build system prompt - usa custom se fornito, altrimenti default AMC"""
+        """Build system prompt: custom se fornito, altrimenti get_lab_optimized_prompt()."""
         prompt_template = self.custom_prompt if self.custom_prompt else get_lab_optimized_prompt()
         return prompt_template
 
@@ -157,44 +87,17 @@ class TestAgentMCP:
             prompt=self.system_message
         )
 
-        # Esporta la visualizzazione LangGraph (mermaid, ascii, png)
         print("Esportazione LangGraph visualization...")
-        try:
-            # xray=True prova ad espandere eventuali subgraph
-            g = self.agent.get_graph(xray=True)
-            mermaid = g.draw_mermaid()
-            with open("langgraph.mmd", "w", encoding="utf-8") as f:
-                f.write(mermaid)
-
-            # ASCII utile se stai in terminale
-            with open("langgraph.txt", "w", encoding="utf-8") as f:
-                f.write(g.draw_ascii())
-
-            # PNG (funziona se hai le dipendenze richieste nel tuo env)
-            png_bytes = g.draw_mermaid_png()
-            with open("langgraph.png", "wb") as f:
-                f.write(png_bytes)
-
-            print(" LangGraph exported: langgraph.mmd / langgraph.txt / langgraph.png")
-        except Exception as e:
-            print(f" Unable to export LangGraph visualization: {e}")
+        export_agent_graph(self.agent)
 
         self._initialized = True
         print("Agent MCP inizializzato con successo!\n")
 
     async def run_test_async(self, test_description: str, verbose: bool = True) -> dict:
         """
-        Esegue un test descritto in linguaggio naturale (versione async).
-        LIVELLO AVANZATO: passed deciso dal codice (tool results), NON dal modello.
+        Esegue un test descritto in linguaggio naturale (async).
+        Pass/fail deciso dal codice (tool results), non dal modello.
         """
-        import uuid
-        import time
-        import json
-
-        # Genera un thread_id unico per il test:
-        #   è il “numero di pratica” del test e serve per tracciare log/artifacts
-        #   isolare lo stato dell'agente
-        #   evitare contaminazioni tra test
         thread_id = f"test-{uuid.uuid4()}"
 
         # Assicurati che l'agent sia inizializzato (avviene solo una volta):
@@ -238,129 +141,42 @@ class TestAgentMCP:
                     "metadata", {}).get("tool_name")
                 print(f"[{event_type}] {name}")
 
-            # Tool end: è qui che hai output dei tool
             if event_type == "on_tool_end":
-                tool_name = ev.get("name") or ev.get(
-                    "metadata", {}).get("tool_name")
-                output_raw = ev.get("data", {}).get("output")
+                tool_name = ev.get("name") or ev.get("metadata", {}).get("tool_name")
+                output_obj = parse_tool_output(ev.get("data", {}).get("output"))
+                steps.append(step_from_tool_end(tool_name, output_obj))
+                err = error_from_tool_output(tool_name, output_obj)
+                if err:
+                    errors.append(err)
+                if tool_name == "capture_screenshot":
+                    art = artifact_from_screenshot(output_obj)
+                    if art:
+                        artifacts.append(art)
 
-                output_obj = output_raw
-                if isinstance(output_raw, str):
-                    parsed = safe_json_loads(output_raw)
-                    if parsed is not None:
-                        output_obj = parsed
-
-                # Registra lo step completato: non è il testo dell'AI, ma il risultato del tool, cioè l'output reale di Playwright
-                step = {
-                    "type": "tool_end",
-                    "tool": tool_name,
-                    "output": output_obj,
-                }
-                steps.append(step)
-
-                # Se il tool restituisce un dict con status=error -> errore
-                if isinstance(output_obj, dict) and output_obj.get("status") == "error":
-                    errors.append({
-                        "tool": tool_name,
-                        "message": output_obj.get("message", "unknown error"),
-                    })
-
-                # Artifact: screenshot -> un artefatto è una prova concreta prodotta dal test.
-                if tool_name == "capture_screenshot" and isinstance(output_obj, dict):
-                    if output_obj.get("status") == "success" and output_obj.get("filename"):
-                        artifact = {
-                            "type": "screenshot",
-                            "filename": output_obj.get("filename"),
-                            "size_bytes": output_obj.get("size_bytes"),
-                        }
-                        # Include base64 if present (when return_base64=True)
-                        if output_obj.get("base64"):
-                            artifact["base64"] = output_obj.get("base64")
-                        artifacts.append(artifact)
-
-            # Tool error: eccezioni durante tool execution
             elif event_type == "on_tool_error":
-                tool_name = ev.get("name") or ev.get(
-                    "metadata", {}).get("tool_name")
+                tool_name = ev.get("name") or ev.get("metadata", {}).get("tool_name")
                 err = ev.get("data", {}).get("error")
                 errors.append({
                     "tool": tool_name,
                     "message": str(err) if err is not None else "tool error",
                 })
 
-            # (opzionale) prova a catturare il testo finale dell'assistente come "notes"
-            # In molti casi arriva come on_chat_model_end / on_llm_end.
-            elif event_type in ("on_chat_model_end", "on_llm_end"):
-                data = ev.get("data", {}) or {}
-                out = data.get("output")
-
-                # out può essere un messaggio, una lista, o un dict: normalizziamo a stringa
-                candidate = ""
-                if isinstance(out, str):
-                    candidate = out
-                elif isinstance(out, dict):
-                    # alcuni driver mettono testo in chiavi tipo "content" o "text"
-                    candidate = out.get("content") or out.get("text") or ""
-                elif isinstance(out, list) and out:
-                    # spesso lista di message-like
-                    last = out[-1]
-                    if isinstance(last, str):
-                        candidate = last
-                    elif isinstance(last, dict):
-                        candidate = last.get(
-                            "content") or last.get("text") or ""
-
+            else:
+                candidate = extract_final_answer_from_event(ev)
                 if candidate:
                     final_answer = candidate
-            
-            # Cattura anche l'ultimo messaggio AI dallo stato finale del grafo
-            elif event_type == "on_chain_end":
-                data = ev.get("data", {}) or {}
-                output = data.get("output")
-                if isinstance(output, dict) and "messages" in output:
-                    messages = output["messages"]
-                    if messages:
-                        # Cerca l'ultimo messaggio AI
-                        for msg in reversed(messages):
-                            if hasattr(msg, "content") and hasattr(msg, "type"):
-                                if msg.type == "ai" and msg.content:
-                                    final_answer = msg.content
-                                    break
 
         duration_ms = int((time.monotonic() - start_ts) * 1000)
-
-        # =========================
-        # PASS/FAIL LOGIC (LEVEL AVANZATO)
-        # =========================
-        passed = True
-
-        # 1) se ci sono errori tool -> fail
-        if errors:
-            passed = False
-
-        # 2) se c'è almeno un check_element_exists usato come assert:
-        #    - se exists=False o is_visible=False -> fail + aggiungi errore
-        for s in steps:
-            if s.get("tool") == "check_element_exists":
-                out = s.get("output")
-                if isinstance(out, dict) and out.get("status") == "success":
-                    exists = bool(out.get("exists", False))
-                    visible = bool(out.get("is_visible", False))
-                    if not exists or not visible:
-                        passed = False
-                        errors.append({
-                            "tool": "check_element_exists",
-                            "message": f"Assertion failed: exists={exists}, is_visible={visible}",
-                        })
+        passed, errors_final = evaluate_passed(steps, errors)
 
         if verbose:
             print(f"\n{'='*80}")
             print("TEST RESULTS (LEVEL 4)")
             print(f"{'='*80}")
             print(f"PASSED: {passed}")
-            if errors:
+            if errors_final:
                 print("ERRORS:")
-                for e in errors:
+                for e in errors_final:
                     print(f" - [{e.get('tool')}] {e.get('message')}")
             print(f"Artifacts: {artifacts}")
             if final_answer:
@@ -373,7 +189,7 @@ class TestAgentMCP:
             "thread_id": thread_id,
             "test_description": test_description,
             "passed": passed,
-            "errors": errors,
+            "errors": errors_final,
             "artifacts": artifacts,
             "steps": steps,
             "notes": final_answer,

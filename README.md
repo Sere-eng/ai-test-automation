@@ -62,8 +62,12 @@ Flask API  ───────────────► LangGraph Agent (ReA
    |                                  | stdio / HTTP
    v                                  v
 JSON response                MCP Server Playwright (async)
-                           (21+ tool: navigate, inspect, click_smart, fill_smart, ...)
+                           (15 tool: start_browser, navigate_to_url, inspect_interactive_elements, click_smart, fill_smart, get_frame, …)
                                      |
                                      v
                                Chromium Headless
 ```
+
+### Documentazione tool Playwright MCP
+
+- Per un riepilogo dei tool Playwright esposti via MCP (con esempi di input/output e linee guida agentiche) vedi `backend/agent/TOOLS.md`.

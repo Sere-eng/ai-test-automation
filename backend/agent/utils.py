@@ -26,3 +26,20 @@ def safe_json_loads(s: str):
         return json.loads(s)
     except Exception:
         return None
+
+
+def export_agent_graph(agent, base_path: str = ".") -> None:
+    """Esporta visualizzazione LangGraph (mermaid, ascii, png). Fallisce in silenzio."""
+    try:
+        g = agent.get_graph(xray=True)
+        mermaid = g.draw_mermaid()
+        with open(f"{base_path}/langgraph.mmd", "w", encoding="utf-8") as f:
+            f.write(mermaid)
+        with open(f"{base_path}/langgraph.txt", "w", encoding="utf-8") as f:
+            f.write(g.draw_ascii())
+        png_bytes = g.draw_mermaid_png()
+        with open(f"{base_path}/langgraph.png", "wb") as f:
+            f.write(png_bytes)
+        print(" LangGraph exported: langgraph.mmd / langgraph.txt / langgraph.png")
+    except Exception as e:
+        print(f" Unable to export LangGraph visualization: {e}")

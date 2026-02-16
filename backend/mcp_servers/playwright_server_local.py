@@ -85,30 +85,6 @@ async def get_page_info() -> str:
 # =========================
 
 @mcp.tool()
-async def click_element(selector: str, selector_type: str = "css", timeout: int = 30000) -> str:
-    """Click su elemento."""
-    result = await playwright.click_element(selector=selector, selector_type=selector_type, timeout=timeout)
-    return to_json(result)
-
-
-@mcp.tool()
-async def fill_input(
-    selector: str,
-    value: str,
-    selector_type: str = "css",
-    clear_first: bool = True
-) -> str:
-    """Compila un input."""
-    result = await playwright.fill_input(
-        selector=selector,
-        value=value,
-        selector_type=selector_type,
-        clear_first=clear_first
-    )
-    return to_json(result)
-
-
-@mcp.tool()
 async def wait_for_element(
     selector: str,
     state: str = "visible",
@@ -133,16 +109,37 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
 
 
 @mcp.tool()
-async def check_element_exists(selector: str, selector_type: str = "css") -> str:
-    """Verifica esistenza/visibilità di un elemento."""
-    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type)
+async def press_key(key: str) -> str:
+    """Premi un tasto (Enter/Escape/etc.)."""
+    result = await playwright.press_key(key=key)
     return to_json(result)
 
 
 @mcp.tool()
-async def press_key(key: str) -> str:
-    """Premi un tasto (Enter/Escape/etc.)."""
-    result = await playwright.press_key(key=key)
+async def check_element_exists(selector: str, selector_type: str = "css", timeout: int = 5000) -> str:
+    """Verifica esistenza e visibilità di un elemento (per assert)."""
+    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_clickable_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
+    """Attende un elemento cliccabile il cui nome contiene name_substring (usa inspect)."""
+    result = await playwright.wait_for_clickable_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_field_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
+    """Attende un campo form il cui nome/placeholder contiene name_substring (usa inspect)."""
+    result = await playwright.wait_for_field_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_control_by_name_and_type(name_substring: str, control_type: str, timeout: int = None, case_insensitive: bool = True) -> str:
+    """Attende un controllo (es. combobox) con nome e tipo (usa inspect)."""
+    result = await playwright.wait_for_control_by_name_and_type(name_substring=name_substring, control_type=control_type, timeout=timeout, case_insensitive=case_insensitive)
     return to_json(result)
 
 
@@ -212,14 +209,19 @@ async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive:
     return to_json(result)
 
 
-# @mcp.tool()  # DEBUG ONLY - disabilitato per evitare confusione AI
-async def inspect_dom_changes(click_target: dict, wait_after_click: int = 2000) -> str:
-    """
-    Click su elemento e ispeziona cambiamenti DOM (elementi aggiunti/rimossi).
-    Utile per debug di menu dinamici/modali.
-    click_target: {"by": "role", "role": "button", "name": "Menu"}
-    """
-    result = await playwright.inspect_dom_changes(click_target=click_target, wait_after_click=wait_after_click)
+@mcp.tool()
+async def click_and_wait_for_text(
+    targets: list[dict] | None = None,
+    text: str = "",
+    timeout_per_try: int = 2000,
+    text_timeout: int = 30000,
+    in_iframe: dict = None,
+) -> str:
+    """Combina click_smart + wait_for_text_content. Se targets vuoto, solo wait_for_text_content."""
+    if not targets:
+        result = await playwright.wait_for_text_content(text=text, timeout=text_timeout, case_sensitive=False, in_iframe=in_iframe)
+        return to_json({"status": result.get("status"), "message": result.get("message"), "click": None, "text_check": result, "fallback_mode": "wait_for_text_content_only"})
+    result = await playwright.click_and_wait_for_text(targets=targets, text=text, timeout_per_try=timeout_per_try, text_timeout=text_timeout, in_iframe=in_iframe)
     return to_json(result)
 
 
@@ -247,53 +249,6 @@ async def get_frame(selector: str = None, url_pattern: str = None, timeout: int 
         )
     """
     result = await playwright.get_frame(selector=selector, url_pattern=url_pattern, timeout=timeout)
-    return to_json(result)
-
-
-# @mcp.tool()  # DEPRECATED - Use fill_smart + wait_for_text_content instead
-async def fill_and_search(
-    input_selector: str,
-    search_value: str,
-    verify_result_text: str = None,
-    in_iframe: dict = None,
-    timeout: int = 10000
-) -> str:
-    """
-    ⚠️ DEPRECATED: Use fill_smart + wait_for_text_content instead.
-    
-    NEW RECOMMENDED WORKFLOW:
-        fill_smart(targets=[...], value="carm", in_iframe={...})
-        wait_for_text_content("CARMAG", timeout=5000)
-    
-    Kept for backward compatibility only.
-    """
-    result = await playwright.fill_and_search(
-        input_selector=input_selector,
-        search_value=search_value,
-        verify_result_text=verify_result_text,
-        in_iframe=in_iframe,
-        timeout=timeout
-    )
-    return to_json(result)
-
-
-@mcp.tool()
-async def inspect_page_structure() -> str:
-    """
-    DEPRECATED: Usa inspect_interactive_elements() invece.
-    Mantenu per compatibilità con codice legacy.
-    """
-    result = await playwright.inspect_interactive_elements()
-    return to_json(result)
-
-
-@mcp.tool()
-async def handle_cookie_banner(strategies: list[str] | None = None, timeout: int = 5000) -> str:
-    """
-    Gestisce cookie banner con strategie multiple.
-    Output: JSON con strategia usata e selector cliccato (se trovato).
-    """
-    result = await playwright.handle_cookie_banner(strategies=strategies, timeout=timeout)
     return to_json(result)
 
 

@@ -1,22 +1,33 @@
-# Lista canonica dei tool esposti da questo MCP server
-# (source of truth per logging e /api/mcp/info)
+# Lista canonica dei tool esposti dal MCP server (source of truth per logging e avvio).
+# Include i tool di check per la regola "dopo ogni azione, un check esplicito".
 TOOL_NAMES = [
+    # RAW - lifecycle & pagina
     "start_browser",
-    "navigate_to_url",
-    "wait_for_load_state",
-    "capture_screenshot",
     "close_browser",
+    "navigate_to_url",
     "get_page_info",
-    "wait_for_element",
-    "get_text",
+    "capture_screenshot",
+
+    # RAW - elementi, tastiera, load state, iframe
     "press_key",
-    "inspect_interactive_elements",
-    "handle_cookie_banner",
+    "get_text",
+    "wait_for_element",
+    "wait_for_load_state",
+    "get_frame",
+
+    # MEDIUM - check / wait su testo o presenza
+    "wait_for_text_content",
+    "check_element_exists",
+
+    # SMART LOCATORS & INSPECTION
     "click_smart",
     "fill_smart",
-    "wait_for_text_content",
-    # "inspect_dom_changes",  # DEBUG ONLY - rimosso per evitare confusione AI
-    # Procedural tools
-    "get_frame",
-    # "fill_and_search"  # DEPRECATED - use fill_smart + wait_for_text_content
+    "inspect_interactive_elements",
+
+    # ADVANCED - wait per nome / controlli / banner / step composti
+    "wait_for_clickable_by_name",
+    "wait_for_control_by_name_and_type",
+    "wait_for_field_by_name",
+    "handle_cookie_banner",
+    "click_and_wait_for_text",
 ]

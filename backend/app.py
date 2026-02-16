@@ -29,16 +29,19 @@ AGENT_MCP_AVAILABLE = False
 # Prova a importare l'AI Agent MCP
 try:
     from agent.test_agent_mcp import TestAgentMCP
-    # Inizializza l'agent (verrà inizializzato alla prima chiamata)
-    # IMPORTANTE: usa_remote=True per server HTTP remoto, parametro che prende da config
-    # Assicurati che playwright_server_remote.py sia in esecuzione su porta 8001
-    test_agent_mcp = TestAgentMCP()  # Usa remoto HTTP
+    from agent.orchestrator import run_full_sync
+    from agent.lab_scenarios import LAB_SCENARIOS
+    test_agent_mcp = TestAgentMCP()
     AGENT_MCP_AVAILABLE = True
-    print(" AI Agent MCP caricato con successo!")
+    ORCHESTRATOR_AVAILABLE = True
+    print(" AI Agent MCP e orchestrator caricati con successo!")
 except ImportError as e:
     print(f" AI Agent MCP non disponibile: {e}")
     print("   Installare: pip install mcp langchain-mcp-adapters")
     test_agent_mcp = None
+    run_full_sync = None
+    LAB_SCENARIOS = []
+    ORCHESTRATOR_AVAILABLE = False
 
 # ==================== ENDPOINT BASE ====================
 
@@ -328,6 +331,61 @@ def mcp_info():
             "handle_cookie_banner"
         ]
     })
+
+# ==================== ENDPOINT AMC LOGIN ====================
+
+# ==================== ENDPOINT LAB ORCHESTRATOR (agentico) ====================
+
+@app.route('/api/test/lab/full', methods=['POST'])
+def test_lab_full():
+    """
+    Esegue il flusso agentico LAB: Prefix Agent (login → home) + Dashboard Agent (scenario).
+    Body JSON: { "scenario_id": "scenario_1" | "scenario_2" | "scenario_3" | "scenario_4" }
+    """
+    if not ORCHESTRATOR_AVAILABLE or run_full_sync is None:
+        return jsonify({
+            "status": "error",
+            "message": "Orchestrator non disponibile"
+        }), 503
+
+    try:
+        data = request.get_json() or {}
+        scenario_id = data.get("scenario_id") or request.args.get("scenario_id")
+        if not scenario_id:
+            return jsonify({
+                "status": "error",
+                "message": "scenario_id mancante",
+                "available_scenarios": [s.id for s in LAB_SCENARIOS]
+            }), 400
+
+        result = run_full_sync(scenario_id, verbose=True)
+        return jsonify({
+            "status": "success",
+            "passed": result.get("passed", False),
+            "phase": result.get("phase"),
+            "prefix": result.get("prefix"),
+            "scenario": result.get("scenario"),
+            "errors": result.get("errors", []),
+            "artifacts": result.get("artifacts", []),
+            "duration_ms": result.get("duration_ms"),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/test/lab/scenarios', methods=['GET'])
+def test_lab_scenarios_list():
+    """Elenco scenari LAB disponibili per l'orchestrator."""
+    if not ORCHESTRATOR_AVAILABLE:
+        return jsonify({"status": "unavailable", "scenarios": []}), 503
+    return jsonify({
+        "status": "ok",
+        "scenarios": [
+            {"id": s.id, "name": s.name, "execution_steps": s.execution_steps}
+            for s in LAB_SCENARIOS
+        ]
+    })
+
 
 # ==================== ENDPOINT AMC LOGIN ====================
 

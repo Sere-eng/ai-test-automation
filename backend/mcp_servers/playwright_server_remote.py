@@ -95,30 +95,6 @@ async def get_page_info() -> str:
 # =========================
 
 @mcp.tool()
-async def click_element(selector: str, selector_type: str = "css", timeout: int = 30000) -> str:
-    """Click su elemento."""
-    result = await playwright.click_element(selector, selector_type, timeout)
-    return to_json(result)
-
-
-@mcp.tool()
-async def fill_input(
-    selector: str,
-    value: str,
-    selector_type: str = "css",
-    clear_first: bool = True
-) -> str:
-    """Compila un input."""
-    result = await playwright.fill_input(
-        selector=selector,
-        value=value,
-        selector_type=selector_type,
-        clear_first=clear_first
-    )
-    return to_json(result)
-
-
-@mcp.tool()
 async def wait_for_element(
     selector: str,
     state: str = "visible",
@@ -143,16 +119,37 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
 
 
 @mcp.tool()
-async def check_element_exists(selector: str, selector_type: str = "css") -> str:
-    """Verifica esistenza/visibilità di un elemento."""
-    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type)
+async def press_key(key: str) -> str:
+    """Premi un tasto (Enter/Escape/etc.)."""
+    result = await playwright.press_key(key=key)
     return to_json(result)
 
 
 @mcp.tool()
-async def press_key(key: str) -> str:
-    """Premi un tasto (Enter/Escape/etc.)."""
-    result = await playwright.press_key(key=key)
+async def check_element_exists(selector: str, selector_type: str = "css", timeout: int = 5000) -> str:
+    """Verifica esistenza e visibilità di un elemento (per assert)."""
+    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_clickable_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
+    """Attende che compaia un elemento cliccabile il cui nome contiene name_substring (usa inspect)."""
+    result = await playwright.wait_for_clickable_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_field_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
+    """Attende che compaia un campo form il cui nome/placeholder contiene name_substring (usa inspect)."""
+    result = await playwright.wait_for_field_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_control_by_name_and_type(name_substring: str, control_type: str, timeout: int = None, case_insensitive: bool = True) -> str:
+    """Attende un controllo (es. combobox) con nome e tipo (usa inspect)."""
+    result = await playwright.wait_for_control_by_name_and_type(name_substring=name_substring, control_type=control_type, timeout=timeout, case_insensitive=case_insensitive)
     return to_json(result)
 
 
@@ -343,63 +340,6 @@ async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 800
 
 
 @mcp.tool()
-async def click_and_wait_for_text(
-    targets: list[dict] | None = None,
-    text: str = "",
-    timeout_per_try: int = 8000,
-    text_timeout: int = 30000,
-    in_iframe: dict = None,
-) -> str:
-    """
-    Combina click_smart + wait_for_text_content in un unico tool:
-    - esegue il click usando tutte le strategie fornite in targets
-    - aspetta che il testo indicato compaia nella pagina (o iframe)
-
-    Utile per step critici come login, "Continua", apertura di modali o moduli.
-    """
-    print("\n [MCP] click_and_wait_for_text called:")
-    print(f"   Targets: {targets}")
-    print(f"   Text: {text}")
-    print(f"   Click timeout_per_try: {timeout_per_try}ms")
-    print(f"   Text timeout: {text_timeout}ms")
-    print(f"   In iframe: {in_iframe}")
-
-    # Tollerante agli errori del modello:
-    # se il chiamante dimentica di passare i targets, degrada
-    # automaticamente a una semplice wait_for_text_content sul testo.
-    if not targets:
-        text_result = await playwright.wait_for_text_content(
-            text=text,
-            timeout=text_timeout,
-            case_sensitive=False,
-            in_iframe=in_iframe,
-        )
-        print(f"   Fallback only-wait, text status: {text_result.get('status')}")
-        fallback_result = {
-            "status": text_result.get("status"),
-            "message": text_result.get("message"),
-            "click": None,
-            "text_check": text_result,
-            "fallback_mode": "wait_for_text_content_only",
-        }
-        return to_json(fallback_result)
-
-    result = await playwright.click_and_wait_for_text(
-        targets=targets,
-        text=text,
-        timeout_per_try=timeout_per_try,
-        text_timeout=text_timeout,
-        in_iframe=in_iframe,
-    )
-
-    print(f"   Overall status: {result.get('status')}")
-    print(f"   Click status: {result.get('click', {}).get('status')}")
-    print(f"   Text check status: {result.get('text_check', {}).get('status')}")
-
-    return to_json(result)
-
-
-@mcp.tool()
 async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False, in_iframe: dict = None) -> str:
     """
     Aspetta che un testo specifico appaia OVUNQUE nella pagina o dentro un iframe.
@@ -441,41 +381,22 @@ async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive:
     return to_json(result)
 
 
-# @mcp.tool()  # DEBUG ONLY - disabilitato per evitare confusione AI
-async def inspect_dom_changes(click_target: dict, wait_after_click: int = 2000) -> str:
+@mcp.tool()
+async def click_and_wait_for_text(
+    targets: list[dict] | None = None,
+    text: str = "",
+    timeout_per_try: int = 8000,
+    text_timeout: int = 30000,
+    in_iframe: dict = None,
+) -> str:
     """
-    Ispeziona cosa cambia nel DOM dopo un click (diagnostico).
-    Mostra nuovi elementi, elementi rimossi, menu/popup aperti.
-    
-    Args:
-        click_target: Target da cliccare (formato click_smart), es: {"by": "text", "text": "Micrologistica"}
-        wait_after_click: Millisecondi da aspettare dopo click (default: 2000)
-    
-    Returns:
-        JSON con:
-        - elements_added: nuovi elementi interattivi apparsi (button, link, menu)
-        - elements_removed: elementi scomparsi
-        - recommendations: suggerimenti su cosa fare dopo (es: "clicca su submenu item X")
-    
-    Use case:
-        - Debug: scoprire perché un click non fa quello che ti aspetti
-        - Capire se si apre un menu/submenu/popup
-        - Trovare il prossimo elemento da cliccare
-    
-    Example workflow:
-        # Invece di:
-        click_smart([{"by": "text", "text": "Micrologistica"}])
-        # Non so cosa succede...
-        
-        # Usa:
-        result = inspect_dom_changes(
-            click_target={"by": "text", "text": "Micrologistica"},
-            wait_after_click=3000
-        )
-        # Output: "Rilevato submenu con 3 item: ['Dashboard', 'Richieste', 'Movimenti']"
-        # -> Ora sai che devi cliccare su "Dashboard"!
+    Combina click_smart + wait_for_text_content. Per step critici (login, Continua, moduli).
+    Se targets è vuoto, esegue solo wait_for_text_content(text).
     """
-    result = await playwright.inspect_dom_changes(click_target=click_target, wait_after_click=wait_after_click)
+    if not targets:
+        result = await playwright.wait_for_text_content(text=text, timeout=text_timeout, case_sensitive=False, in_iframe=in_iframe)
+        return to_json({"status": result.get("status"), "message": result.get("message"), "click": None, "text_check": result, "fallback_mode": "wait_for_text_content_only"})
+    result = await playwright.click_and_wait_for_text(targets=targets, text=text, timeout_per_try=timeout_per_try, text_timeout=text_timeout, in_iframe=in_iframe)
     return to_json(result)
 
 
@@ -521,45 +442,6 @@ async def get_frame(selector: str = None, url_pattern: str = None, iframe_path: 
         )
     """
     result = await playwright.get_frame(selector=selector, url_pattern=url_pattern, iframe_path=iframe_path, timeout=timeout)
-    return to_json(result)
-
-
-# @mcp.tool()  # DEPRECATED - Use fill_smart + wait_for_text_content instead
-async def fill_and_search(
-    input_selector: str,
-    search_value: str,
-    verify_result_text: str = None,
-    in_iframe: dict = None
-) -> str:
-    """
-    ⚠️ DEPRECATED: Use fill_smart + wait_for_text_content instead.
-    
-    This tool uses hardcoded CSS selectors which are brittle.
-    The discovery-first approach is more robust.
-    
-    DEPRECATED WORKFLOW:
-        fill_and_search("input[type='text']", "carm", "CARMAG", in_iframe={...})
-    
-    NEW RECOMMENDED WORKFLOW (discovery-first):
-        fill_smart(
-            targets=[
-                {"by": "placeholder", "placeholder": "Search"},
-                {"by": "label", "label": "Search"},
-                {"by": "role", "role": "searchbox", "name": "Search"}
-            ],
-            value="carm",
-            in_iframe={"url_pattern": "movementreason"}
-        )
-        wait_for_text_content("CARMAG", timeout=5000)
-    
-    Kept for backward compatibility only.
-    """
-    result = await playwright.fill_and_search(
-        input_selector=input_selector,
-        search_value=search_value,
-        verify_result_text=verify_result_text,
-        in_iframe=in_iframe
-    )
     return to_json(result)
 
 
