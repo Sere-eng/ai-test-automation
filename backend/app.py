@@ -13,6 +13,8 @@ import json
 import asyncio
 from datetime import datetime
 
+from agent.utils import make_json_serializable
+
 # Valida configurazione all'avvio
 AppConfig.validate_all()
 
@@ -29,7 +31,7 @@ AGENT_MCP_AVAILABLE = False
 # Prova a importare l'AI Agent MCP
 try:
     from agent.test_agent_mcp import TestAgentMCP
-    from agent.orchestrator import run_full_sync
+    from agent.orchestrator import run_full_sync, run_prefix_to_home, run_lab_scenario
     from agent.lab_scenarios import LAB_SCENARIOS
     test_agent_mcp = TestAgentMCP()
     AGENT_MCP_AVAILABLE = True
@@ -40,6 +42,8 @@ except ImportError as e:
     print("   Installare: pip install mcp langchain-mcp-adapters")
     test_agent_mcp = None
     run_full_sync = None
+    run_prefix_to_home = None
+    run_lab_scenario = None
     LAB_SCENARIOS = []
     ORCHESTRATOR_AVAILABLE = False
 
@@ -340,7 +344,19 @@ def mcp_info():
 def test_lab_full():
     """
     Esegue il flusso agentico LAB: Prefix Agent (login → home) + Dashboard Agent (scenario).
-    Body JSON: { "scenario_id": "scenario_1" | "scenario_2" | "scenario_3" | "scenario_4" }
+
+    Body JSON minimo:
+    {
+        "scenario_id": "scenario_1" | "scenario_2" | "scenario_3" | "scenario_4"
+    }
+
+    Body JSON opzionale (override URL/credenziali rispetto a AppConfig.LAB):
+    {
+        "scenario_id": "...",
+        "url": "https://mdrsanitalab2.eng.it/multimodule/ELLIPSE_LAB/...",
+        "username": "user_esterno",
+        "password": "pwd_esterna"
+    }
     """
     if not ORCHESTRATOR_AVAILABLE or run_full_sync is None:
         return jsonify({
@@ -358,7 +374,18 @@ def test_lab_full():
                 "available_scenarios": [s.id for s in LAB_SCENARIOS]
             }), 400
 
-        result = run_full_sync(scenario_id, verbose=True)
+        # Parametri opzionali per override di URL/credenziali LAB (possono venire dal frontend)
+        lab_url = data.get("url") or data.get("lab_url") or request.args.get("url")
+        lab_username = data.get("username") or data.get("lab_username") or request.args.get("username")
+        lab_password = data.get("password") or data.get("lab_password") or request.args.get("password")
+
+        result = run_full_sync(
+            scenario_id,
+            verbose=True,
+            url=lab_url,
+            user=lab_username,
+            password=lab_password,
+        )
         return jsonify({
             "status": "success",
             "passed": result.get("passed", False),
@@ -368,6 +395,110 @@ def test_lab_full():
             "errors": result.get("errors", []),
             "artifacts": result.get("artifacts", []),
             "duration_ms": result.get("duration_ms"),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/test/lab/prefix', methods=['POST'])
+def test_lab_prefix():
+    """
+    Esegue solo il Prefix Agent LAB: login → selezione organizzazione → Continua → ingresso nel modulo Laboratory.
+
+    Body JSON opzionale:
+    {
+        "url": "https://mdrsanitalab2.eng.it/multimodule/ELLIPSE_LAB/...",
+        "username": "user_esterno",
+        "password": "pwd_esterna"
+    }
+
+    Se i parametri non sono forniti, vengono usati quelli da AppConfig.LAB (es. da .env).
+    """
+    if not ORCHESTRATOR_AVAILABLE or run_prefix_to_home is None:
+        return jsonify({
+            "status": "error",
+            "message": "Orchestrator non disponibile"
+        }), 503
+
+    try:
+        data = request.get_json() or {}
+
+        lab_url = data.get("url") or data.get("lab_url") or request.args.get("url")
+        lab_username = data.get("username") or data.get("lab_username") or request.args.get("username")
+        lab_password = data.get("password") or data.get("lab_password") or request.args.get("password")
+
+        # Esegue SOLO il prefix (login → org → Continua → Laboratorio Analisi)
+        # Il browser resta aperto per eventuale uso successivo.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        prefix_result = loop.run_until_complete(
+            run_prefix_to_home(
+                verbose=True,
+                url=lab_url,
+                user=lab_username,
+                password=lab_password,
+            )
+        )
+        loop.close()
+
+        # Sanitize per evitare 500 (steps/result possono contenere oggetti non serializzabili)
+        safe_result = make_json_serializable(prefix_result)
+        return jsonify({
+            "status": "success",
+            "phase": safe_result.get("phase", "prefix"),
+            "passed": safe_result.get("passed", False),
+            "result": safe_result,
+            "errors": safe_result.get("errors", []),
+            "artifacts": safe_result.get("artifacts", []),
+            "duration_ms": safe_result.get("duration_ms"),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/test/lab/run', methods=['POST'])
+def test_lab_run_scenario():
+    """
+    Esegue SOLO lo scenario LAB partendo dalla pagina attuale del browser (es. Preanalitica).
+
+    Usare dopo POST /api/test/lab/prefix: il prefix lascia il browser aperto nel modulo Laboratory
+    (tipicamente su Preanalitica); questa chiamata esegue lo scenario senza rifare login.
+
+    Body JSON:
+    {
+        "scenario_id": "scenario_1" | "scenario_2" | "scenario_3" | "scenario_4"
+    }
+    """
+    if not ORCHESTRATOR_AVAILABLE or run_lab_scenario is None:
+        return jsonify({
+            "status": "error",
+            "message": "Orchestrator non disponibile"
+        }), 503
+
+    try:
+        data = request.get_json() or {}
+        scenario_id = data.get("scenario_id") or request.args.get("scenario_id")
+        if not scenario_id:
+            return jsonify({
+                "status": "error",
+                "message": "scenario_id mancante",
+                "available_scenarios": [s.id for s in LAB_SCENARIOS]
+            }), 400
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        scenario_result = loop.run_until_complete(
+            run_lab_scenario(scenario_id=scenario_id, verbose=True)
+        )
+        loop.close()
+
+        safe_result = make_json_serializable(scenario_result)
+        return jsonify({
+            "status": "success",
+            "phase": safe_result.get("phase", "scenario"),
+            "passed": safe_result.get("passed", False),
+            "result": safe_result,
+            "scenario_id": scenario_id,
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

@@ -29,12 +29,10 @@ LAB_SCENARIOS: List[LabScenario] = [
             "(es. appartenenza a uno o più piani di lavoro, range temporale).",
         ],
         execution_steps=[
-            "Apri la sezione del submenu Laboratory.",
-            "Accedere alla dashboard di interesse selezionandola dal dropdown menu (se è presente solo una dashboard questa è valorizzata di default).",
-            "Accedere alla funzionalità \"Modifica\".",
-            "Creare un nuovo elemento (gruppo).",
-            "Inserire il titolo del gruppo (obbligatorio) e successivamente creare un nuovo filtro.",
-            "Inserire almeno il titolo del filtro (obbligatorio) e salvare.",
+            "Dal modulo Laboratory (dove compare ad es. Preanalitica), apri la sezione 'Laboratorio' dal menu laterale: clicca la voce di menu con etichetta 'Laboratorio' (icona science). La dashboard Laboratorio si apre con dropdown già valorizzato se c'è una sola dashboard.",
+            "Nella tab 'Filtri' della dashboard Laboratorio, clicca il pulsante 'Modifica'.",
+            "Crea un nuovo gruppo: clicca 'Aggiungi gruppo'. Appare una nuova card con un campo di testo nell'header (senza label, può essere precompilato con 'title'): inserisci lì il titolo del gruppo (obbligatorio). Poi clicca 'Aggiungi filtro' dentro quella card.",
+            "Nella modale: compila almeno il campo obbligatorio 'Nome filtro' (label 'Nome filtro*'); poi clicca 'Conferma' per salvare il filtro.",
         ],
     ),
     LabScenario(

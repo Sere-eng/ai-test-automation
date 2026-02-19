@@ -319,6 +319,34 @@
             border: 1px solid var(--border);
             white-space: pre-wrap;
         }
+        .lab-login-section {
+            margin-bottom: 20px;
+            padding: 14px;
+            background: var(--bg-2);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .lab-login-section .section-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .lab-login-section .field { margin-bottom: 10px; }
+        .lab-login-section label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+        .lab-login-section input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 14px;
+        }
+        .lab-login-section input::placeholder { color: var(--muted); opacity: 0.8; }
+        .lab-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .lab-actions-row .btn { flex: 0 0 auto; }
     </style>
 </head>
 <body>
@@ -347,17 +375,36 @@
         </div>
         <div id="panel-lab" class="panel">
             <p class="panel-desc">
-                Run a full LAB flow: <strong>login → organization → tile</strong> are executed automatically, then the selected scenario runs. You only choose which scenario to run; the steps are predefined.
+                You can <strong>login first</strong>, then <strong>run a scenario</strong> separately, or run <strong>login + scenario</strong> in one shot.
             </p>
+            <div class="lab-login-section">
+                <div class="section-label">1. Login (optional — leave empty to use server default)</div>
+                <div class="field">
+                    <label for="labUrl">URL</label>
+                    <input type="text" id="labUrl" placeholder="e.g. https://mdrsanitalab2.eng.it/... (empty = from server)">
+                </div>
+                <div class="field">
+                    <label for="labUsername">Username</label>
+                    <input type="text" id="labUsername" placeholder="(empty = from server)">
+                </div>
+                <div class="field">
+                    <label for="labPassword">Password</label>
+                    <input type="password" id="labPassword" placeholder="(empty = from server)">
+                </div>
+                <div class="lab-actions-row">
+                    <button class="btn btn-secondary" id="runLoginBtn" onclick="runLabLogin()">Login</button>
+                </div>
+            </div>
             <div class="lab-select-wrap">
-                <label for="labScenarioSelect">Scenario</label>
+                <label for="labScenarioSelect">2. Scenario</label>
                 <select id="labScenarioSelect" class="lab-scenario-select">
                     <option value="">Loading scenarios…</option>
                 </select>
             </div>
             <div id="labStepsPreview" class="lab-steps" style="display:none;"></div>
-            <div class="actions">
-                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full LAB test</button>
+            <div class="actions lab-actions-row">
+                <button class="btn btn-primary" id="runScenarioBtn" onclick="runLabScenarioOnly()">Run scenario only</button>
+                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login + scenario)</button>
             </div>
         </div>
     </div>
@@ -421,6 +468,93 @@
             }
         }
 
+        function showLabResult(data, resultDiv, resultContent, resultHeader) {
+            resultDiv.classList.add('show');
+            resultContent.innerHTML = '';
+            if (data.status === 'success') {
+                resultDiv.className = 'result ' + (data.passed ? 'success' : 'error') + ' show';
+                resultHeader.textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
+                const parts = [];
+                if (data.result && data.result.final_answer) parts.push(data.result.final_answer);
+                if (data.phase) parts.push('Phase: ' + data.phase);
+                if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
+                if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
+                resultContent.textContent = parts.join('\n\n') || 'Done.';
+            } else {
+                resultDiv.className = 'result error show';
+                resultHeader.textContent = 'ERROR';
+                resultContent.textContent = data.message || JSON.stringify(data);
+            }
+        }
+
+        async function runLabLogin() {
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const btn = document.getElementById('runLoginBtn');
+            const url = document.getElementById('labUrl').value.trim();
+            const username = document.getElementById('labUsername').value.trim();
+            const password = document.getElementById('labPassword').value;
+            document.getElementById('loadingText').textContent = 'Running login (prefix)…';
+            resultDiv.classList.remove('show');
+            loadingDiv.classList.add('show');
+            btn.disabled = true;
+            try {
+                const body = {};
+                if (url) body.url = url;
+                if (username) body.username = username;
+                if (password) body.password = password;
+                const response = await fetch(API_BASE + '/api/test/lab/prefix', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                loadingDiv.classList.remove('show');
+                showLabResult(data, resultDiv, document.getElementById('resultContent'), document.getElementById('resultHeader'));
+            } catch (error) {
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
+                document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function runLabScenarioOnly() {
+            const scenarioId = document.getElementById('labScenarioSelect').value;
+            if (!scenarioId) {
+                alert('Select a scenario');
+                return;
+            }
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const btn = document.getElementById('runScenarioBtn');
+            document.getElementById('loadingText').textContent = 'Running scenario…';
+            resultDiv.classList.remove('show');
+            loadingDiv.classList.add('show');
+            btn.disabled = true;
+            try {
+                const response = await fetch(API_BASE + '/api/test/lab/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenario_id: scenarioId })
+                });
+                const data = await response.json();
+                loadingDiv.classList.remove('show');
+                showLabResult(data, resultDiv, document.getElementById('resultContent'), document.getElementById('resultHeader'));
+            } catch (error) {
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
+                document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         async function runLabTest() {
             const scenarioId = document.getElementById('labScenarioSelect').value;
             if (!scenarioId) {
@@ -442,12 +576,13 @@
                 });
                 const data = await response.json();
                 loadingDiv.classList.remove('show');
-                resultDiv.classList.add('show');
                 const resultContent = document.getElementById('resultContent');
+                const resultHeader = document.getElementById('resultHeader');
+                resultDiv.classList.add('show');
                 resultContent.innerHTML = '';
                 if (data.status === 'success') {
                     resultDiv.className = 'result ' + (data.passed ? 'success' : 'error') + ' show';
-                    document.getElementById('resultHeader').textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
+                    resultHeader.textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
                     const parts = [];
                     if (data.prefix && data.prefix.final_answer) parts.push('Prefix: ' + data.prefix.final_answer);
                     if (data.scenario && data.scenario.final_answer) parts.push('Scenario: ' + data.scenario.final_answer);
@@ -457,7 +592,7 @@
                     resultContent.textContent = parts.join('\n\n') || 'Done.';
                 } else {
                     resultDiv.className = 'result error show';
-                    document.getElementById('resultHeader').textContent = 'ERROR';
+                    resultHeader.textContent = 'ERROR';
                     resultContent.textContent = data.message || JSON.stringify(data);
                 }
             } catch (error) {

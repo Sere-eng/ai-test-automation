@@ -12,7 +12,7 @@ import uuid
 
 from agent.setup import create_llm, create_mcp_config
 from agent.system_prompt import get_lab_optimized_prompt
-from agent.utils import export_agent_graph
+from agent.utils import export_agent_graph, format_tool_io
 from agent.evaluation import (
     parse_tool_output,
     step_from_tool_end,
@@ -134,12 +134,26 @@ class TestAgentMCP:
             },
         ):
             event_type = ev.get("event")
+            tool_name = ev.get("name") or ev.get("metadata", {}).get("tool_name")
 
-            # (facoltativo) log minimale
-            if verbose and event_type in ("on_tool_start", "on_tool_end", "on_tool_error"):
-                name = ev.get("name") or ev.get(
-                    "metadata", {}).get("tool_name")
-                print(f"[{event_type}] {name}")
+            # Log minimale + input/output tool (per analisi stabilità catena)
+            if verbose and event_type == "on_tool_start":
+                print(f"[on_tool_start] {tool_name}")
+                inp = ev.get("data", {}).get("input")
+                if inp is not None:
+                    inp_str = format_tool_io(inp)
+                    print(f"  input:  {inp_str}")
+            if verbose and event_type == "on_tool_end":
+                print(f"[on_tool_end] {tool_name}")
+                out_raw = ev.get("data", {}).get("output")
+                if out_raw is not None:
+                    out_clean = parse_tool_output(out_raw)  # stesso output degli step: niente repr/escape
+                    print(f"  output: {format_tool_io(out_clean)}")
+            if verbose and event_type == "on_tool_error":
+                print(f"[on_tool_error] {tool_name}")
+                err = ev.get("data", {}).get("error")
+                if err is not None:
+                    print(f"  error:  {err}")
 
             if event_type == "on_tool_end":
                 tool_name = ev.get("name") or ev.get("metadata", {}).get("tool_name")

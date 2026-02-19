@@ -11,6 +11,19 @@ from typing import Literal, Optional, List, Dict
 from config.settings import AppConfig
 
 
+def _normalize_css_selector(by: str, target: dict) -> Optional[str]:
+    """Normalize CSS selector: for css_id or id-like selector (e.g. mat-input-17), prefix with #."""
+    selector = target.get("selector") or (f"#{target['id']}" if by == "css_id" and target.get("id") else None)
+    if not selector:
+        return None
+    # If it looks like an id (starts with letter/underscore, only alphanumeric/hyphen), ensure # prefix
+    s = selector.strip()
+    if s and not s.startswith("#") and not s.startswith("[") and not s.startswith(".") and "/" not in s:
+        if (s[0].isalpha() or s[0] == "_") and all(c.isalnum() or c in "-_" for c in s):
+            return "#" + s
+    return selector
+
+
 class PlaywrightTools:
     """
     Classe che contiene i tool per interagire con il browser tramite Playwright (ASYNC).
@@ -694,7 +707,7 @@ class PlaywrightTools:
 
                 # Strategy 6: CSS selector (fallback; accept css_name/css_id from model)
                 elif by in ("css", "css_name", "css_id"):
-                    selector = target.get("selector")
+                    selector = _normalize_css_selector(by, target)
                     locator = context.locator(selector) if selector else None
 
                 # Strategy 7: XPath (last resort)
@@ -870,7 +883,7 @@ class PlaywrightTools:
                     locator = context.locator(
                         f'[data-tfa="{target.get("tfa")}"]')
                 elif by in ("css", "css_name", "css_id"):
-                    selector = target.get("selector")
+                    selector = _normalize_css_selector(by, target)
                     locator = context.locator(selector) if selector else None
                 elif by == "xpath":
                     locator = context.locator(f"xpath={target.get('xpath')}")
@@ -1061,6 +1074,17 @@ class PlaywrightTools:
                             "strategy": "css_aria",
                             "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
                         })
+                    # Icon+label buttons (e.g. "add\n\nAGGIUNGI FILTRO"): add text with label only first,
+                    # so get_by_text("AGGIUNGI FILTRO") is tried before the full string (which often times out).
+                    if visible_text and "\n" in visible_text:
+                        parts = [p.strip() for p in visible_text.split("\n") if p.strip()]
+                        if parts:
+                            label_only = parts[-1]
+                            if len(label_only) >= 2 and label_only != visible_text.strip():
+                                suggestions.append({
+                                    "strategy": "text_label",
+                                    "click_smart": {"by": "text", "text": label_only}
+                                })
                     if visible_text:
                         suggestions.append({
                             "strategy": "text",

@@ -127,6 +127,8 @@ AMC_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
       2) Then call close_browser().
     - This is the ONLY screenshot required on success. Do not take intermediate screenshots
       unless the test description explicitly asks for them.
+    - After the last scenario action, do ONLY capture_screenshot then close_browser; do not
+      add extra inspect or other tools, so you stay within the interaction limit.
 
     PASS / FAIL POLICY
     - You MUST NOT declare the test "passed" or "failed".
@@ -185,6 +187,8 @@ LAB_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
     - targets is ALWAYS a non-empty array from playwright_suggestions (e.g. [{"by": "role", "role": "button", "name": "Filters"}]).
     - Pattern: inspect_interactive_elements() → pick element → build targets from playwright_suggestions → click_smart(targets=[...]) or fill_smart(targets=[...], value="...").
     - For critical steps you may use click_and_wait_for_text(targets=[...], text="...") (requires both targets and text).
+    - You MUST copy ALL playwright_suggestions for the chosen element into the targets array (never just a single strategy when more are available), preserving their order. This is what enables the internal fallback chain (role → css → text → tfa, etc.).
+    - For Material icon+label buttons (e.g. text like "add\\nAGGIUNGI FILTRO"), the most robust strategy is usually TEXT on the human-readable label ("AGGIUNGI FILTRO" / "Aggiungi filtro"). Ensure that text-based strategy is present in targets (typically after role strategies and before any data_tfa strategy).
     - Copy ALL playwright_suggestions for the chosen element; put any data_tfa strategy at the END of targets.
 
     DISCOVERY-FIRST
@@ -195,12 +199,12 @@ LAB_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
     - Use in_iframe only when inspect shows iframes and the test clearly refers to content inside one of them.
 
     LAB SCENARIOS (execute from the Laboratory dashboard)
-    - Scenario 1 – Creazione filtro: accedi alla dashboard (dropdown se più di una) → Modifica → crea gruppo (titolo obbligatorio) → crea filtro (titolo obbligatorio) → salva. Risultato: filtro memorizzato e card con campioni coerenti.
-    - Scenario 2 – Contatori: accedi alla dashboard → clicca un contatore in alto con numero diverso da 0.
+    - Scenario 1 - Creazione filtro: accedi alla dashboard (dropdown se più di una) → Modifica → crea gruppo (titolo obbligatorio) → crea filtro (titolo obbligatorio) → salva. Risultato: filtro memorizzato e card con campioni coerenti.
+    - Scenario 2 - Contatori: accedi alla dashboard → clicca un contatore in alto con numero diverso da 0.
       Risultato: elenco campioni nello stato del contatore; contatore a 0 = card non cliccabile.
-    - Scenario 3 – Accesso tramite filtro: accedi alla dashboard → clicca un filtro in un gruppo.
+    - Scenario 3 - Accesso tramite filtro: accedi alla dashboard → clicca un filtro in un gruppo.
       Risultato: solo campioni del filtro (scroll 50 per volta se molti); 1 campione → dettaglio diretto.
-    - Scenario 4 – Dettaglio campione: da elenco campioni clicca una riga. Risultato: pagina di dettaglio del campione.
+    - Scenario 4 - Dettaglio campione: da elenco campioni clicca una riga. Risultato: pagina di dettaglio del campione.
     - Map the test description to the matching scenario(s) and execute the corresponding steps using inspect + click_smart/fill_smart.
 
     ERROR HANDLING (MANDATORY)
@@ -216,6 +220,8 @@ LAB_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
       2) Then call close_browser().
     - This is the ONLY screenshot required on success. Do not take intermediate screenshots
       unless the test description explicitly asks for them.
+    - After the last scenario action, do ONLY capture_screenshot then close_browser; do not
+      add extra inspect or other tools, so you stay within the interaction limit.
 
     PASS / FAIL POLICY
     - You MUST NOT declare the test "passed" or "failed".
@@ -230,6 +236,10 @@ LAB_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
     - After close_browser(), output ONE short neutral sentence summarizing what happened
       (no secrets, no "pass/fail" wording). Example:
       "Navigation to Clinical Laboratory and Laboratory dashboard executed, requested dashboard filters/actions performed, browser closed."
+    - If you completed all requested steps and then called close_browser(), your final message
+      must state that the scenario was completed (e.g. "Scenario completed, browser closed.").
+      Do NOT output "need more steps", "sorry", or "could not process" when you have in fact
+      finished the steps—the backend decides pass/fail from tool outputs, not from your text.
     """
 
 
@@ -243,7 +253,7 @@ def get_lab_optimized_prompt() -> str:
 # =============================================================================
 
 LAB_PREFIX_PROMPT = """You are the LAB Prefix Agent. Your ONLY goal is to reach INSIDE the Laboratory module (after the tile grid).
-    Follow the same sequence as test_lab_workflow_native.py up to and including organization selection.
+    Follow the login and organization selection flow described below up to and including organization selection.
 
     GOAL (strict, in order)
     - Navigate to the LAB URL (from the user message).
@@ -274,7 +284,7 @@ LAB_PREFIX_PROMPT = """You are the LAB Prefix Agent. Your ONLY goal is to reach 
     - inspect_interactive_elements() again. Find the button whose accessible_name contains "continua". click_smart on its playwright_suggestions to click "Continua".
 
     AFTER CONTINUA (tile grid)
-    - wait_for_load_state("domcontentloaded"). Then find and click the Laboratory tile: call wait_for_clickable_by_name("Laboratorio Analisi") first; only if it returns error, call wait_for_clickable_by_name("Clinical Laboratory"). Do NOT call both in parallel (on Italian UI the second would timeout 60s). Then click_smart with the returned targets. Alternatively inspect_interactive_elements() and pick the tile "Laboratorio Analisi" / "Clinical Laboratory", then click_smart. Do NOT stop at the tile grid without entering the Laboratory module.
+    - First call wait_for_load_state("domcontentloaded") (do NOT use "networkidle" here to avoid timeouts on this SPA). Then find and click the Laboratory tile: call wait_for_clickable_by_name("Laboratorio Analisi") first; only if it returns error, call wait_for_clickable_by_name("Clinical Laboratory"). Do NOT call both in parallel (on Italian UI the second would timeout 60s). Then click_smart with the returned targets. Alternatively inspect_interactive_elements() and pick the tile "Laboratorio Analisi" / "Clinical Laboratory", then click_smart. Do NOT stop at the tile grid without entering the Laboratory module.
     - When inside the Laboratory module, output one short sentence and STOP. Do NOT call close_browser().
     """
 

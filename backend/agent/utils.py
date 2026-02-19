@@ -1,6 +1,49 @@
+"""
+Utility generiche (serializzazione, formattazione, parsing, export grafo).
+Nessuna logica di valutazione run: per pass/fail e interpretazione eventi → evaluation.py.
+"""
 import json
 import re
-from typing import Optional
+from typing import Any, Optional
+
+
+# ---------- Serializzazione JSON (response API) ----------
+
+def make_json_serializable(obj: Any) -> Any:
+    """Converte un oggetto in forma JSON-serializable (evita 500 su response)."""
+    if obj is None or isinstance(obj, (bool, int, float, str)):
+        return obj
+    if isinstance(obj, (list, tuple)):
+        return [make_json_serializable(x) for x in obj]
+    if isinstance(obj, dict):
+        return {str(k): make_json_serializable(v) for k, v in obj.items()}
+    return str(obj)
+
+
+# ---------- Formattazione log tool (input/output) ----------
+
+TOOL_IO_MAX_LEN = 800
+
+
+def format_tool_io(value: Any, max_len: int = TOOL_IO_MAX_LEN) -> str:
+    """Formatta input o output di un tool per log (troncato se troppo lungo)."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        s = value
+    elif isinstance(value, (dict, list)):
+        try:
+            s = json.dumps(value, ensure_ascii=False)
+        except Exception:
+            s = repr(value)
+    else:
+        s = repr(value)
+    if len(s) > max_len:
+        return s[:max_len] + f" ... ({len(s)} chars)"
+    return s
+
+
+# ---------- Estrazione / parsing ----------
 
 def extract_final_json(text: str) -> Optional[dict]:
     """

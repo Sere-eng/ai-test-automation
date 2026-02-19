@@ -104,7 +104,7 @@ class PlaywrightConfig:
     
     HEADLESS = os.getenv("PLAYWRIGHT_HEADLESS", "false").lower() == "true"
     TIMEOUT = int(os.getenv("PLAYWRIGHT_TIMEOUT", "30000"))
-    VIEWPORT_WIDTH = int(os.getenv("PLAYWRIGHT_VIEWPORT_WIDTH", "960"))
+    VIEWPORT_WIDTH = int(os.getenv("PLAYWRIGHT_VIEWPORT_WIDTH", "1280"))
     VIEWPORT_HEIGHT = int(os.getenv("PLAYWRIGHT_VIEWPORT_HEIGHT", "1080"))
     LOCALE = os.getenv("PLAYWRIGHT_LOCALE", "it-IT")
     TIMEZONE = os.getenv("PLAYWRIGHT_TIMEZONE", "Europe/Rome")
@@ -162,7 +162,7 @@ class LABConfig:
 class AgentConfig:
     """Configurazione Agent LangGraph"""
     
-    RECURSION_LIMIT: int = int(os.getenv("AGENT_RECURSION_LIMIT", "50"))
+    RECURSION_LIMIT: int = int(os.getenv("AGENT_RECURSION_LIMIT", "80"))
     
     # Tool usage preferences
     ALWAYS_INSPECT_AFTER_NAVIGATION = True

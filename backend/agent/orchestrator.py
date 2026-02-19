@@ -19,14 +19,24 @@ from agent.test_agent_mcp import TestAgentMCP
 from agent.lab_scenarios import get_scenario_by_id, LabScenario
 
 
-# Istruzione fissa per il Prefix Agent (URL e credenziali da config)
-def _prefix_instruction() -> str:
-    url = AppConfig.LAB.URL
-    user = AppConfig.LAB.USERNAME or "<username from env>"
-    password = AppConfig.LAB.PASSWORD or "<password from env>"
+# Istruzione per il Prefix Agent (URL e credenziali parametrizzabili, con fallback da config)
+def _prefix_instruction(
+    url: Optional[str] = None,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
+) -> str:
+    """
+    Costruisce l'istruzione naturale per il Prefix Agent (login → organizzazione → Continua → tile LAB).
+
+    - Se url/user/password sono forniti esplicitamente, usa quelli.
+    - Altrimenti fa fallback su AppConfig.LAB (e infine sui placeholder "<... from env>").
+    """
+    resolved_url = url or AppConfig.LAB.URL
+    resolved_user = user or AppConfig.LAB.USERNAME or "<username from env>"
+    resolved_password = password or AppConfig.LAB.PASSWORD or "<password from env>"
     return (
-        f"Navigate to {url}. "
-        f"Log in with username '{user}' and password '{password}'. "
+        f"Navigate to {resolved_url}. "
+        f"Log in with username '{resolved_user}' and password '{resolved_password}'. "
         "In 'Seleziona Organizzazione' dropdown: open it and select the SECOND option, i.e. 'ORGANIZZAZIONE DI SISTEMA' (not the first 'Dipartimento Interaziendale...'). "
         "Click the 'Continua' button. "
         "Verify the home page with tiles is visible. Then CLICK the tile 'Laboratorio Analisi' (use this exact label first; if the UI is in English, use 'Clinical Laboratory') to enter the Laboratory module. "
@@ -38,27 +48,32 @@ def _scenario_instruction(scenario: LabScenario) -> str:
     steps = "\n".join(f"- {s}" for s in scenario.execution_steps)
     results = "\n".join(f"- {r}" for r in scenario.expected_results)
     return (
-        "The browser is already open and you are on the Laboratory dashboard. Do NOT call start_browser() or navigate_to_url().\n\n"
+        "The browser is already open and you are inside the Laboratory module (you may see Preanalitica or Laboratorio). Do NOT call start_browser() or navigate_to_url().\n\n"
         "SEQUENTIAL TOOLS: Issue only ONE tool call per message. Wait for the result, then in the next message call the next tool. Do NOT send multiple tool calls in the same response (they would run in parallel and break the step order).\n\n"
         "INSTRUCTIONS (follow in this order):\n"
-        "1. Wait for the page to load: call wait_for_load_state(\"domcontentloaded\") or wait_for_load_state(\"networkidle\"). Wait for the result, then continue.\n"
-        "2. Wait for the dashboard content to be ready: call wait_for_text_content(\"Preanalitica\") first—that is usually the section title when the Laboratory module has loaded (the main area shows \"Preanalitica\", \"Laboratorio\", \"Clinica\", or \"Ceppoteca\" as the page heading). If \"Preanalitica\" times out, try \"Laboratorio\", then \"Clinica\" or \"Ceppoteca\". Do NOT use \"Modifica\" as this first check—\"Modifica\" is step 3; it appears only after you have selected the dashboard.\n"
-        "3. Execute the scenario steps below in the exact order given. Complete step 1 (e.g. Apri la sezione Laboratory), then step 2 (e.g. Accedere alla dashboard di interesse selezionandola dal dropdown), then step 3 (e.g. Accedere alla funzionalità 'Modifica'), and so on. Do NOT skip ahead. One tool call at a time.\n"
-        "4. For creating group/filter/save: after clicking Modifica, use inspect_interactive_elements() to discover the actual buttons or links (e.g. \"Crea gruppo\", \"Nuovo gruppo\", \"Aggiungi gruppo\", \"Crea filtro\", \"Salva\", \"Crea\"). Use click_smart or fill_smart with targets from inspect; do NOT use wait_for_text_content with a fixed string for these—the UI labels may vary. Discover first, then interact.\n\n"
+        "1. Wait for the page: call wait_for_load_state(\"domcontentloaded\") or wait_for_load_state(\"networkidle\"). Then call wait_for_text_content(\"Preanalitica\") first—that is the section shown when you land in the Laboratory module; if it times out, try wait_for_text_content(\"Laboratorio\"). Do NOT use 'Laboratorio' as the first check when starting from Preanalitica.\n"
+        "2. Execute the scenario steps below in the exact order. Step 1 may require clicking the SIDE MENU item 'Laboratorio' (aria-label or text 'Laboratorio', icon science) to open the Laboratorio dashboard—do NOT stay on Preanalitica if the scenario asks for the Laboratorio section. Use wait_for_clickable_by_name(\"Laboratorio\") then click_smart, or inspect_interactive_elements() to find the menu item with name 'Laboratorio' and click it. One tool call at a time.\n"
+        "3. On the Laboratorio dashboard: the tab 'Filtri' contains the button 'Modifica'. After clicking Modifica, click 'Aggiungi gruppo'. Then call inspect_interactive_elements() to get the current form_fields. The new card has a text input in the header for the group title (no label; placeholder may be empty). Use fill_smart with the targets from form_fields for that input—prefer the css_id/css strategy with selector #mat-input-* (or the last text input in form_fields). fill_smart does NOT support 'by': 'text'; use only label, placeholder, role, or css/selector from inspect. AFTER filling the group title, call wait_for_clickable_by_name(\"Aggiungi filtro\") (if it times out, try \"AGGIUNGI FILTRO\") to ensure the button is enabled, then call click_smart using ALL the targets from that wait result (i.e. all playwright_suggestions for that button), making sure TEXT strategies on \"AGGIUNGI FILTRO\" / \"Aggiungi filtro\" are included. Do NOT click the disabled 'Aggiungi filtro' (with class 'disabled').\n"
+        "4. When the 'Aggiungi filtro' modal opens: call inspect_interactive_elements() to get the modal's form fields. The modal has its own inputs (different from the group title field in the card). Find the form_fields entry with label or placeholder 'Nome filtro*' and use its playwright_suggestions for fill_smart with the desired filter name—do NOT reuse the selector of the group title (#mat-input-* from the card). Then click_smart on 'Conferma'. After the modal closes, do ONLY: capture_screenshot(\"test_success.png\", return_base64=False), then close_browser(), then one short sentence. No extra inspect or other tools.\n\n"
         f"Scenario: {scenario.name} (id: {scenario.id})\n\n"
         f"Steps:\n{steps}\n\n"
         f"Expected results (for verification):\n{results}\n\n"
-        "After completing all steps, call close_browser() and stop."
+        "After completing all steps, call close_browser() and stop. Then output ONE short sentence that the scenario was completed (e.g. 'Scenario completed, browser closed.'). Do NOT say 'need more steps' or 'sorry' when you have finished the steps."
     )
 
 
-async def run_prefix_to_home(verbose: bool = True) -> dict:
+async def run_prefix_to_home(
+    verbose: bool = True,
+    url: Optional[str] = None,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
+) -> dict:
     """
     Esegue il Prefix Agent: login → selezione organizzazione → Continua → verifica home.
     Non chiude il browser; il server MCP (remoto o locale) mantiene la sessione.
     """
     agent = TestAgentMCP(custom_prompt=get_prefix_prompt())
-    instruction = _prefix_instruction()
+    instruction = _prefix_instruction(url=url, user=user, password=password)
     result = await agent.run_test_async(instruction, verbose=verbose)
     result["phase"] = "prefix"
     return result
@@ -94,12 +109,23 @@ async def run_full(
     scenario_id: str,
     verbose: bool = True,
     skip_prefix_if_already_home: bool = False,
+    url: Optional[str] = None,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
 ) -> dict:
     """
     Esegue prima il prefix (login → home), poi lo scenario LAB.
     Restituisce un risultato combinato; passed = True solo se entrambe le fasi passano.
+
+    - url/user/password possono essere passati esplicitamente (es. da frontend);
+      se None, viene usata la configurazione da AppConfig.LAB.
     """
-    prefix_result = await run_prefix_to_home(verbose=verbose)
+    prefix_result = await run_prefix_to_home(
+        verbose=verbose,
+        url=url,
+        user=user,
+        password=password,
+    )
     if not prefix_result.get("passed", False):
         return {
             "passed": False,
@@ -129,6 +155,9 @@ async def run_full(
 def run_full_sync(
     scenario_id: str,
     verbose: bool = True,
+    url: Optional[str] = None,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
 ) -> dict:
     """Versione sincrona di run_full (per Flask o script non-async)."""
     try:
@@ -136,11 +165,28 @@ def run_full_sync(
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_full(scenario_id, verbose=verbose))
+        return loop.run_until_complete(
+            run_full(
+                scenario_id,
+                verbose=verbose,
+                url=url,
+                user=user,
+                password=password,
+            )
+        )
     # Già in un loop (es. Jupyter): esegui in un thread
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor() as pool:
-        future = pool.submit(asyncio.run, run_full(scenario_id, verbose=verbose))
+        future = pool.submit(
+            asyncio.run,
+            run_full(
+                scenario_id,
+                verbose=verbose,
+                url=url,
+                user=user,
+                password=password,
+            ),
+        )
         return future.result()
 
 
