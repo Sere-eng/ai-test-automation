@@ -204,10 +204,19 @@ LAB_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
       Use this when you need to wait for a specific control to become clickable (e.g. "Aggiungi filtro" after filling the group title) instead of polling inspect.
     - Pattern "area dinamica" (card, modal, panel that changes after a critical click):
       After a critical click (e.g. "Aggiungi filtro", "Modifica", opening a modal):
-      wait_for_dom_change(root_selector="<css of the card/modal/panel>") →
-      inspect_region(root_selector="<same selector>") →
-      click_smart or fill_smart using the suggestions from that region only (no full-page re-inspect).
-      Use this when the UI updates inside a known container and you want to discover only what changed there (e.g. new form fields, new buttons in the modal).
+      1. wait_for_text_content("<a text that appears ONLY after the change>")
+         <- PREFERRED over wait_for_dom_change. Angular SPA updates the DOM synchronously
+            before the MutationObserver can be registered: wait_for_dom_change will time out.
+            Use wait_for_text_content instead - it polls until the new content is visible.
+            Examples: click "Modifica" -> wait_for_text_content("Aggiungi gruppo")
+                      click "Aggiungi filtro" -> wait_for_text_content("Nome filtro")
+      2. inspect_region(root_selector="<css of the card/modal/panel>")
+         <- MANDATORY: re-discovers only the elements inside that container after the change.
+            Do NOT skip this step. Do NOT reuse targets from a previous inspect call -
+            those targets refer to the old state of the UI.
+      3. click_smart or fill_smart using ONLY the suggestions from inspect_region output
+         (no full-page re-inspect needed).
+      AVOID wait_for_dom_change after click actions on Angular apps - it will always time out.
 
     IFRAME
     - Laboratory dashboard pages (shell, menu, dashboards, Filters tab) are on the MAIN page: call inspect and click_smart/fill_smart WITHOUT in_iframe.

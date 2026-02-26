@@ -458,10 +458,17 @@
                     const preview = document.getElementById('labStepsPreview');
                     if (!id) { preview.style.display = 'none'; return; }
                     const s = labScenarios.find(x => x.id === id);
-                    if (s && s.execution_steps && s.execution_steps.length) {
-                        preview.textContent = 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
-                        preview.style.display = 'block';
-                    } else { preview.style.display = 'none'; }
+                    if (s) {
+                    let text = '';
+                    if (s.execution_steps && s.execution_steps.length) {
+                        text += 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
+                    }
+                    if (s.expected_results && s.expected_results.length) {
+                        text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i+1) + '. ' + r).join('\n');
+                    }
+                    preview.textContent = text || '';
+                    preview.style.display = text ? 'block' : 'none';
+                } else { preview.style.display = 'none'; }
                 };
             } catch (e) {
                 select.innerHTML = '<option value="">Failed to load (check server)</option>';

@@ -47,18 +47,29 @@ def _prefix_instruction(
 def _scenario_instruction(scenario: LabScenario) -> str:
     steps = "\n".join(f"- {s}" for s in scenario.execution_steps)
     results = "\n".join(f"- {r}" for r in scenario.expected_results)
+    hints_section = (
+        f"\nOPERATIVE HINTS (scenario-specific):\n{scenario.prompt_hints.strip()}\n"
+        if scenario.prompt_hints else ""
+    )
     return (
-        "The browser is already open and you are inside the Laboratory module (you may see Preanalitica or Laboratorio). Do NOT call start_browser() or navigate_to_url().\n\n"
-        "SEQUENTIAL TOOLS: Issue only ONE tool call per message. Wait for the result, then in the next message call the next tool. Do NOT send multiple tool calls in the same response (they would run in parallel and break the step order).\n\n"
-        "INSTRUCTIONS (follow in this order):\n"
-        "1. Wait for the page: call wait_for_load_state(\"domcontentloaded\") or wait_for_load_state(\"networkidle\"). Then call wait_for_text_content(\"Preanalitica\") first—that is the section shown when you land in the Laboratory module; if it times out, try wait_for_text_content(\"Laboratorio\"). Do NOT use 'Laboratorio' as the first check when starting from Preanalitica.\n"
-        "2. Execute the scenario steps below in the exact order. Step 1 may require clicking the SIDE MENU item 'Laboratorio' (aria-label or text 'Laboratorio', icon science) to open the Laboratorio dashboard—do NOT stay on Preanalitica if the scenario asks for the Laboratorio section. Use wait_for_clickable_by_name(\"Laboratorio\") then click_smart, or inspect_interactive_elements() to find the menu item with name 'Laboratorio' and click it. One tool call at a time.\n"
-        "3. On the Laboratorio dashboard: the tab 'Filtri' contains the button 'Modifica'. After clicking Modifica, click 'Aggiungi gruppo'. Then call inspect_interactive_elements() to get the current form_fields. The new card has a text input in the header for the group title (no label; placeholder may be empty). Use fill_smart with the targets from form_fields for that input—prefer the css_id/css strategy with selector #mat-input-* (or the last text input in form_fields). fill_smart does NOT support 'by': 'text'; use only label, placeholder, role, or css/selector from inspect. AFTER filling the group title, call wait_for_clickable_by_name(\"Aggiungi filtro\") (if it times out, try \"AGGIUNGI FILTRO\") to ensure the button is enabled, then call click_smart using ALL the targets from that wait result (i.e. all playwright_suggestions for that button), making sure TEXT strategies on \"AGGIUNGI FILTRO\" / \"Aggiungi filtro\" are included. Do NOT click the disabled 'Aggiungi filtro' (with class 'disabled').\n"
-        "4. When the 'Aggiungi filtro' modal opens: call inspect_interactive_elements() to get the modal's form fields. The modal has its own inputs (different from the group title field in the card). Find the form_fields entry with label or placeholder 'Nome filtro*' and use its playwright_suggestions for fill_smart with the desired filter name—do NOT reuse the selector of the group title (#mat-input-* from the card). Then click_smart on 'Conferma'. After the modal closes, do ONLY: capture_screenshot(\"test_success.png\", return_base64=False), then close_browser(), then one short sentence. No extra inspect or other tools.\n\n"
+        "The browser is already open and you are inside the Laboratory module "
+        "(you may see Preanalitica or Laboratorio). "
+        "Do NOT call start_browser() or navigate_to_url().\n\n"
+        "SEQUENTIAL TOOLS: Issue only ONE tool call per message. "
+        "Wait for the result, then in the next message call the next tool. "
+        "Do NOT send multiple tool calls in the same response "
+        "(they would run in parallel and break the step order).\n\n"
+        "INITIAL WAIT: call wait_for_load_state(\"domcontentloaded\"), then "
+        "wait_for_text_content(\"Preanalitica\") — if it times out try "
+        "wait_for_text_content(\"Laboratorio\"). "
+        "Do NOT inspect or interact while the main content area is still blank.\n\n"
         f"Scenario: {scenario.name} (id: {scenario.id})\n\n"
         f"Steps:\n{steps}\n\n"
-        f"Expected results (for verification):\n{results}\n\n"
-        "After completing all steps, call close_browser() and stop. Then output ONE short sentence that the scenario was completed (e.g. 'Scenario completed, browser closed.'). Do NOT say 'need more steps' or 'sorry' when you have finished the steps."
+        f"Expected results (for verification):\n{results}\n"
+        f"{hints_section}\n"
+        "After completing all steps: capture_screenshot(\"test_success.png\", return_base64=False), "
+        "then close_browser(), then ONE short sentence. "
+        "Do NOT say 'need more steps' or 'sorry' when you have finished the steps."
     )
 
 

@@ -64,7 +64,7 @@ class LLMConfig:
     
     # Temperature (determinismo)
     TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
-    MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4000"))
+    MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "8000"))
     
     @classmethod
     def get_provider(cls) -> Literal["openrouter", "azure", "openai"]:

@@ -7,7 +7,7 @@ Da qui in poi si applica uno (o più) degli scenari sotto.
 """
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -17,6 +17,7 @@ class LabScenario:
     name: str
     expected_results: List[str]
     execution_steps: List[str]
+    prompt_hints: Optional[str] = None  # istruzioni operative specifiche per l'agente
 
 
 LAB_SCENARIOS: List[LabScenario] = [
@@ -29,11 +30,39 @@ LAB_SCENARIOS: List[LabScenario] = [
             "(es. appartenenza a uno o più piani di lavoro, range temporale).",
         ],
         execution_steps=[
-            "Dal modulo Laboratory (dove compare ad es. Preanalitica), apri la sezione 'Laboratorio' dal menu laterale: clicca la voce di menu con etichetta 'Laboratorio' (icona science). La dashboard Laboratorio si apre con dropdown già valorizzato se c'è una sola dashboard.",
-            "Nella tab 'Filtri' della dashboard Laboratorio, clicca il pulsante 'Modifica'.",
-            "Crea un nuovo gruppo: clicca 'Aggiungi gruppo'. Appare una nuova card con un campo di testo nell'header (senza label, può essere precompilato con 'title'): inserisci lì il titolo del gruppo (obbligatorio). Poi clicca 'Aggiungi filtro' dentro quella card.",
-            "Nella modale: compila almeno il campo obbligatorio 'Nome filtro' (label 'Nome filtro*'); poi clicca 'Conferma' per salvare il filtro.",
+            "Apri il menu laterale → click sulla voce 'Laboratorio'"
+            "Accedere alla dashboard di interesse selezionandola dal dropdown menu "
+            "(se è presente solo una dashboard è valorizzata di default).",
+            "Accedere alla funzionalità 'Modifica'.",
+            "Creare un nuovo elemento (gruppo).",
+            "Inserire il titolo del gruppo (obbligatorio) e successivamente creare un nuovo filtro.",
+            "Inserire almeno il titolo del filtro (obbligatorio) e salvare.",
         ],
+        # prompt_hints disabilitati per testare il sistema con solo execution_steps + system prompt.
+        # Riattivare se il modello fallisce su step specifici.
+        # prompt_hints="""
+        # FLUSSO ATTESO (eseguire in questo ordine esatto):
+        # 1. Apri il menu laterale → click sulla voce 'Laboratorio' (icona science) →
+        #    wait_for_text_content o inspect per verificare che la dashboard sia visibile.
+        # 2. Click 'Modifica' → wait_for_text_content("Aggiungi gruppo") per verificare
+        #    che la dashboard è entrata in modalità modifica.
+        #    NON usare wait_for_dom_change qui: Angular aggiorna il DOM prima che
+        #    il MutationObserver venga registrato (race condition → timeout).
+        # 3. Click 'Aggiungi gruppo' → inspect_region sulla card appena creata per
+        #    scoprire il campo titolo (nessuna label, può avere placeholder vuoto o 'title').
+        #    Usa fill_smart con strategy css_id (#mat-input-*) o l'ultimo input in form_fields.
+        # 4. Pattern "elemento singolo" per 'Aggiungi filtro':
+        #    - dopo fill_smart del titolo gruppo, prendi i targets di 'Aggiungi filtro'
+        #      dall'inspect precedente
+        #    - wait_for_element_state(targets, state="enabled")
+        #    - click_smart(targets)
+        # 5. Modale aperta → pattern "area dinamica":
+        #    - wait_for_text_content("Nome filtro")
+        #    - inspect_region(root_selector=".cdk-overlay-pane")
+        #    - fill_smart su 'Nome filtro*', click_smart su 'Conferma'
+        # 6. capture_screenshot("test_success.png", return_base64=False) → close_browser()
+        # """
+        prompt_hints=None,
     ),
     LabScenario(
         id="scenario_2",

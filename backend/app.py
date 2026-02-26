@@ -329,7 +329,7 @@ def mcp_info():
         "tools_count": len(test_agent_mcp.tool_names) if test_agent_mcp.tool_names else 13,
         "tools": [
             "start_browser", "navigate_to_url", "click_element",
-            "fill_input", "wait_for_element", "get_text",
+            "fill_input", "get_text",
             "check_element_exists", "press_key", "capture_screenshot",
             "close_browser", "get_page_info", "inspect_page_structure",
             "handle_cookie_banner"
@@ -512,7 +512,12 @@ def test_lab_scenarios_list():
     return jsonify({
         "status": "ok",
         "scenarios": [
-            {"id": s.id, "name": s.name, "execution_steps": s.execution_steps}
+            {
+                "id": s.id,
+                "name": s.name,
+                "execution_steps": s.execution_steps,
+                "expected_results": s.expected_results,
+            }
             for s in LAB_SCENARIOS
         ]
     })

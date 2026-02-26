@@ -95,18 +95,25 @@ async def get_page_info() -> str:
 # =========================
 
 @mcp.tool()
-async def wait_for_element(
-    selector: str,
+async def wait_for_element_state(
+    targets: List[Dict],
     state: str = "visible",
-    selector_type: str = "css",
-    timeout: int = 30000
+    timeout: int | None = None,
+    in_iframe: dict | None = None,
 ) -> str:
-    """Attende che un elemento diventi visible/hidden/attached/detached."""
-    result = await playwright.wait_for_element(
-        selector=selector,
-        selector_type=selector_type,
+    """
+    Attende che un elemento individuato tramite SMART TARGETS raggiunga uno stato logico.
+
+    - Usa la stessa semantica di targets di click_smart/fill_smart (role, label, placeholder, css, tfa, xpath).
+    - Stati supportati:
+        - Playwright nativi: "visible", "hidden", "attached", "detached"
+        - Logici: "enabled", "disabled" (polling su is_enabled()).
+    """
+    result = await playwright.wait_for_element_state(
+        targets=targets,
         state=state,
-        timeout=timeout
+        timeout=timeout,
+        in_iframe=in_iframe,
     )
     return to_json(result)
 
@@ -122,13 +129,6 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
 async def press_key(key: str) -> str:
     """Premi un tasto (Enter/Escape/etc.)."""
     result = await playwright.press_key(key=key)
-    return to_json(result)
-
-
-@mcp.tool()
-async def check_element_exists(selector: str, selector_type: str = "css", timeout: int = 5000) -> str:
-    """Verifica esistenza e visibilità di un elemento (per assert)."""
-    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type, timeout=timeout)
     return to_json(result)
 
 
@@ -207,12 +207,54 @@ async def inspect_interactive_elements(in_iframe: dict | None = None) -> str:
 
 
 @mcp.tool()
+async def inspect_region(root_selector: str, in_iframe: dict | None = None) -> str:
+    """
+    Ispeziona SOLO una regione della pagina, identificata da root_selector (CSS).
+
+    Restituisce clickable_elements, interactive_controls e form_fields limitati all'interno
+    del contenitore, con la stessa struttura di inspect_interactive_elements.
+    """
+    result = await playwright.inspect_region(root_selector=root_selector, in_iframe=in_iframe)
+    return to_json(result)
+
+
+@mcp.tool()
 async def handle_cookie_banner(strategies: list[str] | None = None, timeout: int = 5000) -> str:
     """
     Gestisce cookie banner con strategie multiple.
     Output: JSON con strategia usata e selector cliccato (se trovato).
     """
     result = await playwright.handle_cookie_banner(strategies=strategies, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
+async def wait_for_dom_change(
+    root_selector: str = "body",
+    timeout: int | None = None,
+    attributes: bool = True,
+    child_list: bool = True,
+    subtree: bool = True,
+    attribute_filter: list[str] | None = None,
+    in_iframe: dict | None = None,
+) -> str:
+    """
+    Attende il primo cambiamento DOM (MutationObserver) sotto un contenitore.
+
+    Use-case tipico:
+    - dopo un click critico (es. "Aggiungi filtro"), usa wait_for_dom_change(root_selector="<card selector>")
+      per sapere quando la card/modal ha cambiato struttura, poi chiama inspect_region(root_selector)
+      per scoprire i nuovi controlli senza re-ispezionare l'intera pagina.
+    """
+    result = await playwright.wait_for_dom_change(
+        root_selector=root_selector,
+        timeout=timeout,
+        attributes=attributes,
+        child_list=child_list,
+        subtree=subtree,
+        attribute_filter=attribute_filter,
+        in_iframe=in_iframe,
+    )
     return to_json(result)
 
 

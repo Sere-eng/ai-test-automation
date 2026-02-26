@@ -122,7 +122,11 @@ async def main():
         
         # Aspetta che Angular sia montato (root component presente)
         print("\n⏳ Waiting for Angular root component...")
-        result = await tools.wait_for_element("[ng-version]", state="attached", timeout=10000)
+        result = await tools.wait_for_element_state(
+            targets=[{"by": "css", "selector": "[ng-version]"}],
+            state="attached",
+            timeout=10000,
+        )
         if result['status'] == 'success':
             print(f"   ✓ Angular mounted")
         else:
@@ -130,7 +134,11 @@ async def main():
         
         # Aspetta che menu principale sia caricato (attende bottone Micrologistica)
         print("\n⏳ Waiting for main menu to load...")
-        result = await tools.wait_for_element('[aria-label="Micrologistica"]', state="visible", timeout=10000)
+        result = await tools.wait_for_element_state(
+            targets=[{"by": "css", "selector": '[aria-label="Micrologistica"]'}],
+            state="visible",
+            timeout=10000,
+        )
         if result['status'] == 'success':
             print(f"   ✓ Main menu loaded")
         else:

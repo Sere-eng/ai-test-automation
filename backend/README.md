@@ -215,7 +215,6 @@ Il MCP server espone **21 tool async**. Fonte unica: `mcp_servers/tool_names.py`
 | Tool | Descrizione |
 |------|-------------|
 | `click_and_wait_for_text(targets, text, text_timeout, in_iframe)` | `click_smart` + `wait_for_text_content` in un solo step |
-| `check_element_exists(selector, selector_type)` | Verifica esistenza e visibilità elemento (usato da `evaluation.py` per assertion) |
 
 ### Pattern d'uso consigliati
 
