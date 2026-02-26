@@ -1,1586 +1,350 @@
-Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**, LLM (Large Language Models) e Playwright per automatizzare test di interfacce web con architettura enterprise-ready.
+# AI Test Automation Agent (MCP)
 
-![Tools](https://img.shields.io/badge/Playwright_Tools-20-blue)
-![Version](https://img.shields.io/badge/version-3.0.0--discovery-green)
+Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**, LangGraph e Playwright per automatizzare test di interfacce web enterprise con AI agent.
+
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![MCP](https://img.shields.io/badge/MCP-1.12.3-purple)
+![Version](https://img.shields.io/badge/version-3.2.0-green)
 
 ---
 
-## 📋 Indice
+## Indice
 
-- [Cosa Fa Questo Progetto](#-cosa-fa-questo-progetto)
-- [Architettura MCP](#️-architettura-mcp)
-- [Tecnologie Utilizzate](#️-tecnologie-utilizzate)
-- [Struttura del Progetto](#-struttura-del-progetto)
-- [Setup Completo](#-setup-completo)
-- [Configurazione LLM (OpenAI / Azure / OpenRouter)](#-configurazione-llm-openai--azure--openrouter)
-- [Tool Playwright Disponibili (20 tools)](#️-tool-playwright-disponibili)
-  - [Discovery Tools](#-discovery-tools-discovery-first-workflow)
-    - [inspect_interactive_elements](#inspect_interactive_elements)
-  - [Smart Locators](#-smart-locators-enterprise-apps---retry-automatico)
-    - [click_smart](#click_smarttargets-listdict-timeout_per_try-int--2000)
-    - [fill_smart](#fill_smarttargets-listdict-value-str-timeout_per_try-int--2000)
-  - [Procedural Tools](#-procedural-tools-workflow-complessi)
-    - [get_frame](#get_frameselector-str--none-url_pattern-str--none-timeout-int--10000)
-  - [Base Tools](#-base-tools)
-    - [start_browser, navigate_to_url, click_element, fill_input](#1-start_browserheadless-bool--false)
-    - [wait_for_element, wait_for_load_state, wait_for_text_content](#5-wait_for_elementselector-str-state-str--visible-selector_type-str--css-timeout-int--30000)
-    - [get_text, check_element_exists, press_key](#6-get_textselector-str-selector_type-str--css)
-    - [capture_screenshot, close_browser, get_page_info](#9-capture_screenshotfilename-str--none-return_base64-bool--false-)
-    - [handle_cookie_banner](#handle_cookie_bannerstrategies-liststr--none-timeout-int--5000)
-  - [Legacy Tools (Deprecati)](#-legacy-tools-deprecati)
-    - [inspect_page_structure](#inspect_page_structure)
-- [API Endpoints](#-api-endpoints)
-- [Esempi di Utilizzo](#-esempi-di-utilizzo)
-- [MCP: Locale vs Remoto](#-mcp-locale-vs-remoto)
-- [Risorse](#-risorse)
+- [Architettura](#architettura)
+- [Struttura del Progetto](#struttura-del-progetto)
+- [Setup](#setup)
+- [Configurazione](#configurazione)
+- [Tool Playwright (21 tools)](#tool-playwright)
+- [Orchestratore LAB](#orchestratore-lab)
+- [API Endpoints](#api-endpoints)
+- [MCP: Locale vs Remoto](#mcp-locale-vs-remoto)
 
 ---
 
-## 🎯 Cosa Fa Questo Progetto
-
-Questo sistema permette di:
-- ✅ Descrivere test in **linguaggio naturale** (es. "vai su google.com e cerca 'test automation'")
-- ✅ **AI Agent** (GPT-4, Claude, etc.) capisce il test e lo esegue automaticamente
-- ✅ **MCP Protocol** gestisce i tool in modo isolato e scalabile
-- ✅ **Playwright Async** controlla il browser (clicca, compila form, naviga)
-- ✅ **Screenshot Base64** ritornati direttamente nella risposta JSON
-- ✅ **Discovery-First Workflow**: inspect → discover → use (no hardcoded selectors)
-- ✅ **Smart Locators** per enterprise apps (Angular/React/Vue) con retry automatico
-- ✅ **Procedural Tools** per workflow complessi (iframe, navigation, search)
-- ✅ **AJAX handling** automatico per caricamenti dinamici
-- ✅ **Performance-optimized**: retry=1 + 3-level fallback (normale → force → JS click)
-- ✅ **Robust error handling**: AI agent con istruzioni prominenti per gestione fallimenti
-
----
-
-## 🏗️ Architettura MCP
-
-### Cos'è MCP?
-
-**MCP (Model Context Protocol)** è uno standard aperto per comunicazione tra LLM e tool esterni. Creato da Anthropic, supportato da OpenAI e altri.
-
-### Architettura del Sistema
+## Architettura
 
 ```
-┌─────────────────────────────────────────────┐
-│         FRONTEND (Angular)                  │
-│  - Comprende le dashboard da testare        │
-│                                             │
-│                                             │
-└──────────────────┬──────────────────────────┘
-                   │ HTTP REST API
-                   ▼
-┌─────────────────────────────────────────────┐
-│         BACKEND (Flask)                     │
-│  - Endpoint REST                            │
-│  - CORS handling                            │
-│                                             │
-└──────────────────┬──────────────────────────┘
-                   │ Python call
-                   ▼
-┌─────────────────────────────────────────────┐
-│         AI AGENT (LangGraph)                │
-│  - ReAct pattern                            │
-│  - Natural language → Actions               │
-│  - Tool selection                           │
-│  - Multi-LLM support (OpenAI/Azure/Router)  │
-└──────────────────┬──────────────────────────┘
-                   │ MCP Protocol
-                   ▼
-┌─────────────────────────────────────────────┐
-│         MCP CLIENT                          │
-│  - Tool discovery                           │
-│  - Request/Response handling (async)        │
-└──────────────────┬──────────────────────────┘
-                   │ stdio OR HTTP
-                   ▼
-┌─────────────────────────────────────────────┐
-│    MCP SERVER (Playwright Tools)            │
-│  - Exposes 20 async tools                   │
-│  - Discovery: inspect_interactive_elements  │
-│  - Smart Locators: click_smart, fill_smart  │
-│  - Procedural: get_frame                    │
-│  - Isolated process                         │
-│  - Returns base64 screenshots               │
-└──────────────────┬──────────────────────────┘
-                   │ Async call
-                   ▼
-┌─────────────────────────────────────────────┐
-│         Playwright Async (Chromium)         │
-│  - Browser automation (async API)           │
-│  - In-memory screenshots                    │
-│  - Page structure analysis                  │
-└─────────────────────────────────────────────┘
+Frontend (Angular)
+       │ HTTP REST
+       ▼
+Backend (Flask)
+       │ Python call
+       ▼
+AI Agent (LangGraph - ReAct)
+  ├─ system_prompt.py   ← regole comportamento agent
+  ├─ evaluation.py      ← pass/fail da tool results (non dal modello)
+  └─ orchestrator.py    ← Prefix Agent + Scenario Agent
+       │ MCP Protocol
+       ▼
+MCP Client (langchain-mcp-adapters)
+       │ stdio | HTTP
+       ▼
+MCP Server (playwright_server_local / remote)
+  └─ 21 Playwright tools async
+       │
+       ▼
+Playwright Async (Chromium)
 ```
+
+**Flusso orchestrato (LAB):**
+1. **Prefix Agent** → login, selezione organizzazione, navigazione al modulo Laboratory (browser rimane aperto)
+2. **Scenario Agent** → esegue lo scenario LAB dalla dashboard Laboratory, chiude il browser
+
+Il pass/fail è deciso da `evaluation.py` sui tool results, non dall'output testuale del modello.
 
 ---
 
-## ⚡ Performance Optimizations (v3.0)
-
-### Smart Retry Strategy
-
-**Problema**: Retry eccessivi rallentano i test (~18s per elemento con 3 retry × 3 strategie × 2s timeout)
-
-**Soluzione implementata**:
-- ✅ **max_retries = 1** (ridotto da 3) in `click_smart()` e `fill_smart()`
-- ✅ **3-level fallback** compenso: normale click → force click → JS click
-- ✅ **Active waiting** invece di retry loop: `wait_for_element(..., state="visible")`
-
-**Risultato**: ~6s per elemento (66% più veloce) mantenendo robustezza
-
-### Fallback Chain
-
-```python
-# Try 1: CLICK NORMALE con RETRY (preferito - più sicuro)
-await locator.click()  # Verifica visibilità, actionability, stabilità
-
-# Try 2: FORCE CLICK (bypassa actionability, serve visibilità)
-await locator.click(force=True)  # Per DIV con role="button" (Angular Material)
-
-# Try 3: JAVASCRIPT CLICK (bypassa TUTTO - last resort)
-await element.evaluate("el => el.click()")  # Per elementi off-viewport, opacity:0
-```
-
-### AI Agent Error Handling
-
-**System prompt ottimizzato** con istruzioni prominenti:
-
-```markdown
-⚠️ ERROR HANDLING (MANDATORY - READ FIRST):
-When ANY tool returns an error or timeout:
-1) IMMEDIATELY call capture_screenshot()
-2) IMMEDIATELY call close_browser()
-3) STOP - do NOT attempt alternative approaches
-```
-
-**Benefici**:
-- Browser sempre chiuso (no processi zombie)
-- Screenshot catturati su ogni errore (debugging)
-- Comportamento deterministico (no loop infiniti)
-
-### Playwright Native Waits
-
-Sostituiti `asyncio.sleep()` con `page.wait_for_timeout()` (7 posizioni):
-- ✅ Semanticamente corretto per operazioni browser
-- ✅ Gestito dal loop di Playwright (no blocking asyncio event loop)
-- ✅ Coerenza con altri wait methods (`wait_for_load_state`, `wait_for_element`)
-
----
-
-### Vantaggi di MCP
-
-| Vantaggio | Descrizione |
-|-----------|-------------|
-| **🔒 Isolamento** | Tool in processo separato → più robusto |
-| **📈 Scalabile** | Tool su server dedicati se necessario |
-| **🔄 Riusabile** | Tool condivisibili tra team/progetti |
-| **📜 Standard** | Protocol aperto, 1000+ tool disponibili |
-| **🛡️ Sicuro** | Security boundaries chiari |
-| **⚡ Async** | Non-blocking I/O per performance |
-
----
-
-## 🛠️ Tecnologie Utilizzate
-
-### Backend (Python)
-- **Python 3.10+** - Linguaggio principale
-- **Flask 3.1.2** - Web framework per API REST
-- **Playwright 1.49.1 (Async API)** - Browser automation
-- **LangChain 0.3.21** - Framework per LLM
-- **LangGraph 0.4.3** - Workflow orchestration
-- **MCP 1.12.3** - Model Context Protocol
-- **langchain-mcp-adapters 0.1.7** - MCP integration
-
-### AI/LLM (Multi-Provider)
-- **OpenAI GPT-4o-mini** - Fast & cost-effective
-- **Azure OpenAI** - Enterprise compliance
-- **OpenRouter** - Access to Claude, Gemini, etc.
-- **Temperature 0** - Deterministic per testing
-
-### Frontend (Angular)
-- **Angular 18+** - Framework frontend
-- **TypeScript** - Type-safe development
-- **Material UI** - UI components
-
----
-
-## 📁 Struttura del Progetto
+## Struttura del Progetto
 
 ```
-ai-test-automation/
+backend/
+├── app.py                          # Flask server
+├── requirements.txt
+├── .env                            # Variabili d'ambiente (non committare)
+├── .env.example
 │
-├── backend/                           # Backend Python
-│   ├── venv/                         # Virtual environment
-│   ├── .env                          # Environment variables (SECRET!)
-│   ├── .env.example                  # Template per .env
-│   ├── .gitignore                    # Git ignore rules
-│   ├── requirements.txt              # Python dependencies (con MCP)
-│   ├── app.py                        # Flask server principale
-│   ├── README.md                     # Questa documentazione
-│   │
-│   ├── config/                       # Configuration modules
-│   │   ├── __init__.py
-│   │   └──settings.py               # Centralized config
-│   │
-│   ├── agent/                        # AI Agent modules
-│   │   ├── __init__.py
-│   │   ├── tools.py                  # Playwright tools ASYNC
-│   │   ├── utils.py                  # Utility functions
-│   │   ├── system_prompt.py          # System prompt AMC + LAB (unificati, regole strette)
-│   │   ├── lab_scenarios.py          # Definizione 4 scenari LAB (dopo login/org)
-│   │   └── test_agent_mcp.py        # Agent con MCP (multi-LLM, discovery-first)
-│   │
-│   ├── mcp_servers/                  # MCP Servers ASYNC
-│   │   ├── __init__.py
-│   │   ├── playwright_server_local.py    # Server locale (stdio)
-│   │   ├── playwright_server_remote.py   # Server remoto (HTTP)
-│   │   └── tool_names.py            # Source of truth per tool list
-│   │
-│   └── tests/                        # Test scripts
-│       ├── test_mcp_remote.py
-│       ├── test_webdriver_detection.py
-│       ├── test_amc_workflow_native.py   # Workflow AMC (chiamate dirette, no MCP)
-│       └── test_lab_workflow_native.py   # Workflow LAB (login → org → Laboratory → filtri)
+├── config/
+│   └── settings.py                 # Configurazione centralizzata (LLM, MCP, Playwright)
 │
-└── frontend/                         # Frontend Angular
-    └── (coming soon)
+├── agent/
+│   ├── tools.py                    # 21 Playwright tools async
+│   ├── system_prompt.py            # Prompt AMC, LAB Scenario, LAB Prefix
+│   ├── lab_scenarios.py            # Definizione 4 scenari LAB
+│   ├── orchestrator.py             # Prefix Agent + Scenario Agent + run_full
+│   ├── test_agent_mcp.py           # TestAgentMCP: init, run_test_async, stream
+│   ├── evaluation.py               # Pass/fail logic da tool results
+│   └── utils.py                    # Serializzazione, logging, export grafo
+│
+├── mcp_servers/
+│   ├── playwright_server_local.py  # Server MCP via stdio
+│   ├── playwright_server_remote.py # Server MCP via HTTP
+│   └── tool_names.py               # Source of truth lista tool
+│
+└── tests/
+    ├── test_mcp_remote.py
+    ├── test_amc_workflow_native.py
+    └── test_lab_workflow_native.py
 ```
 
 ---
 
-## 🚀 Setup Completo
+## Setup
 
 ### Prerequisiti
 
-- ✅ **Python 3.10+** ([Download](https://www.python.org/downloads/))
-- ✅ **Git** per version control
-- ✅ **API Key** per uno di questi:
-  - [OpenAI API Key](https://platform.openai.com/api-keys)
-  - [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
-  - [OpenRouter API Key](https://openrouter.ai/) (accesso a Claude, Gemini, etc.)
+- Python 3.10+
+- API key per uno dei provider LLM supportati (OpenAI, Azure OpenAI, OpenRouter)
 
----
-
-### Step 1: Clona il Repository
+### Installazione
 
 ```bash
 git clone <repository-url>
 cd ai-test-automation/backend
-```
 
----
-
-### Step 2: Crea Ambiente Virtuale
-
-```bash
-# Crea venv
 python -m venv venv
+source venv/bin/activate          # Windows: .\venv\Scripts\Activate
 
-# Attiva venv
-# Windows PowerShell:
-.\venv\Scripts\Activate
-
-# Mac/Linux:
-source venv/bin/activate
-
-# Verifica attivazione (dovresti vedere "(venv)" nel prompt)
-```
-
----
-
-### Step 3: Installa Dipendenze (incluso MCP)
-
-```bash
-# Aggiorna pip
-python -m pip install --upgrade pip
-
-# Installa tutte le dipendenze
+pip install --upgrade pip
 pip install -r requirements.txt
-
-# Verifica installazione MCP
-python -c "import mcp; print('✅ MCP version:', mcp.__version__)"
-
-# Installa browser Chromium
 playwright install chromium
 ```
 
-**Dipendenze installate:**
-- Flask, Flask-CORS
-- Playwright (async API)
-- LangChain, LangGraph
-- MCP + langchain-mcp-adapters
-- OpenAI SDK
+### Verifica
+
+```bash
+python -c "import flask, playwright, langchain, mcp; print('OK')"
+python -c "from langchain_mcp_adapters.client import MultiServerMCPClient; print('MCP OK')"
+```
+
+### Avvio
+
+```bash
+python app.py
+```
 
 ---
 
-### Step 4: Configura Variabili d'Ambiente
+## Configurazione
 
-Crea il file `.env` nella cartella `backend/`:
+Crea `backend/.env` dal template `.env.example`:
 
 ```bash
-# backend/.env
+# LLM — scegli UNO dei tre provider
 
-# ============================================
-# LLM Configuration (scegli UNO)
-# ============================================
-
-# Opzione 1: OpenRouter (Raccomandato - accesso a Claude, Gemini, GPT) ⭐
-OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE
+# OpenRouter (consigliato: accesso a Claude, Gemini, GPT con una sola key)
+OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
-# Altri modelli: openai/gpt-4o-mini, google/gemini-2.0-flash-exp:free
 
-# Opzione 2: OpenAI Standard
-# OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
-
-# Opzione 3: Azure OpenAI (Enterprise)
-# AZURE_OPENAI_API_KEY=your_azure_key
+# Azure OpenAI (enterprise)
+# AZURE_OPENAI_API_KEY=...
 # AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 # AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
 # AZURE_OPENAI_API_VERSION=2024-08-01-preview
 
-# ============================================
-# Flask Configuration
-# ============================================
-FLASK_ENV=development
-FLASK_DEBUG=True
+# OpenAI standard
+# OPENAI_API_KEY=sk-proj-...
+
+# App under test (LAB)
+LAB_URL=https://...
+LAB_USERNAME=user@example.com
+LAB_PASSWORD=...
+
+# Flask
 FLASK_PORT=5000
+FLASK_DEBUG=True
 
-# ============================================
-# Playwright Configuration (opzionale)
-# ============================================
+# Playwright
 PLAYWRIGHT_HEADLESS=False
-PLAYWRIGHT_TIMEOUT=30000
-
-# ============================================
-# AMC Login Credentials (per test automation)
-# ============================================
-AMC_USERNAME=tuo.nome.cognome@eng.it
-AMC_PASSWORD=tua_password_sicura
 ```
 
-> 🔐 **IMPORTANTE:** 
-> - Non committare MAI `.env` su Git!
-> - Usa `.env.example` come template
-> - Configura SOLO UNO dei provider LLM
+**Priorità provider:** OpenRouter → Azure → OpenAI (primo trovato nelle env).
 
-**Priorità Detection:**
-1. 🟣 OpenRouter (se `OPENROUTER_API_KEY` presente)
-2. 🔵 Azure OpenAI (se `AZURE_OPENAI_API_KEY` presente)
-3. 🟢 OpenAI Standard (se `OPENAI_API_KEY` presente)
+**MCP mode:** configurabile in `config/settings.py` → `MCPConfig.MODE = "local"` oppure `"remote"`.
 
 ---
 
-### Step 5: Test Installazione
+## Tool Playwright
 
-```bash
-# Test 1: Verifica Python packages
-python -c "import flask, playwright, langchain, mcp; print('✅ All packages OK')"
+Il MCP server espone **21 tool async**. Fonte unica: `mcp_servers/tool_names.py`.
 
-# Test 2: Verifica MCP
-python -c "from langchain_mcp_adapters.client import MultiServerMCPClient; print('✅ MCP adapters OK')"
+### Lifecycle & navigazione
+| Tool | Descrizione |
+|------|-------------|
+| `start_browser(headless)` | Avvia Chromium (stealth mode) |
+| `close_browser()` | Chiude browser e libera risorse |
+| `navigate_to_url(url)` | Naviga e attende `domcontentloaded` |
+| `get_page_info()` | Restituisce URL, titolo, viewport |
+| `get_frame(selector, url_pattern)` | Accesso a iframe (by CSS o URL pattern) |
 
-# Test 3: Verifica API key
-python -c "import os; from dotenv import load_dotenv; load_dotenv(); print('✅ API key loaded' if (os.getenv('OPENAI_API_KEY') or os.getenv('OPENROUTER_API_KEY') or os.getenv('AZURE_OPENAI_API_KEY')) else '❌ Missing API key')"
+### Interazione base
+| Tool | Descrizione |
+|------|-------------|
+| `get_text(selector, selector_type)` | Estrae testo da elemento |
+| `press_key(key)` | Simula pressione tasto (Enter, Escape, ...) |
+| `capture_screenshot(filename, return_base64)` | Screenshot full-page; `return_base64=False` per default (risparmia token) |
+| `handle_cookie_banner(strategies, timeout)` | Gestione banner cookie con strategie multiple |
+
+### Wait
+| Tool | Descrizione |
+|------|-------------|
+| `wait_for_load_state(state, timeout)` | Attende stato pagina: `domcontentloaded`, `load`, `networkidle` |
+| `wait_for_text_content(text, timeout, in_iframe)` | Attende comparsa testo nel DOM (supporta iframe) |
+| `wait_for_element_state(targets, state, timeout)` | Attende che un elemento raggiunga uno stato (`visible`, `enabled`, `hidden`, ...) |
+| `wait_for_dom_change(root_selector, timeout)` | Attende qualsiasi cambiamento DOM in un container (modale, card, panel) |
+
+### Discovery
+| Tool | Descrizione |
+|------|-------------|
+| `inspect_interactive_elements()` | **Tool chiave.** Scansione WCAG di tutta la pagina: restituisce `iframes`, `clickable_elements`, `form_fields`, ognuno con `playwright_suggestions` pronti per `click_smart`/`fill_smart` |
+| `inspect_region(root_selector)` | Come `inspect_interactive_elements` ma limitato a un container CSS (modale, pannello) |
+
+### Smart locators
+| Tool | Descrizione |
+|------|-------------|
+| `click_smart(targets, timeout_per_try)` | Click con fallback chain: normal click → force click → JS click. `targets` viene da `playwright_suggestions` |
+| `fill_smart(targets, value, timeout_per_try)` | Fill con retry e `clear_first`. Stessa logica di `click_smart` |
+
+### Wait name-based (polling su inspect)
+| Tool | Descrizione |
+|------|-------------|
+| `wait_for_clickable_by_name(name_substring, timeout)` | Attende e restituisce `targets` per un elemento cliccabile |
+| `wait_for_control_by_name_and_type(name_substring, control_type, timeout)` | Attende un controllo specifico (`combobox`, `tab`, `checkbox`, ...) |
+| `wait_for_field_by_name(name_substring, timeout)` | Attende un campo form e restituisce `targets` per `fill_smart` |
+
+### Procedurale
+| Tool | Descrizione |
+|------|-------------|
+| `click_and_wait_for_text(targets, text, text_timeout, in_iframe)` | `click_smart` + `wait_for_text_content` in un solo step |
+| `check_element_exists(selector, selector_type)` | Verifica esistenza e visibilità elemento (usato da `evaluation.py` per assertion) |
+
+### Pattern d'uso consigliati
+
+**Discovery-first (obbligatorio dopo ogni navigazione):**
+```
+navigate_to_url → inspect_interactive_elements
+  → prendi playwright_suggestions dell'elemento target
+  → click_smart(targets=[...tutte le suggestions...])
 ```
 
-Se tutti i test passano: **✅ Setup completato!**
-
----
-
-### Step 6: Avvia il Server
-
-```bash
-# Assicurati che venv sia attivo
-python app.py
+**Elemento singolo (bottone che aspetti diventi enabled):**
+```
+inspect_interactive_elements → targets del bottone
+→ wait_for_element_state(targets, state="enabled")
+→ click_smart(targets)
 ```
 
-**Output atteso (con OpenRouter):**
-
+**Area dinamica (modale/card che cambia dopo click):**
 ```
-================================================================================
-VALIDAZIONE CONFIGURAZIONE
-================================================================================
-MCP Mode: REMOTE - Assicurati che il server sia attivo su http://localhost:8001/mcp/
-LLM Provider: OPENROUTER
-   Model: openai/gpt-4o-mini
-Flask: localhost:5000
-Playwright: headless=False
-================================================================================
-
- AI Agent MCP caricato con successo!
-
-================================================================================
-AI TEST AUTOMATION SERVER (MCP Edition)
-================================================================================
-URL: http://localhost:5000
-MCP Mode: remote
-
- ENDPOINT DISPONIBILI:
-
-[BASE]
-   - GET  /                      → Server info
-   - GET  /api/health            → Health check
-
-[BROWSER - Diretti (senza MCP)]
-   - POST /api/browser/start     → Avvia browser
-   - POST /api/browser/navigate  → Naviga a URL
-   - GET  /api/browser/screenshot → Screenshot
-   - POST /api/browser/close     → Chiudi browser
-
-[AI AGENT MCP]
-   - POST /api/agent/mcp/test/run    → Esegui test con AI+MCP
-   - GET  /api/agent/mcp/test/stream → Stream test real-time
-   - GET  /api/mcp/info              → Info configurazione MCP
-
-   MCP Mode: REMOTE
-      Server remoto: http://localhost:8001/mcp/
-      (Assicurati che playwright_server_remote.py sia attivo)
-
-[AMC LOGIN TEST]
-   - POST /api/test/amc/inspect      → Ispeziona form login
-   - POST /api/test/amc/login        → Test login automatico
-  Credenziali configurate: tuo.nome.cognome@eng.it
-
-================================================================================
-Premi CTRL+C per fermare il server
-================================================================================
+click_smart(...)
+→ wait_for_dom_change(root_selector=".mat-dialog-container")
+→ inspect_region(root_selector=".mat-dialog-container")
+→ fill_smart / click_smart con suggestions della regione
 ```
 
 ---
 
-### Step 7: Test Rapido
+## Orchestratore LAB
 
-Apri un **nuovo terminale** e testa:
+`orchestrator.py` gestisce il flusso completo in due fasi con agenti separati.
 
+```python
+from agent.orchestrator import run_full_sync
+
+result = run_full_sync(
+    scenario_id="scenario_1",
+    url="https://...",
+    user="user@example.com",
+    password="...",
+    verbose=True,
+)
+print(result["passed"])   # True / False
+print(result["errors"])   # lista errori per tool
+```
+
+**Scenari disponibili** (definiti in `lab_scenarios.py`):
+
+| ID | Scenario |
+|----|----------|
+| `scenario_1` | Creazione filtro e visualizzazione in dashboard |
+| `scenario_2` | Accesso tramite contatori |
+| `scenario_3` | Accesso tramite filtro |
+| `scenario_4` | Pagina di dettaglio campione |
+
+**Struttura risultato:**
+```python
+{
+    "passed": True,
+    "phase": "full",
+    "prefix": { ... },   # risultato Prefix Agent
+    "scenario": { ... }, # risultato Scenario Agent
+    "errors": [],
+    "artifacts": [{"type": "screenshot", "filename": "test_success.png"}],
+    "duration_ms": 18400,
+}
+```
+
+---
+
+## API Endpoints
+
+### Health & info
+
+```
+GET  /                       # server info
+GET  /api/health             # health check + config
+GET  /api/mcp/info           # configurazione MCP attiva
+```
+
+### AI Agent
+
+```
+POST /api/agent/mcp/test/run     # esegui test in linguaggio naturale
+GET  /api/agent/mcp/test/stream  # stream real-time
+```
+
+**Esempio `/api/agent/mcp/test/run`:**
 ```bash
-# Test 1: Health check
-curl http://localhost:5000/api/health
-
-# Test 2: MCP info
-curl http://localhost:5000/api/mcp/info
-
-# Test 3: Esegui test con AI Agent
 curl -X POST http://localhost:5000/api/agent/mcp/test/run \
   -H "Content-Type: application/json" \
-  -d '{"test_description": "Go to google.com, if a cookie consent banner appears handle cookie banner, search for 'AI test automation', wait for results, and close"}'
+  -d '{"test_description": "Go to google.com, search for AI automation, close browser"}'
 ```
 
-**Risposta attesa (Test 3):**
 ```json
 {
   "status": "success",
-  "final_answer": "✅ Test completed successfully...",
-  "passed": true,
-  "mcp_mode": "remote",
-  "timestamp": "2024-12-18T..."
-}
-```
-
-Se vedi questo: **🎉 Tutto funziona!**
-
----
-
-## 🔧 Configurazione LLM (OpenAI / Azure / OpenRouter)
-
-Il sistema supporta **3 provider LLM** con auto-detection:
-
-### OpenRouter (Raccomandato) ⭐
-
-**Vantaggi:**
-- ✅ Accesso a Claude, Gemini, GPT, e altri
-- ✅ API key unica per tutti i modelli
-- ✅ Modelli gratuiti disponibili
-- ✅ Economico per testing
-
-**Setup:**
-```bash
-# .env
-OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
-```
-
-**Modelli consigliati:**
-- `anthropic/claude-3.5-sonnet` - Migliore qualità
-- `anthropic/claude-3-haiku` - Economico
-- `openai/gpt-4o-mini` - GPT via OpenRouter
-- `google/gemini-2.0-flash-exp:free` - Gratuito
-
-**Ottieni key:** [openrouter.ai](https://openrouter.ai/)
-
----
-
-### Azure OpenAI (Enterprise)
-
-**Vantaggi:**
-- ✅ Compliance aziendale
-- ✅ Data residency EU
-- ✅ SLA garantito
-
-**Setup:**
-```bash
-# .env
-AZURE_OPENAI_API_KEY=your_key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
-AZURE_OPENAI_API_VERSION=2024-08-01-preview
-```
-
----
-
-### OpenAI Standard
-
-**Setup:**
-```bash
-# .env
-OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
-```
-
-**Modello:** `gpt-4o-mini` (hardcoded)
-
----
-
-## 🛠️ Tool Playwright Disponibili
-
-Il sistema espone **20 tool async** tramite MCP Server (lista in `mcp_servers/tool_names.py`):
-
-- **Browser / navigazione**: start_browser, navigate_to_url, wait_for_load_state, close_browser
-- **Pagina / interazione base**: get_page_info, wait_for_element, get_text, check_element_exists, press_key, handle_cookie_banner
-- **Discovery**: inspect_interactive_elements
-- **Smart Locators**: click_smart, fill_smart (retry + fallback chain)
-- **Wait / procedural avanzati**: wait_for_text_content, get_frame, wait_for_clickable_by_name, wait_for_control_by_name_and_type, wait_for_field_by_name, click_and_wait_for_text
-- **Artifact**: capture_screenshot
-
-### 🔍 Discovery Tools (DISCOVERY-FIRST WORKFLOW)
-
-#### `inspect_interactive_elements()`
-
-**⭐ STRUMENTO CHIAVE** per il discovery-first workflow. Scansiona **TUTTI** gli elementi interattivi della pagina usando standard WCAG.
-
-**Cosa scopre:**
-- **Iframes**: src, name, title per `get_frame()`
-- **Clickable elements**: bottoni, link, menu items, tabs
-- **Form fields**: input, textarea, select
-
-**Cosa restituisce:**
-```json
-{
-  "status": "success",
-  "iframes": [
-    {"src": "https://...", "name": "contentFrame", "title": "Main Content"}
-  ],
-  "clickable_elements": [
-    {
-      "accessible_name": "Micrologistica",  // Nome WCAG (aria-label, text, title)
-      "role": "button",                      // Role semantico
-      "text": "Micrologistica",              // Testo visibile
-      "aria_label": "Open Micrologistica",   // Per CSS selectors
-      "data_tfa": "micro_btn",               // Test automation ID
-      "playwright_suggestions": [            // READY-TO-USE payloads
-        {
-          "strategy": "role",
-          "click_smart": {"by": "role", "role": "button", "name": "Micrologistica"}
-        },
-        {
-          "strategy": "text",
-          "click_smart": {"by": "text", "text": "Micrologistica"}
-        },
-        {
-          "strategy": "css_aria",
-          "click_smart": {"by": "css", "selector": "[aria-label='Open Micrologistica']"}
-        },
-        {
-          "strategy": "tfa",
-          "click_smart": {"by": "tfa", "tfa": "micro_btn"}
-        }
-      ]
-    }
-  ],
-  "form_fields": [
-    {
-      "accessible_name": "Username",
-      "type": "text",
-      "placeholder": "Enter your username",
-      "name": "username",
-      "id": "user-input",
-      "aria_label": "Username field",
-      "playwright_suggestions": [            // READY-TO-USE payloads
-        {
-          "strategy": "label",
-          "fill_smart": {"by": "label", "label": "Username"}
-        },
-        {
-          "strategy": "placeholder",
-          "fill_smart": {"by": "placeholder", "placeholder": "Enter your username"}
-        },
-        {
-          "strategy": "role",
-          "fill_smart": {"by": "role", "role": "textbox", "name": "Username"}
-        },
-        {
-          "strategy": "css_name",
-          "fill_smart": {"by": "css", "selector": "[name='username']"}
-        },
-        {
-          "strategy": "css_id",
-          "fill_smart": {"by": "css", "selector": "#user-input"}
-        }
-      ]
-    }
-  ]
-}
-```
-
-**DISCOVERY-FIRST WORKFLOW** (pattern validato da test nativi):
-```python
-# Step 1: Navigate
-navigate_to_url("https://app.com/login")
-
-# Step 2: DISCOVER (MANDATORY dopo ogni navigazione)
-result = inspect_interactive_elements()
-
-# Step 3: READ output - trova elemento per accessible_name
-username_field = [f for f in result['form_fields'] if 'username' in f['accessible_name'].lower()][0]
-login_button = [e for e in result['clickable_elements'] if 'login' in e['accessible_name'].lower()][0]
-
-# Step 4: EXTRACT ALL strategies from playwright_suggestions (fallback chain)
-user_strategies = [s['fill_smart'] for s in username_field['playwright_suggestions']]
-login_strategies = [s['click_smart'] for s in login_button['playwright_suggestions']]
-
-# Step 5: USE ALL strategies (fallback automatico: prova tutte finché una funziona)
-fill_smart(user_strategies, "testuser")  # Prova: label → placeholder → role → css
-click_smart(login_strategies)  # Prova: role → text → css
-
-# Step 6: Dopo navigation, REPEAT (inspect again)
-wait_for_navigation()
-inspect_interactive_elements()  # Discover home page
-```
-
-**QUANDO USARLO (CRITICAL):**
-- ✅ **SEMPRE dopo navigate_to_url()**
-- ✅ Dopo click che triggera navigation (menu, tabs)
-- ✅ Prima di interagire con pagine enterprise (Angular/React/Vue)
-- ✅ Per trovare iframe selectors prima di get_frame()
-
-**VANTAGGI vs HARDCODING:**
-- ✅ **Nessun guessing**: selectors reali dalla pagina
-- ✅ **Strategie pre-ordinate**: role > text > css > tfa (affidabilità)
-- ✅ **Payloads ready-to-use**: copy&paste in click_smart/fill_smart
-- ✅ **WCAG compliance**: accessible_name standard W3C
-
-**FORBIDDEN PRACTICES:**
-- ❌ Hardcoding selectors senza inspect
-- ❌ Guess accessible_name senza vedere output
-- ❌ Modificare playwright_suggestions (usarli as-is)
-- ❌ Skippare inspect dopo navigation
-
----
-
-#### `inspect_dom_changes(click_target: dict, wait_after_click: int = 2000)`
-
-Click su elemento e analizza cambiamenti DOM (elementi aggiunti/rimossi).
-
-**Utile per:**
-- Debug menu dinamici (Angular/React)
-- Verificare cosa cambia dopo click
-- Capire perché elementi non appaiono
-
-**Esempio:**
-```python
-# Debug: perché il menu non si apre dopo click?
-result = inspect_dom_changes(
-    click_target={"by": "role", "role": "button", "name": "Menu"},
-    wait_after_click=2000
-)
-# Output: lista elementi aggiunti/rimossi al DOM
-```
-
----
-
-### 🎯 Smart Locators (Enterprise Apps - Retry Automatico)
-
-Per enterprise apps (Angular/React/Vue) con DOM complesso, i **tool base falliscono**. Gli smart locators provano **strategie multiple** finché una non funziona.
-
-#### `click_smart(targets: list[dict], timeout_per_try: int = 2000)`
-
-**Click enterprise con retry automatico**. Prova strategie in ordine finché una non ha successo.
-
-**Strategia di retry (3 livelli):**
-```
-Try 1: Normal click (3 retry con backoff 500ms/1500ms/3000ms)
-  ↓ fallisce
-Try 2: Force click + is_visible() check (skips se hidden)
-  ↓ fallisce o elemento hidden
-Try 3: JavaScript click (bypassa tutto, triggera eventi)
-```
-
-**Strategie disponibili (in ordine di affidabilità):**
-1. **role**: `{"by": "role", "role": "button", "name": "Login"}` ← WCAG, più robusto
-2. **text**: `{"by": "text", "text": "Click me"}`
-3. **css_aria**: `{"by": "css", "selector": "[aria-label='Submit']"}`
-4. **tfa**: `{"by": "tfa", "tfa": "submit_btn"}` ← Test IDs (possono cambiare)
-
-**Esempio (copy da inspect output):**
-```python
-# Dopo inspect_interactive_elements(), copiare payload:
-click_smart([
-    {"by": "role", "role": "button", "name": "Micrologistica"},  # Try 1-3 con questa strategia
-    {"by": "text", "text": "Micrologistica"}                     # Se fallisce, try 1-3 con questa
-])
-```
-
-**Output:**
-```json
-{
-  "status": "success",
-  "message": "Clicked (JS) using strategy #2: css",
-  "strategy": "css",          // Strategia usata
-  "try": 3,                   // Livello click (1=normal, 2=force, 3=JS)
-  "retries": 2                // Retry dentro Try 1
-}
-```
-
----
-
-#### `fill_smart(targets: list[dict], value: str, timeout_per_try: int = 2000)`
-
-**Fill enterprise con retry automatico**. Stessa logica di click_smart ma per form fields.
-
-**Retry mechanism:**
-- 3 tentativi per strategia (backoff: 500ms → 1500ms → 3000ms)
-- Supporta `clear_first=True` (default)
-
-**Strategie disponibili (in ordine):**
-1. **label**: `{"by": "label", "label": "Username"}` ← Più affidabile
-2. **placeholder**: `{"by": "placeholder", "placeholder": "Enter email"}`
-3. **role**: `{"by": "role", "role": "textbox", "name": "Search"}`
-4. **css_name**: `{"by": "css", "selector": "[name='email']"}`
-5. **css_id**: `{"by": "css", "selector": "#username"}`
-6. **css_aria**: `{"by": "css", "selector": "[aria-label='Email']"}`
-7. **tfa**: `{"by": "tfa", "tfa": "login_email"}` ← Fragile (ultimo)
-
-**Esempio (copy da inspect output):**
-```python
-# Dopo inspect_interactive_elements(), copiare payload:
-fill_smart([
-    {"by": "label", "label": "Username"},
-    {"by": "placeholder", "placeholder": "Enter username"}
-], "testuser@example.com")
-```
-
----
-
-### 🚀 Procedural Tools (Workflow Complessi)
-
-Combinano più operazioni per ridurre step e token LLM.
-
-#### `get_frame(selector: str = None, url_pattern: str = None, timeout: int = 10000)`
-
-Accesso semplificato a iframe. Usa selector CSS **oppure** URL pattern.
-
-**Esempi:**
-```python
-# By URL pattern (più robusto)
-get_frame(url_pattern="movementreason", timeout=5000)
-
-# By CSS selector
-get_frame(selector="iframe#app-frame", timeout=5000)
-```
-
-**Tip:** Usa `inspect_interactive_elements()` per trovare iframe src prima.
-
----
-
-#### `navigate_and_wait(...)` *(non esposto)*
-
-**Procedural**: Click + wait navigation + wait text. Non è tra i 15 tool attualmente esposti dal server MCP; equivalente: `click_smart` + `wait_for_load_state` / `wait_for_text_content`.
-
-**Combina:**
-- `click_smart(click_target)`
-- `wait_for_navigation()`
-- `wait_for_text_content(wait_for_text)` (opzionale)
-
-**Esempio:**
-```python
-# Menu navigation: click "Anagrafiche" e aspetta "Causali" appaia
-navigate_and_wait(
-    click_target={"by": "role", "role": "button", "name": "Anagrafiche"},
-    wait_for_text="Causali",
-    wait_timeout=5000
-)
-```
-
----
-
-#### ~~`fill_and_search(input_selector: str, search_value: str, verify_result_text: str = None, in_iframe: dict = None, timeout: int = 10000)`~~
-
-**⚠️ DEPRECATED**: Use `fill_smart()` + `wait_for_text_content()` instead for better resilience with fallback chain.
-
-**Migration Example:**
-```python
-# OLD (deprecated):
-fill_and_search(
-    input_selector="input[type='text']",
-    search_value="carm",
-    verify_result_text="CARMAG",
-    in_iframe={"url_pattern": "movementreason"}
-)
-
-# NEW (recommended):
-fill_smart(
-    targets=[
-        {"by": "placeholder", "placeholder": "Search"},
-        {"by": "label", "label": "Search"},
-        {"by": "role", "role": "searchbox", "name": "Search"}
-    ],
-    value="carm",
-    in_iframe={"url_pattern": "movementreason"}
-)
-wait_for_text_content(
-    "CARMAG", 
-    timeout=5000,
-    in_iframe={"url_pattern": "movementreason"}
-)
-```
-
----
-
-### 🧠 Advanced Wait Tools (Name-based)
-
-Questi tool usano **polling su `inspect_interactive_elements()`** per trovare elementi a partire dal loro nome/logical type, e restituiscono payload già pronti per `click_smart` / `fill_smart`.
-
-#### `wait_for_clickable_by_name(name_substring: str, timeout: int | None = None, case_insensitive: bool = True)`
-
-Aspetta che compaia un **elemento cliccabile** (bottoni, link, tiles) il cui `accessible_name` o testo visibile contenga `name_substring`.
-
-- Usa in polling `inspect_interactive_elements()["clickable_elements"]`.
-- Restituisce: `status`, `message`, `element` completo e `targets` per `click_smart`.
-
-**Esempio (tile LAB):**
-```python
-res = await wait_for_clickable_by_name("Laboratorio Analisi", timeout=20000)
-if res["status"] == "success":
-    await click_smart(res["targets"])
-```
-
-#### `wait_for_control_by_name_and_type(name_substring: str, control_type: str, timeout: int | None = None, case_insensitive: bool = True)`
-
-Aspetta che compaia un **controllo interattivo** specifico (combobox, tab, checkbox, switch), cercando in `inspect_interactive_elements()["interactive_controls"]`.
-
-- `control_type` è il tipo logico (es. `"combobox"`, `"checkbox"`, `"tab"`).
-- Restituisce: `status`, `message`, `element` e `targets` per `click_smart`.
-
-**Esempio (selettore organizzazione LAB):**
-```python
-res = await wait_for_control_by_name_and_type(
-    "Seleziona Organizzazione",
-    control_type="combobox",
-    timeout=15000,
-)
-if res["status"] == "success":
-    await click_smart(res["targets"])
-```
-
-#### `wait_for_field_by_name(name_substring: str, timeout: int | None = None, case_insensitive: bool = True)`
-
-Aspetta che compaia un **campo form** (input/textarea/select) leggendo `inspect_interactive_elements()["form_fields"]`.
-
-- Match su `accessible_name`, `placeholder` o `name` che contengono `name_substring`.
-- Restituisce: `status`, `message`, `element` e `targets` per `fill_smart` (con fallback a CSS id/name).
-
-**Esempio (campo Username):**
-```python
-res = await wait_for_field_by_name("Username", timeout=10000)
-if res["status"] == "success":
-    await fill_smart(res["targets"], "test-user")
-```
-
-#### `click_and_wait_for_text(targets: list[dict], text: str, timeout_per_try: int = AppConfig.AGENT.DEFAULT_TIMEOUT_PER_TRY, text_timeout: int = 30000, in_iframe: dict = None)`
-
-Tool **procedurale composto**: esegue `click_smart(targets)` e poi `wait_for_text_content(text, ...)` (stessa firma di `wait_for_text_content`, con supporto `in_iframe`).
-
-- Utile per step critici dove click + testo atteso vanno sempre insieme (login OK, “Continua”, apertura modulo).
-- Restituisce: `status`, `message`, `click` (risultato di `click_smart`), `text_check` (risultato di `wait_for_text_content`).
-
-**Esempio (click “Login” e attesa testo “Preanalitica”):**
-```python
-await click_and_wait_for_text(
-    targets=login_button_targets,
-    text="Preanalitica",
-    text_timeout=30000,
-)
-```
-
----
-
-### 📝 Base Tools
-
-#### 1. `start_browser(headless: bool = False)`
-Avvia browser Chromium (async).
-
-**Args:**
-- `headless`: Se True, browser invisibile
-
-**Esempio:**
-```python
-await start_browser(headless=False)  # Vedi il browser
-```
-
----
-
-#### 2. `navigate_to_url(url: str)`
-Naviga a URL e aspetta caricamento (async).
-
-**Esempio:**
-```python
-await navigate_to_url("https://google.com")
-```
-
----
-
-#### 3. `click_element(selector: str, selector_type: str = "css", timeout: int = 30000)`
-Clicca su elemento (async).
-
-**Selector types:**
-- `"css"` - CSS selector (default)
-- `"xpath"` - XPath
-- `"text"` - Testo visibile
-
-**Esempi:**
-```python
-await click_element("#login-button", "css")
-await click_element("//button[@type='submit']", "xpath")
-await click_element("Accedi", "text")
-```
-
----
-
-#### 4. `fill_input(selector: str, value: str, selector_type: str = "css", clear_first: bool = True)`
-Compila campo input (async).
-
-**Esempio:**
-```python
-await fill_input("input[name='username']", "testuser")
-```
-
----
-
-#### 5. `wait_for_element(selector: str, state: str = "visible", selector_type: str = "css", timeout: int = 30000)`
-
-**FONDAMENTALE per AJAX!** Aspetta che elemento appaia/scompaia (async).
-
-**States:**
-- `"visible"` - Elemento visibile
-- `"hidden"` - Elemento nascosto
-- `"attached"` - Nel DOM
-- `"detached"` - Rimosso dal DOM
-
-**Esempio:**
-```python
-await wait_for_element("#search-results", "visible")
-```
-
----
-
-#### `wait_for_load_state(state: str = "load", timeout: int = 30000)`
-
-Aspetta che la **pagina nel suo complesso** raggiunga un certo stato di caricamento (equivalente a `page.wait_for_load_state` di Playwright).
-
-**States consigliati:**
-- `"domcontentloaded"` – DOM pronto (più veloce, usato per la maggior parte delle navigazioni).
-- `"load"` – risorse principali caricate.
-- `"networkidle"` – nessuna richiesta in corso (può andare in timeout su SPA con polling).
-
-**Esempi:**
-```python
-# Dopo login o click su "Continua"
-await wait_for_load_state("domcontentloaded", timeout=15000)
-
-# Dopo apertura di una dashboard pesante
-await wait_for_load_state("networkidle", timeout=30000)
-```
-
----
-
-#### 6. `get_text(selector: str, selector_type: str = "css")`
-Estrae testo da elemento (async).
-
----
-
-#### 7. `check_element_exists(selector: str, selector_type: str = "css")`
-Verifica esistenza elemento (async).
-
----
-
-#### 8. `press_key(key: str)`
-Simula pressione tasto (async).
-
-**Esempio:**
-```python
-await press_key("Enter")
-await press_key("Escape")
-```
-
----
-
-#### 9. `capture_screenshot(filename: str = None, return_base64: bool = False)` ⭐
-
-Cattura screenshot full-page (async).
-
-**IMPORTANTE:** Ritorna base64 solo se `return_base64=True` (risparmia token!)
-
-**Esempio:**
-```python
-await capture_screenshot("page.png", return_base64=False)  # No base64
-await capture_screenshot("page.png", return_base64=True)   # Con base64
-```
-
----
-
-#### 10. `close_browser()`
-Chiude browser e libera risorse (async).
-
----
-
-#### 11. `get_page_info()`
-Ottiene URL, titolo, viewport correnti (async).
-
----
-
-#### 12. `wait_for_navigation(timeout: int = 10000)`
-
-Attende completamento navigazione (domcontentloaded). Utile dopo click su link/submit.
-
----
-
-#### 13. `wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False, in_iframe: dict = None)`
-
-Attende che un testo appaia nel DOM (pagina principale o dentro iframe). Utile per verificare stato pagina dopo azioni o risultati search in iframe.
-
-**Args:**
-- `in_iframe`: Dict per cercare dentro iframe (es: `{"url_pattern": "movementreason"}`)
-
-**Esempi:**
-```python
-# Main page (default)
-wait_for_text_content("Dashboard", timeout=10000)
-
-# Inside iframe (Causali search result)
-wait_for_text_content(
-    "CARMAG",
-    timeout=5000,
-    in_iframe={"url_pattern": "movementreason"}
-)
-```
-
----
-
-#### 14. `handle_cookie_banner(strategies: list[str] | None = None, timeout: int = 5000)`
-
-Gestisce cookie banner con strategie multiple.
-
----
-
-### 📖 Legacy Tools (Deprecati)
-
-#### `inspect_page_structure()`
-
-**DEPRECATO**: Usa `inspect_interactive_elements()` invece.
-
-Mantenuto per compatibilità con codice legacy. Il nuovo tool:
-- Trova **più elementi** (clickable + forms + iframes)
-- Genera **playwright_suggestions** ready-to-use
-- Supporta **discovery-first workflow**
-- Estrae **accessible_name** (WCAG standard)
-
-**Migration:**
-```python
-# OLD (deprecato)
-result = inspect_page_structure()
-inputs = result['inputs']  # Lista parziale
-
-# NEW (raccomandato)
-result = inspect_interactive_elements()
-form_fields = result['form_fields']  # Lista completa + suggestions
-clickable = result['clickable_elements']
-
-# Copy payload da suggestions
-fill_smart([form_fields[0]['playwright_suggestions'][0]['fill_smart']], "value")
-```
-
-**Ispeziona la struttura della pagina** per trovare selettori corretti (form, input, button).
-
-**Utilità:**
-- 🔍 Debug di form di login
-- 📋 Scoperta selettori per pagine sconosciute
-- 🛠️ Analisi struttura DOM
-- 📝 Documentazione automatica selettori
-
-**Returns:**
-```json
-{
-  "status": "success",
-  "message": "Page structure analyzed: 3 inputs, 3 buttons, 1 forms",
-  "page_info": {
-    "url": "https://amc.eng.it/multimodule/web/",
-    "title": "Ellipse COT |"
-  },
-  "inputs": [
-    {
-      "index": 0,
-      "type": "text",
-      "name": "username",
-      "id": "",
-      "placeholder": "Username",
-      "class": "mat-input-element",
-      "selector_suggestions": [
-        "input[name='username']",
-        "input[type='text']",
-        "input[placeholder='Username']"
-      ]
-    },
-    {
-      "index": 1,
-      "type": "password",
-      "name": "password",
-      "placeholder": "",
-      "selector_suggestions": [
-        "input[name='password']",
-        "input[type='password']"
-      ]
-    },
-    {
-      "index": 2,
-      "type": "checkbox",
-      "name": "useDefaultProfiling",
-      "selector_suggestions": [
-        "input[name='useDefaultProfiling']",
-        "input[type='checkbox']"
-      ]
-    }
-  ],
-  "buttons": [
-    {
-      "index": 0,
-      "text": "Login",
-      "type": "submit",
-      "id": "",
-      "class": "mat-raised-button",
-      "selector_suggestions": [
-        "button:has-text('Login')",
-        "button[type='submit']"
-      ]
-    },
-    {
-      "index": 1,
-      "text": "Accedi",
-      "type": "button",
-      "selector_suggestions": [
-        "button:has-text('Accedi')"
-      ]
-    },
-    {
-      "index": 2,
-      "text": "Recupera password",
-      "type": "button",
-      "selector_suggestions": [
-        "button:has-text('Recupera password')"
-      ]
-    }
-  ],
-  "forms": [
-    {
-      "index": 0,
-      "action": "/auth/login",
-      "method": "POST",
-      "id": "login-form"
-    }
-  ]
-}
-```
-
-**Esempio uso AI Agent:**
-```javascript
-// Test description
-"Go to https://example.com/login, inspect the page structure to find login form selectors, then close"
-
-// AI Agent calls:
-1. start_browser()
-2. navigate_to_url("https://example.com/login")
-3. wait_for_element("body", "visible")
-4. inspect_page_structure()  // ⭐ NEW TOOL
-5. close_browser()
-
-// Output includes all selectors ready to use!
-```
-
-**Quando usarlo:**
-- ✅ **Prima di scrivere test per pagine nuove** (scopri selettori in 5 secondi)
-- ✅ **Test in linguaggio naturale** ("login with user/pass") → AI usa inspect automaticamente
-- ✅ **Per trovare selettori corretti quando i test falliscono** (selettori cambiati?)
-- ✅ **Debug di form complessi** (login, registrazione, checkout)
-- ✅ **Documentazione struttura pagine per il team**
-- ✅ **Anti-guessing strategy** → evita che AI inventi selettori inesistenti
-
-**Quando NON usarlo:**
-- ❌ Se conosci già i selettori E sono stabili (usa direttamente `fill_input`, `click_element`)
-- ❌ Pagine molto dinamiche (React/Angular con ID random ogni render)
-- ❌ Test ad alte performance (inspect aggiunge ~2-3 secondi)
-- ❌ Solo per curiosità (costa tempo/token LLM)
-
----
-
-### 💡 Anti-Guessing Strategy con inspect_page_structure
-
-**Problema comune in AI test automation:**
-```python
-# AI che INVENTA selettori (MALE ❌)
-fill_input("#username", "test")     # Elemento non esiste!
-fill_input("#password", "pass")      # Elemento non esiste!
-click_element("#login-btn")          # Elemento non esiste!
-→ Test FALLISCE
-```
-
-**Soluzione in questo progetto:**
-```python
-# AI che SCOPRE selettori (BENE ✅)
-inspect_page_structure()             # Ispeziona pagina reale
-→ Trova: input[name='username'], input[name='password'], button:has-text('Login')
-
-fill_input("input[name='username']", "test")   # Elemento esiste!
-fill_input("input[name='password']", "pass")    # Elemento esiste!
-click_element("button:has-text('Login')")       # Elemento esiste!
-→ Test PASSA
-```
-
-**System Prompt istruisce l'AI:**
-```
-SELECTOR DISCOVERY (CRITICAL):
-- NEVER guess selectors like #username, #password
-- When test says "fill username/password" without exact selectors:
-    1. Call inspect_page_structure() FIRST
-    2. Use the suggested selectors from the output
-    3. Then fill_input/click_element with discovered selectors
-```
----
-
-## 🌐 API Endpoints
-
-### [BASE]
-
-#### `GET /`
-Server info e status.
-
-#### `GET /api/health`
-Health check con info configurazione.
-
----
-
-### [AI AGENT MCP]
-
-#### `POST /api/agent/mcp/test/run`
-Esegue test con AI Agent tramite MCP.
-
-**Body:**
-```json
-{
-  "test_description": "Go to google.com and search for 'AI testing'"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "test_description": "Go to google.com...",
-  "final_answer": "✅ Test completed successfully...",
   "passed": true,
   "mcp_mode": "local",
-  "screenshots": [...],
-  "screenshots_count": 1,
-  "timestamp": "2024-12-18T..."
+  "artifacts": [],
+  "errors": [],
+  "duration_ms": 9200,
+  "timestamp": "2025-..."
 }
 ```
 
----
+### Test AMC (login automation)
 
-#### `GET /api/mcp/info`
-Info configurazione MCP.
-
-**Response:**
-```json
-{
-  "mcp_mode": "local",
-  "server_config": {
-    "command": "python",
-    "args": ["-m", "mcp_servers.playwright_server_local"],
-    "transport": "stdio"
-  },
-  "tools_count": 12
-}
+```
+POST /api/test/amc/inspect   # ispeziona DOM pagina login
+POST /api/test/amc/login     # test login automatico (credenziali da .env)
 ```
 
 ---
 
-### [AMC LOGIN TEST] 🔐
+## MCP: Locale vs Remoto
 
-#### `POST /api/test/amc/inspect`
-Ispeziona DOM.
-
-**Response:**
-```json
-{
-  "status": "success",
-  "test_type": "amc_inspect",
-  "final_answer": "📝 Page structure with selectors...",
-  "note": "Use this info to update selectors in config"
-}
-```
+| | Locale (`stdio`) | Remoto (`HTTP`) |
+|---|---|---|
+| Avvio server | subprocess automatico | `python mcp_servers/playwright_server_remote.py` |
+| Comunicazione | stdin/stdout | HTTP `http://localhost:8001/mcp/` |
+| Consigliato per | development, debug | production, più worker |
+| Config | `MCPConfig.MODE = "local"` | `MCPConfig.MODE = "remote"` |
 
 ---
 
-#### `POST /api/test/amc/login`
-Test login automatico (usa credenziali da `.env`).
+## Note tecniche
 
-**Body (opzionale):**
-```json
-{
-  "take_screenshot": true,
-  "wait_after_login": 5
-}
-```
+**Pass/fail:** deciso da `evaluation.py` sui tool results (non sull'output testuale del modello). Tolleranza: se l'ultimo uso di `click_smart`/`fill_smart` è `success`, errori precedenti dello stesso tool vengono ignorati.
 
-**Response:**
-```json
-{
-  "status": "success",
-  "test_type": "amc_login",
-  "username": "tuo.nome.cognome@eng.it",
-  "passed": true,
-  "final_answer": "✅ Login successful...",
-  "note": "Credentials loaded from environment variables"
-}
-```
+**System prompts** (`system_prompt.py`): tre prompt distinti — `AMC_SYSTEM_PROMPT`, `LAB_SYSTEM_PROMPT`, `LAB_PREFIX_PROMPT`. Il Prefix Agent lascia sempre il browser aperto (`close_browser` è esplicitamente vietato).
 
----
-
-## 💡 Esempi di Utilizzo
-
-### Esempio 1: Discovery-First Login Workflow
-
-```bash
-curl -X POST http://localhost:5000/api/agent/mcp/test/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "test_description": "Go to https://example.com/login, discover the page structure using inspect, then fill username and password fields using discovered selectors, click login, and close"
-  }' | jq '.'
-```
-
-**AI Agent execution:**
-1. `start_browser()`
-2. `navigate_to_url("https://example.com/login")`
-3. `inspect_interactive_elements()` ← Discover form
-4. Read output → find username/password fields
-5. Copy payload from `playwright_suggestions`
-6. `fill_smart([{by: "label", label: "Username"}], "user")`
-7. `fill_smart([{by: "label", label: "Password"}], "pass")`
-8. `click_smart([{by: "role", role: "button", name: "Login"}])`
-9. `close_browser()`
-
----
-
-### Esempio 2: Enterprise Menu Navigation
-
-```bash
-curl -X POST http://localhost:5000/api/agent/mcp/test/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "test_description": "Navigate to app home, discover menu structure, click on Settings using smart locators, wait for Profile tab to appear, take screenshot"
-  }'
-```
-
-**Pattern:**
-```
-navigate → inspect → discover → copy payload → click_smart → repeat
-```
-
----
-
-### Esempio 3: Iframe Search (Discovery-First + Smart Locators)
-
-```bash
-curl -X POST http://localhost:5000/api/agent/mcp/test/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "test_description": "Navigate to Causali page, search for CARMAG inside iframe with URL pattern movementreason"
-  }'
-```
-
-**AI uses discovery-first pattern with iframe:**
-```python
-# After navigating to Causali page
-wait_for_load_state(state="domcontentloaded", timeout=30000)
-wait_for_timeout(3000)  # Let iframe Angular initialize
-
-# Discovery-first for iframe (generic WCAG strategies)
-fill_smart(
-    targets=[
-        {"by": "placeholder", "placeholder": "Search"},
-        {"by": "label", "label": "Search"},
-        {"by": "role", "role": "searchbox", "name": "Search"}
-    ],
-    value="carm",
-    in_iframe={"url_pattern": "movementreason"}
-)
-wait_for_text_content("CARMAG", timeout=5000)
-```
-
----
-
-### Tool Combinations (Discovery Pattern)
-
-**Best Practice Pattern:**
-```javascript
-// Test description
-"Login to app, navigate to Settings, verify Profile section exists"
-
-// AI Agent execution (discovery-first):
-1. start_browser()
-2. navigate_to_url("https://app.com/login")
-3. inspect_interactive_elements()  // ← Discover login form
-4. fill_smart([discovered_username_strategy], "user")
-5. fill_smart([discovered_password_strategy], "pass")
-6. click_smart([discovered_login_button_strategy])
-7. wait_for_navigation()
-8. inspect_interactive_elements()  // ← Discover home page
-9. click_smart([discovered_settings_strategy])
-10. wait_for_navigation()
-11. inspect_interactive_elements()  // ← Discover settings page
-12. check_element_exists("text=Profile", "text")
-13. close_browser()
-```
-
-**Key principle:**
-> ALWAYS `inspect_interactive_elements()` after navigation → COPY payload → USE
-
----
-
-## 🔄 MCP: Locale vs Remoto
-
-### Modalità Locale (Default)
-
-```python
-# config/settings.py
-MCPConfig.MODE = "local"
-```
-
-**Come funziona:**
-- MCP Server avviato come **subprocess** da Python
-- Comunicazione via **stdio** (stdin/stdout)
-- Stesso processo Python
-
-**Vantaggi:**
-- ✅ Più semplice da debuggare
-- ✅ No configurazione network
-- ✅ Meno overhead
-- ✅ Raccomandato per development
-
----
-
-### Modalità Remota
-
-```python
-# config/settings.py
-MCPConfig.MODE = "remote"
-MCPConfig.REMOTE_HOST = "localhost"
-MCPConfig.REMOTE_PORT = 8000
-```
-
-**Come funziona:**
-- MCP Server come **processo separato**
-- Comunicazione via **HTTP**
-- Può essere su macchina diversa
-
-**Avvio manuale server:**
-```bash
-python mcp_servers/playwright_server_remote.py
-```
-
-**Vantaggi:**
-- ✅ Server scalabile (più worker)
-- ✅ Server su macchina dedicata
-- ✅ Isolamento completo
-- ✅ Raccomandato per production
----
-
-## 📚 Risorse
-
-### Documentazione Ufficiale
-
-- **MCP Protocol:** https://modelcontextprotocol.io/
-- **Playwright Python:** https://playwright.dev/python/
-- **LangChain:** https://python.langchain.com/
-- **OpenRouter:** https://openrouter.ai/docs
-- **WCAG Accessible Name:** https://www.w3.org/WAI/WCAG21/Understanding/name-role-value.html
-
-### Tool Specifici
-
-- **inspect_interactive_elements:** Discovery-first workflow tool (vedi sezione Discovery Tools)
-- **click_smart / fill_smart:** Enterprise locators con retry (vedi sezione Smart Locators)
-- **Procedural tools:** get_frame
-- **Browser Config:** `backend/config/settings.py`
-- **Guida agentic ai tool Playwright MCP:** `backend/agent/TOOLS.md` (spiegazione per ogni tool con esempi di input/output e note d'uso nei flussi AMC/LAB)
-
-### Best Practices
-
-- ✅ **ALWAYS inspect after navigation** (discovery-first)
-- ✅ **COPY payloads from playwright_suggestions** (no modifications)
-- ✅ **Use smart locators for enterprise apps** (Angular/React/Vue)
-- ✅ **Use procedural tools for complex workflows** (reduce steps)
-- ❌ **NEVER hardcode selectors** without inspect
-- ❌ **NEVER guess accessible_name** values
-- ❌ **NEVER modify playwright_suggestions** (use as-is)
-
----
-
-## 📝 Changelog
-
-### v3.2.0 (refactor prompts + LAB scenarios)
-- ✨ **NEW:** `backend/agent/system_prompt.py` — prompt AMC e LAB unificati con regole strette (NO GUESSED TEXT, check obbligatorio dopo ogni azione, gestione "attendi che la pagina sia caricata").
-- ✨ **NEW:** `backend/agent/lab_scenarios.py` — definizione strutturata dei 4 scenari LAB (creazione filtro, contatori, accesso tramite filtro, dettaglio campione).
-- 🔧 **CHANGED:** `navigate_to_url` usa `wait_until="domcontentloaded"` e timeout da config (niente più `networkidle` per evitare timeout su SPA).
-- 🔧 **CHANGED:** `click_and_wait_for_text` accetta `targets` opzionale; se mancante fa fallback a `wait_for_text_content`.
-- 🗑️ **REMOVED:** `backend/agent/amc_system_prompt.py` (sostituito da `system_prompt.py`).
-- 🗑️ **REMOVED:** `backend/tests/test_workflow_native.py` (sostituito da test AMC e LAB specifici).
-- 📚 **IMPROVED:** Sezione LAB SCENARIOS nel prompt; riferimento ai 4 flussi dopo la home.
-
-### v3.1.0-discovery-first
-- 🗑️ **DEPRECATED:** `fill_and_search()` (use `fill_smart()` + `wait_for_text_content()`)
-- 🔧 **CHANGED:** Iframe workflow now uses discovery-first approach (treat as external DOM)
-- 🔧 **CHANGED:** Tool count: 19 → 18
-- 📚 **IMPROVED:** System prompt with iframe-as-external-DOM philosophy
-- 📚 **IMPROVED:** Complete migration guide for fill_and_search → fill_smart
-
-### v3.0.0-discovery
-- ✨ **NEW:** `inspect_interactive_elements()` - Discovery-first workflow
-- ✨ **NEW:** `click_smart()` / `fill_smart()` - Enterprise smart locators
-- ✨ **NEW:** Procedural tools: `get_frame()`
-- ✨ **NEW:** Retry mechanism (3 levels: normal → force → JS click)
-- ✨ **NEW:** `playwright_suggestions` in inspect output (ready-to-use payloads)
-- ✨ **NEW:** WCAG-compliant `accessible_name` extraction
-- 🔧 **CHANGED:** Tool count: 12 → 19
-- 🔧 **CHANGED:** System prompt: discovery-first workflow
-- 🗑️ **DEPRECATED:** `inspect_page_structure()` (use `inspect_interactive_elements()`)
-
-### v2.2.0-inspect
-- ✨ Added `inspect_page_structure()` for selector discovery
-- 🔧 Improved anti-guessing strategy
-
-### v2.0.0
-- ✨ Initial MCP implementation
-- ✨ Multi-LLM support (OpenAI/Azure/OpenRouter)
-
----
-
-</parameter>
+**LangGraph graph export:** a ogni inizializzazione agent vengono generati `langgraph.mmd`, `langgraph.txt`, `langgraph.png` nella working directory.

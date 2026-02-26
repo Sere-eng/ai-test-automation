@@ -8,6 +8,7 @@ Output: JSON string uniforme per tutti i tool
 import json
 import sys
 import os
+from typing import Dict, List
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from tool_names import TOOL_NAMES
@@ -49,6 +50,7 @@ async def navigate_to_url(url: str) -> str:
     result = await playwright.navigate_to_url(url)
     return to_json(result)
 
+
 @mcp.tool()
 async def wait_for_load_state(state: str = "domcontentloaded", timeout: int = 30000) -> str:
     """Attende un load state Playwright (load/domcontentloaded/networkidle)."""
@@ -85,18 +87,25 @@ async def get_page_info() -> str:
 # =========================
 
 @mcp.tool()
-async def wait_for_element(
-    selector: str,
+async def wait_for_element_state(
+    targets: List[Dict],
     state: str = "visible",
-    selector_type: str = "css",
-    timeout: int = 30000
+    timeout: int | None = None,
+    in_iframe: dict | None = None,
 ) -> str:
-    """Attende che un elemento diventi visible/hidden/attached/detached."""
-    result = await playwright.wait_for_element(
-        selector=selector,
-        selector_type=selector_type,
+    """
+    Attende che un elemento individuato tramite SMART TARGETS raggiunga uno stato logico.
+
+    - Usa la stessa semantica di targets di click_smart/fill_smart (role, label, placeholder, css, tfa, xpath).
+    - Stati supportati:
+        - Playwright nativi: "visible", "hidden", "attached", "detached"
+        - Logici: "enabled", "disabled" (polling su is_enabled()).
+    """
+    result = await playwright.wait_for_element_state(
+        targets=targets,
         state=state,
-        timeout=timeout
+        timeout=timeout,
+        in_iframe=in_iframe,
     )
     return to_json(result)
 
@@ -112,13 +121,6 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
 async def press_key(key: str) -> str:
     """Premi un tasto (Enter/Escape/etc.)."""
     result = await playwright.press_key(key=key)
-    return to_json(result)
-
-
-@mcp.tool()
-async def check_element_exists(selector: str, selector_type: str = "css", timeout: int = 5000) -> str:
-    """Verifica esistenza e visibilità di un elemento (per assert)."""
-    result = await playwright.check_element_exists(selector=selector, selector_type=selector_type, timeout=timeout)
     return to_json(result)
 
 
@@ -150,10 +152,48 @@ async def wait_for_control_by_name_and_type(name_substring: str, control_type: s
 @mcp.tool()
 async def inspect_interactive_elements(in_iframe: dict | None = None) -> str:
     """
-    Ispeziona elementi interattivi (clickable, form fields, iframes).
-    Genera strategie pronte per click_smart e fill_smart.
+    Scansiona TUTTI gli elementi interattivi usando solo standard web (NO attributi custom).
+    Trova: iframe, button, link, input, select, textarea + ARIA roles.
+    Output: JSON con iframes, clickable_elements, form_fields + accessibility info inline.
+
+    Use case principale:
+        - Scoprire struttura pagina sconosciuta
+        - Trovare selettori robusti per login/navigation
+        - Identificare iframe (per get_frame)
+
+    Cosa cerca (SOLO STANDARD):
+        1. Iframe: src, title, name
+        2. Clickable: button, a, [role=button/link/menuitem]
+        3. Form fields: input, select, textarea
+
+    Per ogni elemento estrae:
+        - accessible_name (WCAG)
+        - role (ARIA/semantic)
+        - aria-label
+        - testo visibile
+        - playwright_suggestions: locator pronti per click_smart/fill_smart
+
+    IGNORA: data-*, ng-*, class names (instabili)
+
+    Returns:
+        JSON con:
+        - iframes: [{src, title, selector}]
+        - clickable_elements: [{role, accessible_name, text, playwright_suggestions}]
+        - form_fields: [{type, accessible_name, placeholder, playwright_suggestions}]
     """
     result = await playwright.inspect_interactive_elements(in_iframe=in_iframe)
+    return to_json(result)
+
+
+@mcp.tool()
+async def inspect_region(root_selector: str, in_iframe: dict | None = None) -> str:
+    """
+    Ispeziona SOLO una regione della pagina, identificata da root_selector (CSS).
+
+    Restituisce clickable_elements, interactive_controls e form_fields limitati all'interno
+    del contenitore, con la stessa struttura di inspect_interactive_elements.
+    """
+    result = await playwright.inspect_region(root_selector=root_selector, in_iframe=in_iframe)
     return to_json(result)
 
 
@@ -168,24 +208,79 @@ async def handle_cookie_banner(strategies: list[str] | None = None, timeout: int
 
 
 @mcp.tool()
-async def click_smart(targets: list[dict], timeout_per_try: int = 2000) -> str:
+async def wait_for_dom_change(
+    root_selector: str = "body",
+    timeout: int | None = None,
+    attributes: bool = True,
+    child_list: bool = True,
+    subtree: bool = True,
+    attribute_filter: list[str] | None = None,
+    in_iframe: dict | None = None,
+) -> str:
     """
-    Click enterprise con strategie multiple.
-    Prova role → text → css_aria → tfa finché uno funziona.
-    targets: [{"by": "role", "role": "button", "name": "Login"}, ...]
+    Attende il primo cambiamento DOM (MutationObserver) sotto un contenitore.
+
+    Use-case tipico:
+    - dopo un click critico (es. "Aggiungi filtro"), usa wait_for_dom_change(root_selector="<card selector>")
+      per sapere quando la card/modal ha cambiato struttura, poi chiama inspect_region(root_selector)
+      per scoprire i nuovi controlli senza re-ispezionare l'intera pagina.
     """
-    result = await playwright.click_smart(targets=targets, timeout_per_try=timeout_per_try)
+    result = await playwright.wait_for_dom_change(
+        root_selector=root_selector,
+        timeout=timeout,
+        attributes=attributes,
+        child_list=child_list,
+        subtree=subtree,
+        attribute_filter=attribute_filter,
+        in_iframe=in_iframe,
+    )
     return to_json(result)
 
 
 @mcp.tool()
-async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 2000) -> str:
+async def click_smart(targets: List[Dict[str, str]], timeout_per_try: int = 8000, in_iframe: dict = None) -> str:
     """
-    Fill enterprise con strategie multiple.
-    Prova label → placeholder → role → css → tfa finché uno funziona.
-    targets: [{"by": "label", "label": "Username"}, ...]
+    Click elemento con FALLBACK CHAIN automatico - prova tutte le strategie fino al successo.
+    Resilienza massima: role fallisce su duplicato? Prova css_aria. css_aria manca? Prova text.
+    Supporta interazioni dentro iframe (app Angular embedded).
+
+    Args:
+        targets: Lista strategie ordinate per robustezza (da inspect_interactive_elements), es:
+            [{"by": "role", "role": "button", "name": "Login"},
+             {"by": "css", "selector": "[aria-label='Login']"},
+             {"by": "text", "text": "Login"}]
+        timeout_per_try: Timeout per ogni tentativo in ms (default: 8000)
+        in_iframe: dict per iframe (singolo o annidati)
+            - Singolo: {"selector": "..."} o {"url_pattern": "..."}
+            - Annidati: {"iframe_path": [{"url_pattern": "..."}, {"selector": "..."}]}
+
+    Best practice: Usa inspect_interactive_elements() e copia TUTTE le strategie da playwright_suggestions.
     """
-    result = await playwright.fill_smart(targets=targets, value=value, timeout_per_try=timeout_per_try)
+    result = await playwright.click_smart(targets=targets, timeout_per_try=timeout_per_try, in_iframe=in_iframe)
+    return to_json(result)
+
+
+@mcp.tool()
+async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 8000, in_iframe: dict = None) -> str:
+    """
+    Fill input con FALLBACK CHAIN automatico - prova tutte le strategie fino al successo.
+    Resilienza massima: label manca? Prova placeholder. Placeholder vuoto? Prova role.
+    Supporta interazioni dentro iframe (app Angular embedded).
+
+    Args:
+        targets: Lista strategie ordinate per robustezza (da inspect_interactive_elements), es:
+            [{"by": "label", "label": "Username"},
+             {"by": "placeholder", "placeholder": "Enter username"},
+             {"by": "role", "role": "textbox", "name": "Username"}]
+        value: Valore da inserire
+        timeout_per_try: Timeout per ogni tentativo in ms (default: 8000)
+        in_iframe: dict per iframe (singolo o annidati)
+            - Singolo: {"selector": "..."} o {"url_pattern": "..."}
+            - Annidati: {"iframe_path": [{"url_pattern": "..."}, {"selector": "..."}]}
+
+    Best practice: Usa inspect_interactive_elements() e copia TUTTE le strategie da playwright_suggestions.
+    """
+    result = await playwright.fill_smart(targets=targets, value=value, timeout_per_try=timeout_per_try, in_iframe=in_iframe)
     return to_json(result)
 
 
@@ -194,10 +289,10 @@ async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive:
     """
     Attende che un testo appaia nel DOM (pagina principale o iframe).
     Utile per verificare stato della pagina dopo azioni o risultati search in iframe.
-    
+
     Args:
         in_iframe: {"url_pattern": "..."} per cercare dentro iframe
-    
+
     Example (iframe):
         wait_for_text_content(
             "CARMAG",
@@ -213,7 +308,7 @@ async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive:
 async def click_and_wait_for_text(
     targets: list[dict] | None = None,
     text: str = "",
-    timeout_per_try: int = 2000,
+    timeout_per_try: int = 8000,
     text_timeout: int = 30000,
     in_iframe: dict = None,
 ) -> str:
@@ -225,30 +320,26 @@ async def click_and_wait_for_text(
     return to_json(result)
 
 
-# =========================
-# Tool procedurali (workflow complessi)
-# =========================
-
 @mcp.tool()
-async def get_frame(selector: str = None, url_pattern: str = None, timeout: int = 10000) -> str:
+async def get_frame(selector: str = None, url_pattern: str = None, iframe_path: list = None, timeout: int = 10000) -> str:
     """
-    Accesso semplificato a iframe.
-    Usa selector CSS oppure url_pattern.
-    Ritorna SOLO metadata serializzabile (non l'oggetto Frame).
+    Accesso semplificato a iframe (singolo o annidati).
     Per interagire dentro iframe, usa click_smart/fill_smart con in_iframe parameter.
-    
-    Example:
-        frame = get_frame(url_pattern="movementreason")
-        fill_smart(
-            targets=[
-                {"by": "placeholder", "placeholder": "Search"},
-                {"by": "label", "label": "Search"}
-            ],
-            value="carm",
-            in_iframe={"url_pattern": "movementreason"}
-        )
+
+    Args:
+        selector: CSS selector dell'iframe
+        url_pattern: Pattern URL dell'iframe (alternativa a selector)
+        iframe_path: Lista di dict per iframe annidati
+        timeout: Timeout in ms per ogni livello (default: 10000)
+
+    Example (iframe singolo):
+        get_frame(url_pattern="movementreason")
+        fill_smart(targets=[...], value="carm", in_iframe={"url_pattern": "movementreason"})
+
+    Example (iframe annidati):
+        get_frame(iframe_path=[{"url_pattern": "dashboard"}, {"selector": "iframe#widget"}])
     """
-    result = await playwright.get_frame(selector=selector, url_pattern=url_pattern, timeout=timeout)
+    result = await playwright.get_frame(selector=selector, url_pattern=url_pattern, iframe_path=iframe_path, timeout=timeout)
     return to_json(result)
 
 
@@ -268,6 +359,4 @@ if __name__ == "__main__":
         print(f"   - {name}")
     print("=" * 80)
 
-    # Per stdio basta run() senza specificare transport (default stdio in FastMCP),
-    # ma lo esplicitiamo per chiarezza.
     mcp.run(transport="stdio")

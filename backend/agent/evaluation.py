@@ -103,7 +103,6 @@ def extract_final_answer_from_event(ev: dict) -> Optional[str]:
 def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[dict]]:
     """
     Pass/fail da steps e errori (livello avanzato: codice decide, non il modello).
-    Restituisce (passed, errors) con eventuali errori check_element_exists aggiunti.
     """
     errors_out = list(errors)
 
@@ -127,19 +126,5 @@ def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[d
 
     passed = len(errors_out) == 0
 
-    for s in steps:
-        if s.get("tool") != "check_element_exists":
-            continue
-        out = s.get("output")
-        if not isinstance(out, dict) or out.get("status") != "success":
-            continue
-        exists = bool(out.get("exists", False))
-        visible = bool(out.get("is_visible", False))
-        if not exists or not visible:
-            passed = False
-            errors_out.append({
-                "tool": "check_element_exists",
-                "message": f"Assertion failed: exists={exists}, is_visible={visible}",
-            })
-
     return passed, errors_out
+

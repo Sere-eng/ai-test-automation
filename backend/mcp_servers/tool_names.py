@@ -1,5 +1,4 @@
 # Lista canonica dei tool esposti dal MCP server (source of truth per logging e avvio).
-# Include i tool di check per la regola "dopo ogni azione, un check esplicito".
 TOOL_NAMES = [
     # RAW - lifecycle & pagina
     "start_browser",
@@ -11,18 +10,19 @@ TOOL_NAMES = [
     # RAW - elementi, tastiera, load state, iframe
     "press_key",
     "get_text",
-    "wait_for_element",
     "wait_for_load_state",
+    "wait_for_element_state",
     "get_frame",
 
-    # MEDIUM - check / wait su testo o presenza
+    # MEDIUM - wait su testo
     "wait_for_text_content",
-    "check_element_exists",
 
     # SMART LOCATORS & INSPECTION
     "click_smart",
     "fill_smart",
     "inspect_interactive_elements",
+    "inspect_region",
+    "wait_for_dom_change",
 
     # ADVANCED - wait per nome / controlli / banner / step composti
     "wait_for_clickable_by_name",
