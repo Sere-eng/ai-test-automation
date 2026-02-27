@@ -1,4 +1,4 @@
-# AI Test Automation con LLM, MCP e Playwright
+# Production-oriented agentic system for LLM-driven UI automation in complex enterprise environments.
 
 Sistema di **test automation intelligente** che usa:
 - **LLM (GPT-4o, Claude, Gemini, …)** per capire test scritti in linguaggio naturale
@@ -16,23 +16,61 @@ L'obiettivo è avere un **tester virtuale** che, dato un requisito funzionale in
 
 ## Cosa fa questo progetto
 
-**Automazione guidata da linguaggio naturale**
+### Automazione guidata da linguaggio naturale
+
+Il sistema riceve uno scenario scritto in linguaggio naturale, non pre-strutturato.
 
 Esempio:
-> "Avvia il browser, fai login su LAB, seleziona *organizzazione di sistema*, apri *Laboratory* e crea un nuovo filtro salvato."
 
-**Automazione su app enterprise reale**
+> "Login to LAB, open the Laboratory dashboard and create a new saved filter."
 
-Sistemi AMC / LAB con login SSO, iframe, componenti Angular Material, dashboard con contatori, filtri e card KPI. Scenari concreti:
-- creazione e salvataggio filtri
+L’istruzione viene interpretata dall’LLM e scomposta in passi eseguibili.  
+L’esecuzione avviene esclusivamente tramite tool MCP validati, senza accesso diretto al DOM o utilizzo di selettori hard-coded.
+
+Pattern di esecuzione tipico:
+
+1. `start_browser`
+2. `navigate_to_url`
+3. `inspect_interactive_elements` (discovery-first)
+4. `click_smart` (fallback su ARIA role, accessible name, label, CSS validato)
+5. `fill_smart` (solo campi obbligatori identificati dinamicamente)
+6. `wait_for_dom_change`
+7. validazione strutturata tramite `evaluation.py`
+
+Il pass/fail è determinato in modo **deterministico** dai risultati dei tool (JSON strutturato), non dall’output testuale del modello.
+
+---
+
+### Automazione su app enterprise reale
+
+Validato su moduli AMC / LAB in ambiente enterprise sanitario con:
+
+- login SSO
+- iframe annidati
+- componenti Angular Material
+- dashboard con contatori, card KPI, filtri dinamici
+
+Scenari concreti includono:
+
+- creazione e salvataggio di filtri
 - navigazione tramite contatori
-- elenco campioni e pagina dettaglio
+- apertura lista campioni e pagina dettaglio
+- verifica presenza elementi post-azione
 
-**Best practice anti-allucinazioni**
+L’architettura è progettata per funzionare su interfacce non uniformi, dove non è possibile aggiungere attributi di test (no `data-testid`).
+
+---
+
+### Best practice anti-allucinazioni
 
 - Discovery-first: prima `inspect_interactive_elements`, poi `click_smart` / `fill_smart`
-- Niente selettori indovinati (`#username` & co.)
-- Regole di system prompt rigide per gestione errori, uso corretto dei tool, divieto di stringhe generiche nei check (es. `"home"`, `"dashboard"`)
+- Nessun selettore inventato (`#username`, `#submit`, ecc.)
+- Tool invocation obbligatoria per ogni azione
+- Separazione netta tra:
+  - reasoning LLM
+  - esecuzione tool
+  - valutazione deterministica
+- Regole di system prompt rigide per gestione errori e divieto di stringhe generiche nei check (es. `"home"`, `"dashboard"`)
 
 ---
 
