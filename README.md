@@ -79,5 +79,5 @@ Pass/fail deciso da `evaluation.py` sui tool results — non dall'output testual
 
 | File | Contenuto |
 |------|-----------|
-| `backend/README.md` | Setup, configurazione, API endpoints, riferimento completo ai tool |
-| `backend/TOOLS.md` | Guida operativa ai 21 tool Playwright MCP: input/output, pattern d'uso |
+| [`backend/README.md`](backend/README.md) | Setup, configurazione, API endpoints, riferimento completo ai tool |
+| [`backend/agent/TOOLS.md`](backend/agent/TOOLS.md) | Guida operativa ai 21 tool Playwright MCP: input/output, pattern d'uso |
