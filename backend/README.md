@@ -165,7 +165,7 @@ PLAYWRIGHT_HEADLESS=False
 
 ## Tool Playwright
 
-Il MCP server espone **21 tool async**. Fonte unica: `mcp_servers/tool_names.py`.
+Il MCP server espone **23 tool async**. Fonte unica: `mcp_servers/tool_names.py`.
 
 ### Lifecycle & navigazione
 | Tool | Descrizione |
@@ -180,6 +180,7 @@ Il MCP server espone **21 tool async**. Fonte unica: `mcp_servers/tool_names.py`
 | Tool | Descrizione |
 |------|-------------|
 | `get_text(selector, selector_type)` | Estrae testo da elemento |
+| `get_text_by_visible_content(search_text, timeout)` | Trova il primo elemento visibile che contiene `search_text` ed estrae il testo completo (innerText). Usare solo per testi espliciti negli expected results dello scenario. |
 | `press_key(key)` | Simula pressione tasto (Enter, Escape, ...) |
 | `capture_screenshot(filename, return_base64)` | Screenshot full-page; `return_base64=False` per default (risparmia token) |
 | `handle_cookie_banner(strategies, timeout)` | Gestione banner cookie con strategie multiple |

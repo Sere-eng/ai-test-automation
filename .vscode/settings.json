@@ -2,5 +2,8 @@
     "python-envs.pythonProjects": [],
     "python.analysis.extraPaths": [
         "./backend"
+    ],
+    "cursorpyright.analysis.extraPaths": [
+        "./backend"
     ]
 }

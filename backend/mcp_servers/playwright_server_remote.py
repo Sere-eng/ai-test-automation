@@ -126,6 +126,17 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
 
 
 @mcp.tool()
+async def get_text_by_visible_content(search_text: str, timeout: int = 10000) -> str:
+    """
+    Trova il primo elemento visibile che contiene search_text e ne restituisce il testo (innerText).
+    Utile per leggere il footer elenco campioni, es. get_text_by_visible_content("Totale righe visualizzate")
+    restituisce "Totale righe visualizzate: 32 su 32".
+    """
+    result = await playwright.get_text_by_visible_content(search_text=search_text, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
 async def press_key(key: str) -> str:
     """Premi un tasto (Enter/Escape/etc.)."""
     result = await playwright.press_key(key=key)
@@ -213,6 +224,15 @@ async def inspect_region(root_selector: str, in_iframe: dict | None = None) -> s
 
     Restituisce clickable_elements, interactive_controls e form_fields limitati all'interno
     del contenitore, con la stessa struttura di inspect_interactive_elements.
+
+    IMPORTANTE — contenuto inline vs dialog:
+    - Se questo tool restituisce status="error" con message="Contenitore non trovato per selector '...'",
+      significa che il contenuto è stato reso INLINE nella pagina (es. dopo click "Modifica" nella
+      LAB dashboard, i nuovi controlli appaiono inline, NON dentro una dialog separata).
+    - In quel caso NON fermarti: chiama inspect_interactive_elements() per scoprire i nuovi elementi.
+    - Usa inspect_region SOLO quando sai che esiste un contenitore specifico, ad esempio:
+        - dopo "Aggiungi filtro" → root_selector=".mat-mdc-dialog-container"  (vera dialog)
+        - dopo "Modifica" → il contenuto è inline: usa inspect_interactive_elements() invece
     """
     result = await playwright.inspect_region(root_selector=root_selector, in_iframe=in_iframe)
     return to_json(result)

@@ -26,6 +26,7 @@ Tool definiti in `tools.py` ed esposti dal server MCP (`mcp_servers/tool_names.p
 | `wait_for_field_by_name` | Wait name-based | `status`, `element`, `targets` |
 | `click_and_wait_for_text` | Procedurale | `status`, `click`, `text_check` |
 | `get_text` | Base | `status`, `text` |
+| `get_text_by_visible_content` | Base | `status`, `text`, `search_text` |
 | `press_key` | Base | `status`, `key` |
 | `handle_cookie_banner` | Base | `status`, `strategy_used` |
 | `get_frame` | Base | `status`, `url`, `selector` |
@@ -438,6 +439,28 @@ Legge il testo visibile di un elemento. Utile per assert su label, messaggi, tit
 
 ```json
 { "status": "success", "text": "Laboratorio Analisi", "selector": ".page-title" }
+```
+
+---
+
+#### `get_text_by_visible_content(search_text, timeout=10000)`
+Trova il **primo elemento visibile** che contiene `search_text` (match non esatto) e ne restituisce l'intero `innerText`, ripulito.
+
+Uso corretto:
+- testo atteso **esplicito** negli expected results dello scenario (es. footer `"Totale righe visualizzate: X su X"` negli scenari 2-3)
+- non come check generico di "fine scenario" o per cercare stringhe vaghe come `"ok"`, `"success"`, `"completato"`.
+
+```json
+// input
+{ "search_text": "Totale righe visualizzate", "timeout": 10000 }
+
+// output
+{
+  "status": "success",
+  "message": "Testo estratto",
+  "search_text": "Totale righe visualizzate",
+  "text": "Totale righe visualizzate: 25 su 25"
+}
 ```
 
 ---

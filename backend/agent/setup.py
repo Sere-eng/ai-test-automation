@@ -30,6 +30,14 @@ def create_llm():
             temperature=AppConfig.LLM.TEMPERATURE,
             max_tokens=AppConfig.LLM.MAX_TOKENS,
         )
+    if provider == "ollama":
+        return ChatOpenAI(
+            model=AppConfig.LLM.OLLAMA_MODEL,
+            api_key="ollama",  # Ollama non verifica la key
+            base_url=AppConfig.LLM.OLLAMA_ENDPOINT,
+            temperature=AppConfig.LLM.TEMPERATURE,
+            max_tokens=AppConfig.LLM.MAX_TOKENS,
+        )
     # default: openai
     return ChatOpenAI(
         model=AppConfig.LLM.OPENAI_MODEL,

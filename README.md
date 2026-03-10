@@ -61,8 +61,9 @@ Orchestrator (orchestrator.py)
          │  stdio | HTTP
          ▼
    MCP Server Playwright (async)
-   21 tool: start_browser, navigate_to_url, inspect_interactive_elements,
-            click_smart, fill_smart, wait_for_dom_change, inspect_region, …
+   23 tool: start_browser, navigate_to_url, inspect_interactive_elements,
+            click_smart, fill_smart, wait_for_dom_change, inspect_region,
+            get_text_by_visible_content, …
          │
          ▼
    Chromium
@@ -79,5 +80,5 @@ Pass/fail deciso da `evaluation.py` sui tool results — non dall'output testual
 
 | File | Contenuto |
 |------|-----------|
-| `backend/README.md` | Setup, configurazione, API endpoints, riferimento completo ai tool |
-| `backend/TOOLS.md` | Guida operativa ai 21 tool Playwright MCP: input/output, pattern d'uso |
+| `backend/README.md` | Setup, configurazione, API endpoints, riferimento completo ai tool MCP |
+| `backend/TOOLS.md` | Guida operativa ai tool Playwright MCP: input/output, pattern d'uso |

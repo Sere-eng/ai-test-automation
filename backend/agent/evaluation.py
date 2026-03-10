@@ -8,6 +8,27 @@ from typing import Any, Optional
 from agent.utils import safe_json_loads
 
 
+# Classificazione logica dei tool per la valutazione pass/fail.
+# - SOFT_TOOLS: azioni/interazioni dove errori intermedi fanno parte del fallback naturale.
+# - PROBING_TOOLS: wait usati spesso in modalità "tentativo" prima della verifica finale.
+# - HARD_ASSERT_TOOLS: asserzioni vere e proprie; qualsiasi errore viene considerato blocccante.
+SOFT_TOOLS: set[str] = {
+    "click_smart",
+    "fill_smart",
+    "wait_for_clickable_by_name",
+    "wait_for_field_by_name",
+    "wait_for_control_by_name_and_type",
+}
+
+PROBING_TOOLS: set[str] = {
+    "wait_for_text_content",
+}
+
+HARD_ASSERT_TOOLS: set[str] = {
+    "wait_for_element_state",
+}
+
+
 def normalize_tool_output_raw(output_raw: Any) -> Any:
     """
     Estrae la stringa content da oggetti message (es. ToolMessage LangChain).
@@ -119,7 +140,10 @@ def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[d
         if status in ("success", "error") and tool:
             last_status_by_tool[tool] = status
 
-    tolerant_tools = {"click_smart", "fill_smart"}
+    # Tool "tolleranti": SOFT_TOOLS + PROBING_TOOLS.
+    # Se l'ULTIMO utilizzo di uno di questi tool è andato in success,
+    # gli errori precedenti per quello stesso tool non causano fail.
+    tolerant_tools = SOFT_TOOLS | PROBING_TOOLS
     for t in tolerant_tools:
         if last_status_by_tool.get(t) == "success":
             errors_out = [e for e in errors_out if e.get("tool") != t]

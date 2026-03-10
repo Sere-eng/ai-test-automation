@@ -6,6 +6,7 @@ import asyncio
 import base64
 import datetime
 from playwright.async_api import async_playwright, Page
+import re
 from typing import Literal, Optional, List, Dict
 
 from config.settings import AppConfig
@@ -23,6 +24,42 @@ def _normalize_css_selector(by: str, target: dict) -> Optional[str]:
             return "#" + s
     return selector
 
+
+def _normalize_targets_for_mode(targets: List[Dict], mode: str) -> List[Dict]:
+    """
+    Accepts both "flat" targets ({"by": "...", ...}) and raw playwright_suggestions
+    wrappers ({"strategy": "...", "fill_smart": {...}} / {"strategy": "...", "click_smart": {...}})
+    and always returns a list of flat dicts ready for click_smart/fill_smart.
+    """
+    key = "fill_smart" if mode == "fill" else "click_smart"
+    normalized: List[Dict] = []
+    for t in targets or []:
+        if isinstance(t, dict) and key in t:
+            normalized.append(t[key])
+        else:
+            normalized.append(t)
+    return normalized
+
+def _strip_material_icon_prefix(name: str) -> str:
+    """
+    Rimuove il prefisso di icona Material da un accessible_name concatenato.
+    Es: "addAggiungi filtro" → "Aggiungi filtro"
+        "editModifica"       → "Modifica"
+        "add\nAGGIUNGI"      → "AGGIUNGI"  (già gestito dal split \n)
+    Lascia invariato se non c'è un prefisso riconoscibile.
+    """
+    if not name:
+        return name
+    # Caso 1: separato da newline → prendi l'ultima parte non vuota
+    if "\n" in name:
+        parts = [p.strip() for p in name.split("\n") if p.strip()]
+        return parts[-1] if parts else name
+    # Caso 2: concatenato senza separatore: parola lowercase breve (2-8 char)
+    # seguita da testo che inizia con maiuscola o uppercase
+    m = re.match(r'^[a-z_]{2,8}([A-Z].+)$', name)
+    if m:
+        return m.group(1).strip()
+    return name
 
 class PlaywrightTools:
     """
@@ -292,6 +329,33 @@ class PlaywrightTools:
                 "status": "error",
                 "message": f"Errore nell'estrazione: {str(e)}",
                 "selector": selector
+            }
+
+    async def get_text_by_visible_content(self, search_text: str, timeout: int = 10000) -> dict:
+        """
+        Trova il primo elemento visibile che contiene il testo search_text e ne restituisce
+        il testo completo (innerText). Usare SOLO quando search_text è esplicitamente
+        menzionato negli expected results dello scenario corrente (es. il footer
+        "Totale righe visualizzate: X su X" negli scenari 2-3).
+        Non chiamare come verifica generica di fine scenario.
+        """
+        try:
+            if not self.page:
+                return {"status": "error", "message": "Browser non avviato"}
+            locator = self.page.get_by_text(search_text, exact=False).first
+            await locator.wait_for(state="visible", timeout=timeout)
+            text = await locator.inner_text()
+            return {
+                "status": "success",
+                "message": "Testo estratto",
+                "search_text": search_text,
+                "text": (text or "").strip(),
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Elemento con testo '{search_text}' non trovato o non visibile: {str(e)}",
+                "search_text": search_text,
             }
 
     async def wait_for_load_state(
@@ -773,6 +837,9 @@ class PlaywrightTools:
                 "message": "Nessuna strategia fornita (targets vuoto)"
             }
 
+        # Accept both flat targets and raw playwright_suggestions wrappers
+        targets = _normalize_targets_for_mode(targets, mode="click")
+
         # Determina context (page o iframe)
         context = self.page
         if in_iframe:
@@ -961,6 +1028,9 @@ class PlaywrightTools:
                 "status": "error",
                 "message": "Nessuna strategia fornita (targets vuoto)"
             }
+
+        # Accept both flat targets and raw playwright_suggestions wrappers
+        targets = _normalize_targets_for_mode(targets, mode="fill")
 
         # Determina context (page o iframe)
         context = self.page
@@ -1178,9 +1248,10 @@ class PlaywrightTools:
                         pass
                     suggestions = []
                     if effective_role and accessible_name:
+                        clean_name = _strip_material_icon_prefix(accessible_name)
                         suggestions.append({
                             "strategy": "role",
-                            "click_smart": {"by": "role", "role": effective_role, "name": accessible_name}
+                            "click_smart": {"by": "role", "role": effective_role, "name": clean_name}
                         })
                     if aria_label:
                         suggestions.append({
@@ -1195,7 +1266,7 @@ class PlaywrightTools:
                             label_only = parts[-1]
                             if len(label_only) >= 2 and label_only != visible_text.strip():
                                 suggestions.append({
-                                    "strategy": "text_label",
+                                    "strategy": "text",
                                     "click_smart": {"by": "text", "text": label_only}
                                 })
                     if visible_text:
@@ -1217,6 +1288,70 @@ class PlaywrightTools:
                 except Exception as e:
                     print(f"Error inspecting clickable {idx}: {e}")
                     continue
+
+            # === 2b. RIGHE DI TABELLA CLICCABILI (euristica per liste campioni) ===
+            try:
+                row_selector = "table tbody tr, tr[role='row'], .mat-row, .mat-mdc-row, .cdk-row"
+                rows = await context.locator(row_selector).all()
+                base_index = len(clickable_info)
+                for r_idx, row in enumerate(rows):
+                    try:
+                        # Salta eventuali righe di intestazione
+                        in_header = await row.evaluate(
+                            "el => !!el.closest('thead')"
+                        )
+                        if in_header:
+                            continue
+
+                        full_text = ""
+                        try:
+                            full_text = await row.inner_text()
+                        except Exception:
+                            pass
+                        if not full_text:
+                            continue
+
+                        # Normalizza e tronca il testo per usarlo come "nome" riga
+                        normalized = " ".join(full_text.split()).strip()
+                        if not normalized:
+                            continue
+                        short_text = normalized[:200]
+
+                        suggestions = []
+                        # Costruisce un selettore CSS stabile basato sulla posizione nella tbody
+                        nth_selector = await row.evaluate(
+                            """
+                            (el) => {
+                                const table = el.closest('table');
+                                if (!table) return null;
+                                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                                const index = rows.indexOf(el);
+                                if (index < 0) return null;
+                                return `tbody tr:nth-of-type(${index + 1})`;
+                            }
+                            """
+                        )
+                        if nth_selector:
+                            suggestions.append({
+                                "strategy": "css_row",
+                                "click_smart": {"by": "css", "selector": nth_selector}
+                            })
+
+                        clickable_info.append({
+                            "index": base_index + r_idx,
+                            "tag": "tr",
+                            "role": "row",
+                            "accessible_name": short_text,
+                            "text": short_text,
+                            "aria_label": None,
+                            "data_tfa": None,
+                            "playwright_suggestions": suggestions
+                        })
+                    except Exception as e:
+                        print(f"Error inspecting table row {r_idx}: {e}")
+                        continue
+            except Exception as e:
+                print(f"Error inspecting table rows: {e}")
 
             # === 3. FORM FIELDS ===
             form_fields = await context.locator("input, select, textarea").all()
@@ -1461,7 +1596,7 @@ class PlaywrightTools:
 
             # Trova il contenitore radice
             try:
-                root = await context.locator(root_selector).first
+                root = context.locator(root_selector).first
                 # forza l'esistenza con una wait corta
                 await root.wait_for(state="attached", timeout=AppConfig.PLAYWRIGHT.DEFAULT_TIMEOUT_PER_TRY if hasattr(AppConfig.PLAYWRIGHT, "DEFAULT_TIMEOUT_PER_TRY") else 2000)
             except Exception:
@@ -1511,9 +1646,10 @@ class PlaywrightTools:
                         pass
                     suggestions = []
                     if effective_role and accessible_name:
+                        clean_name = _strip_material_icon_prefix(accessible_name)
                         suggestions.append({
                             "strategy": "role",
-                            "click_smart": {"by": "role", "role": effective_role, "name": accessible_name}
+                            "click_smart": {"by": "role", "role": effective_role, "name": clean_name}
                         })
                     if aria_label:
                         suggestions.append({
@@ -1526,7 +1662,7 @@ class PlaywrightTools:
                             label_only = parts[-1]
                             if len(label_only) >= 2 and label_only != visible_text.strip():
                                 suggestions.append({
-                                    "strategy": "text_label",
+                                    "strategy": "text",
                                     "click_smart": {"by": "text", "text": label_only}
                                 })
                     if visible_text:
@@ -1548,6 +1684,67 @@ class PlaywrightTools:
                 except Exception as e:
                     print(f"Error inspecting regional clickable {idx}: {e}")
                     continue
+
+            # === 1b. RIGHE DI TABELLA CLICCABILI NELLA REGIONE (euristica per liste campioni) ===
+            try:
+                row_selector = "table tbody tr, tr[role='row'], .mat-row, .mat-mdc-row, .cdk-row"
+                rows = await root.locator(row_selector).all()
+                base_index = len(clickable_info)
+                for r_idx, row in enumerate(rows):
+                    try:
+                        in_header = await row.evaluate(
+                            "el => !!el.closest('thead')"
+                        )
+                        if in_header:
+                            continue
+
+                        full_text = ""
+                        try:
+                            full_text = await row.inner_text()
+                        except Exception:
+                            pass
+                        if not full_text:
+                            continue
+
+                        normalized = " ".join(full_text.split()).strip()
+                        if not normalized:
+                            continue
+                        short_text = normalized[:200]
+
+                        suggestions = []
+                        nth_selector = await row.evaluate(
+                            """
+                            (el) => {
+                                const table = el.closest('table');
+                                if (!table) return null;
+                                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                                const index = rows.indexOf(el);
+                                if (index < 0) return null;
+                                return `tbody tr:nth-of-type(${index + 1})`;
+                            }
+                            """
+                        )
+                        if nth_selector:
+                            suggestions.append({
+                                "strategy": "css_row",
+                                "click_smart": {"by": "css", "selector": nth_selector}
+                            })
+
+                        clickable_info.append({
+                            "index": base_index + r_idx,
+                            "tag": "tr",
+                            "role": "row",
+                            "accessible_name": short_text,
+                            "text": short_text,
+                            "aria_label": None,
+                            "data_tfa": None,
+                            "playwright_suggestions": suggestions
+                        })
+                    except Exception as e:
+                        print(f"Error inspecting table row in region {r_idx}: {e}")
+                        continue
+            except Exception as e:
+                print(f"Error inspecting table rows in region: {e}")
 
             # === 2. FORM FIELDS NELLA REGIONE ===
             form_fields = await root.locator("input, select, textarea").all()

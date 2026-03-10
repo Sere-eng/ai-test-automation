@@ -418,15 +418,6 @@
         <div class="result-header" id="resultHeader"></div>
         <div class="result-content" id="resultContent"></div>
     </div>
-    
-    <div class="examples">
-        <div class="examples-title">Examples (Custom test)</div>
-        <div class="example-list">
-            <div class="example-item" onclick="loadExample(0)">
-                AMC Test: Login → Save Session → Navigate → Search
-            </div>
-        </div>
-    </div>
 
     <script>
         const API_BASE = 'http://localhost:5000';
@@ -451,25 +442,36 @@
                     select.innerHTML = '<option value="">No scenarios (server unavailable?)</option>';
                     return;
                 }
-                select.innerHTML = '<option value="">Choose a scenario…</option>' +
-                    labScenarios.map(s => '<option value="' + s.id + '">' + (s.name || s.id) + '</option>').join('');
+                // Niente placeholder selezionabile: la prima opzione corrisponde a scenario_1,
+                // la seconda a scenario_2, ecc. Così "seconda opzione" = scenario_2.
+                select.innerHTML = labScenarios
+                    .map((s, i) => '<option value="' + s.id + '">' + (i + 1) + '. ' + (s.name || s.id) + '</option>')
+                    .join('');
                 select.onchange = function() {
                     const id = select.value;
                     const preview = document.getElementById('labStepsPreview');
                     if (!id) { preview.style.display = 'none'; return; }
                     const s = labScenarios.find(x => x.id === id);
                     if (s) {
-                    let text = '';
-                    if (s.execution_steps && s.execution_steps.length) {
-                        text += 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
+                        let text = '';
+                        if (s.execution_steps && s.execution_steps.length) {
+                            text += 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
+                        }
+                        if (s.expected_results && s.expected_results.length) {
+                            text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i+1) + '. ' + r).join('\n');
+                        }
+                        preview.textContent = text || '';
+                        preview.style.display = text ? 'block' : 'none';
+                    } else {
+                        preview.style.display = 'none';
                     }
-                    if (s.expected_results && s.expected_results.length) {
-                        text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i+1) + '. ' + r).join('\n');
-                    }
-                    preview.textContent = text || '';
-                    preview.style.display = text ? 'block' : 'none';
-                } else { preview.style.display = 'none'; }
                 };
+
+                // Mostra subito i dettagli del primo scenario (se presente)
+                if (labScenarios.length > 0) {
+                    select.value = labScenarios[0].id;
+                    select.onchange();
+                }
             } catch (e) {
                 select.innerHTML = '<option value="">Failed to load (check server)</option>';
             }
@@ -482,7 +484,8 @@
                 resultDiv.className = 'result ' + (data.passed ? 'success' : 'error') + ' show';
                 resultHeader.textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
                 const parts = [];
-                if (data.result && data.result.final_answer) parts.push(data.result.final_answer);
+                const notes = data.result && (data.result.notes || data.result.final_answer);
+                if (notes) parts.push(notes);
                 if (data.phase) parts.push('Phase: ' + data.phase);
                 if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
                 if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
@@ -591,8 +594,10 @@
                     resultDiv.className = 'result ' + (data.passed ? 'success' : 'error') + ' show';
                     resultHeader.textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
                     const parts = [];
-                    if (data.prefix && data.prefix.final_answer) parts.push('Prefix: ' + data.prefix.final_answer);
-                    if (data.scenario && data.scenario.final_answer) parts.push('Scenario: ' + data.scenario.final_answer);
+                    const prefixNote = data.prefix && (data.prefix.notes || data.prefix.final_answer);
+                    if (prefixNote) parts.push('Prefix: ' + prefixNote);
+                    const scenarioNote = data.scenario && (data.scenario.notes || data.scenario.final_answer);
+                    if (scenarioNote) parts.push('Scenario: ' + scenarioNote);
                     if (data.phase) parts.push('Phase: ' + data.phase);
                     if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
                     if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));

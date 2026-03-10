@@ -10,16 +10,16 @@ import sys
 import os
 from typing import Dict, List
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
-from tool_names import TOOL_NAMES
+
+# Aggiungi la cartella backend al path PRIMA di importare i moduli
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 load_dotenv()
 
-# Permette import da backend/
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from agent.tools import PlaywrightTools  # noqa: E402
-from config.settings import AppConfig    # noqa: E402
+from config.settings import AppConfig
+from agent.tools import PlaywrightTools
+from mcp.server.fastmcp import FastMCP
+from tool_names import TOOL_NAMES
 
 # MCP server (stdio)
 mcp = FastMCP("PlaywrightTools")
@@ -118,6 +118,17 @@ async def get_text(selector: str, selector_type: str = "css") -> str:
 
 
 @mcp.tool()
+async def get_text_by_visible_content(search_text: str, timeout: int = 10000) -> str:
+    """
+    Trova il primo elemento visibile che contiene search_text e ne restituisce il testo (innerText).
+    Utile per leggere il footer elenco campioni, es. get_text_by_visible_content("Totale righe visualizzate")
+    restituisce "Totale righe visualizzate: 32 su 32".
+    """
+    result = await playwright.get_text_by_visible_content(search_text=search_text, timeout=timeout)
+    return to_json(result)
+
+
+@mcp.tool()
 async def press_key(key: str) -> str:
     """Premi un tasto (Enter/Escape/etc.)."""
     result = await playwright.press_key(key=key)
@@ -126,14 +137,14 @@ async def press_key(key: str) -> str:
 
 @mcp.tool()
 async def wait_for_clickable_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
-    """Attende un elemento cliccabile il cui nome contiene name_substring (usa inspect)."""
+    """Attende che compaia un elemento cliccabile il cui nome contiene name_substring (usa inspect)."""
     result = await playwright.wait_for_clickable_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)
     return to_json(result)
 
 
 @mcp.tool()
 async def wait_for_field_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
-    """Attende un campo form il cui nome/placeholder contiene name_substring (usa inspect)."""
+    """Attende che compaia un campo form il cui nome/placeholder contiene name_substring (usa inspect)."""
     result = await playwright.wait_for_field_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)
     return to_json(result)
 
@@ -192,6 +203,15 @@ async def inspect_region(root_selector: str, in_iframe: dict | None = None) -> s
 
     Restituisce clickable_elements, interactive_controls e form_fields limitati all'interno
     del contenitore, con la stessa struttura di inspect_interactive_elements.
+
+    IMPORTANTE — contenuto inline vs dialog:
+    - Se questo tool restituisce status="error" con message="Contenitore non trovato per selector '...'",
+      significa che il contenuto è stato reso INLINE nella pagina (es. dopo click "Modifica" nella
+      LAB dashboard, i nuovi controlli appaiono inline, NON dentro una dialog separata).
+    - In quel caso NON fermarti: chiama inspect_interactive_elements() per scoprire i nuovi elementi.
+    - Usa inspect_region SOLO quando sai che esiste un contenitore specifico, ad esempio:
+        - dopo "Aggiungi filtro" → root_selector=".mat-mdc-dialog-container"  (vera dialog)
+        - dopo "Modifica" → il contenuto è inline: usa inspect_interactive_elements() invece
     """
     result = await playwright.inspect_region(root_selector=root_selector, in_iframe=in_iframe)
     return to_json(result)
@@ -280,20 +300,53 @@ async def fill_smart(targets: list[dict], value: str, timeout_per_try: int = 800
 
     Best practice: Usa inspect_interactive_elements() e copia TUTTE le strategie da playwright_suggestions.
     """
+    print(f"\n [MCP] fill_smart called:")
+    print(f"   Targets: {targets}")
+    print(f"   Value: {'*' * len(value) if value else 'empty'}")
+    print(f"   Timeout: {timeout_per_try}ms")
+    print(f"   In iframe: {in_iframe}")
+
     result = await playwright.fill_smart(targets=targets, value=value, timeout_per_try=timeout_per_try, in_iframe=in_iframe)
+
+    print(f"   Result: {result.get('status')} - {result.get('message', 'N/A')}")
+    if result.get('status') == 'success':
+        print(f"   Used strategy: {result.get('strategy', 'N/A')}")
+
     return to_json(result)
 
 
 @mcp.tool()
 async def wait_for_text_content(text: str, timeout: int = 30000, case_sensitive: bool = False, in_iframe: dict = None) -> str:
     """
-    Attende che un testo appaia nel DOM (pagina principale o iframe).
-    Utile per verificare stato della pagina dopo azioni o risultati search in iframe.
+    Aspetta che un testo specifico appaia OVUNQUE nella pagina o dentro un iframe.
+    Utile per verificare caricamenti AJAX, messaggi success/error, risultati search in iframe.
 
     Args:
-        in_iframe: {"url_pattern": "..."} per cercare dentro iframe
+        text: Testo da cercare nella pagina
+        timeout: Timeout in ms (default: 30000)
+        case_sensitive: Se True, match esatto case-sensitive (default: False)
+        in_iframe: Dict per cercare dentro iframe (opzionale)
+            {"url_pattern": "movementreason"} - iframe singolo
+            {"iframe_path": [{...}, {...}]} - iframe annidati
 
-    Example (iframe):
+    Returns:
+        JSON con status e dettagli testo trovato
+
+    Use case:
+        - Verifica dopo login: aspetta "Welcome" (pagina principale)
+        - Verifica dopo search in iframe Causali: aspetta "CARMAG" DENTRO iframe
+        - Verifica navigazione: aspetta titolo sezione
+
+    Example (main page):
+        click_smart([{"by": "role", "role": "button", "name": "Login"}])
+        wait_for_text_content("Dashboard", timeout=10000)
+
+    Example (iframe - Causali search):
+        fill_smart(
+            targets=[{"by": "placeholder", "placeholder": "Cerca"}],
+            value="carm",
+            in_iframe={"url_pattern": "movementreason"}
+        )
         wait_for_text_content(
             "CARMAG",
             timeout=5000,
@@ -312,7 +365,10 @@ async def click_and_wait_for_text(
     text_timeout: int = 30000,
     in_iframe: dict = None,
 ) -> str:
-    """Combina click_smart + wait_for_text_content. Se targets vuoto, solo wait_for_text_content."""
+    """
+    Combina click_smart + wait_for_text_content. Per step critici (login, Continua, moduli).
+    Se targets è vuoto, esegue solo wait_for_text_content(text).
+    """
     if not targets:
         result = await playwright.wait_for_text_content(text=text, timeout=text_timeout, case_sensitive=False, in_iframe=in_iframe)
         return to_json({"status": result.get("status"), "message": result.get("message"), "click": None, "text_check": result, "fallback_mode": "wait_for_text_content_only"})
