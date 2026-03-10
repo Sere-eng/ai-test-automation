@@ -90,28 +90,54 @@ async def run_prefix_to_home(
     return result
 
 
-async def run_lab_scenario(scenario_id: str, verbose: bool = True) -> dict:
+async def run_lab_scenario(
+    scenario_id: Optional[str] = None,
+    scenario: Optional[LabScenario] = None,
+    verbose: bool = True
+) -> dict:
     """
     Esegue lo scenario LAB dalla home. Presuppone che il browser sia già sulla home
     (dopo run_prefix_to_home sullo stesso server MCP).
+    
+    Args:
+        scenario_id: ID dello scenario da cercare in LAB_SCENARIOS (opzionale se scenario è fornito)
+        scenario: Oggetto LabScenario diretto (per scenari dinamici estratti da documenti)
+        verbose: Se True stampa log dettagliati
+    
+    Returns:
+        Dict con risultato dell'esecuzione
     """
-    scenario = get_scenario_by_id(scenario_id)
-    if not scenario:
-        return {
-            "phase": "scenario",
-            "passed": False,
-            "errors": [{"tool": "orchestrator", "message": f"Scenario '{scenario_id}' not found"}],
-            "artifacts": [],
-            "steps": [],
-            "notes": "",
-            "duration_ms": 0,
-            "scenario_id": scenario_id,
-        }
+    # Se scenario non è fornito, cerca per ID
+    if scenario is None:
+        if scenario_id is None:
+            return {
+                "phase": "scenario",
+                "passed": False,
+                "errors": [{"tool": "orchestrator", "message": "Either scenario_id or scenario must be provided"}],
+                "artifacts": [],
+                "steps": [],
+                "notes": "",
+                "duration_ms": 0,
+            }
+        scenario = get_scenario_by_id(scenario_id)
+        if not scenario:
+            return {
+                "phase": "scenario",
+                "passed": False,
+                "errors": [{"tool": "orchestrator", "message": f"Scenario '{scenario_id}' not found"}],
+                "artifacts": [],
+                "steps": [],
+                "notes": "",
+                "duration_ms": 0,
+                "scenario_id": scenario_id,
+            }
+    
+    # Esegui lo scenario
     agent = TestAgentMCP(custom_prompt=get_lab_optimized_prompt())
     instruction = _scenario_instruction(scenario)
     result = await agent.run_test_async(instruction, verbose=verbose)
     result["phase"] = "scenario"
-    result["scenario_id"] = scenario_id
+    result["scenario_id"] = scenario.id
     result["scenario_name"] = scenario.name
     return result
 

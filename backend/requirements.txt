@@ -33,3 +33,9 @@ uvicorn==0.34.0
 # Per MCP Server HTTP
 fastapi==0.115.12
 httpx==0.28.1
+
+# Document Processing (Word, HTML)
+beautifulsoup4==4.14.3
+chardet==7.0.1
+python-docx==1.2.0
+lxml==6.0.2
