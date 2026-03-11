@@ -61,6 +61,10 @@ class LLMConfig:
     # OpenAI Standard (priorità 3)
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_MODEL = "gpt-4o-mini"
+
+    # Ollama (priorità 4)
+    OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:14b")
     
     # Temperature (determinismo)
     TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
@@ -75,13 +79,16 @@ class LLMConfig:
             return "azure"
         elif cls.OPENAI_API_KEY:
             return "openai"
+        elif cls.OLLAMA_ENDPOINT:
+            return "ollama"
         else:
             raise ValueError(
                 "Nessuna API key configurata!\n"
                 "Configura .env con una di queste:\n"
                 "  - OPENROUTER_API_KEY + OPENROUTER_MODEL\n"
                 "  - OPENAI_API_KEY\n"
-                "  - AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_DEPLOYMENT_NAME"
+                "  - AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_DEPLOYMENT_NAME\n"
+                "  - OLLAMA_ENDPOINT + OLLAMA_MODEL"
             )
     
     @classmethod

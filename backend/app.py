@@ -340,8 +340,6 @@ def mcp_info():
         ]
     })
 
-# ==================== ENDPOINT AMC LOGIN ====================
-
 # ==================== ENDPOINT LAB ORCHESTRATOR (agentico) ====================
 
 @app.route('/api/test/lab/full', methods=['POST'])

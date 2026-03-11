@@ -136,6 +136,21 @@ class TestAgentMCP:
             event_type = ev.get("event")
             tool_name = ev.get("name") or ev.get("metadata", {}).get("tool_name")
 
+            # Log opzionale del function calling del modello (tool_calls raw)
+            if verbose and event_type in ("on_chat_model_stream", "on_chat_model_end"):
+                data = ev.get("data", {}) or {}
+                msg_obj = data.get("chunk") or data.get("output")
+                messages = []
+                if msg_obj is not None:
+                    if isinstance(msg_obj, (list, tuple)):
+                        messages = msg_obj
+                    else:
+                        messages = [msg_obj]
+                for m in messages:
+                    tool_calls = getattr(m, "tool_calls", None)
+                    if tool_calls:
+                        print("[model_tool_call]", tool_calls)
+
             # Log minimale + input/output tool (per analisi stabilità catena)
             if verbose and event_type == "on_tool_start":
                 print(f"[on_tool_start] {tool_name}")

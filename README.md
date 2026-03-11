@@ -99,8 +99,9 @@ Orchestrator (orchestrator.py)
          │  stdio | HTTP
          ▼
    MCP Server Playwright (async)
-   21 tool: start_browser, navigate_to_url, inspect_interactive_elements,
-            click_smart, fill_smart, wait_for_dom_change, inspect_region, …
+   23 tool: start_browser, navigate_to_url, inspect_interactive_elements,
+            click_smart, fill_smart, wait_for_dom_change, inspect_region,
+            get_text_by_visible_content, …
          │
          ▼
    Chromium
