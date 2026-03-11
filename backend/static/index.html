@@ -567,9 +567,9 @@
                 <div id="scenariosList" style="margin-top: 10px;"></div>
             </div>
             
-            <!-- Step 4: Run Batch Test -->
+            <!-- Step 4: Run Test(s) -->
             <div class="lab-login-section" id="batchSection" style="display:none;">
-                <div class="section-label">3. Run Batch Test</div>
+                <div class="section-label">3. Run Test(s)</div>
                 <div class="field">
                     <label for="batchUrl">URL</label>
                     <input type="text" id="batchUrl" placeholder="https://your-lab-url.com">
@@ -582,7 +582,14 @@
                     <label for="batchPassword">Password</label>
                     <input type="password" id="batchPassword" placeholder="password">
                 </div>
+                <div class="field">
+                    <label for="extractedScenarioSelect">Select Scenario (optional)</label>
+                    <select id="extractedScenarioSelect" class="lab-scenario-select">
+                        <option value="">-- Select to run single scenario --</option>
+                    </select>
+                </div>
                 <div class="lab-actions-row">
+                    <button class="btn btn-secondary" id="runSingleBtn" onclick="runSingleScenario()" style="margin-right: 12px;">Run Selected</button>
                     <button class="btn btn-primary" id="runBatchBtn" onclick="runBatchTest()">Run All Scenarios</button>
                 </div>
             </div>
@@ -924,24 +931,19 @@ Close the browser.`
                     scenariosListDiv.innerHTML = '';
                     data.scenarios.forEach((scenario, idx) => {
                         const scenarioDiv = document.createElement('div');
-                        scenarioDiv.style.cssText = 'background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-bottom: 10px;';
-                        scenarioDiv.innerHTML = `
-                            <div style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">${idx + 1}. ${scenario.name}</div>
-                            <div style="font-size: 12px; color: var(--muted); margin-bottom: 6px;">ID: ${scenario.id}</div>
-                            <div style="font-size: 13px; margin-bottom: 8px;">
-                                <strong>Steps:</strong>
-                                <ul style="margin: 4px 0 0 20px;">
-                                    ${scenario.execution_steps.map(s => `<li>${s}</li>`).join('')}
-                                </ul>
-                            </div>
-                            <div style="font-size: 13px;">
-                                <strong>Expected Results:</strong>
-                                <ul style="margin: 4px 0 0 20px;">
-                                    ${scenario.expected_results.map(r => `<li>${r}</li>`).join('')}
-                                </ul>
-                            </div>
-                        `;
+                        scenarioDiv.style.cssText = 'background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 10px;';
+                        scenarioDiv.innerHTML = `<div style="font-weight: 600; color: var(--accent); margin-bottom: 4px;">${idx + 1}. ${scenario.name}</div><div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">ID: ${scenario.id}</div><div style="font-size: 13px; margin-bottom: 6px;"><strong>Steps:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${scenario.execution_steps.map(s => `<li>${s}</li>`).join('')}</ul></div><div style="font-size: 13px;"><strong>Expected Results:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${scenario.expected_results.map(r => `<li>${r}</li>`).join('')}</ul></div>`;
                         scenariosListDiv.appendChild(scenarioDiv);
+                    });
+                    
+                    // Populate scenario selector dropdown
+                    const scenarioSelect = document.getElementById('extractedScenarioSelect');
+                    scenarioSelect.innerHTML = '<option value="">-- Select to run single scenario --</option>';
+                    data.scenarios.forEach((scenario, idx) => {
+                        const option = document.createElement('option');
+                        option.value = idx;
+                        option.textContent = `${idx + 1}. ${scenario.name}`;
+                        scenarioSelect.appendChild(option);
                     });
                     
                     previewDiv.style.display = 'block';
@@ -1173,6 +1175,101 @@ Close the browser.`
                 }
                 
             } catch (error) {
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
+                document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        async function runSingleScenario() {
+            if (!extractedScenarios || extractedScenarios.length === 0) {
+                alert('Please extract scenarios first');
+                return;
+            }
+            
+            const scenarioIndex = document.getElementById('extractedScenarioSelect').value;
+            if (scenarioIndex === '') {
+                alert('Please select a scenario from the dropdown');
+                return;
+            }
+            
+            const url = document.getElementById('batchUrl').value.trim();
+            const username = document.getElementById('batchUsername').value.trim();
+            const password = document.getElementById('batchPassword').value;
+            
+            if (!url || !username || !password) {
+                alert('Please fill in URL, username, and password');
+                return;
+            }
+            
+            const selectedScenario = extractedScenarios[parseInt(scenarioIndex)];
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const batchProgressDiv = document.getElementById('batchProgress');
+            const btn = document.getElementById('runSingleBtn');
+            
+            document.getElementById('loadingText').textContent = `Running scenario: ${selectedScenario.name}...`;
+            resultDiv.classList.remove('show');
+            loadingDiv.classList.add('show');
+            batchProgressDiv.style.display = 'none';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(API_BASE + '/api/test/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scenarios: [selectedScenario], // Single scenario as array
+                        url: url,
+                        username: username,
+                        password: password,
+                        save_results: true
+                    })
+                });
+                const data = await response.json();
+                loadingDiv.classList.remove('show');
+                
+                const resultContent = document.getElementById('resultContent');
+                const resultHeader = document.getElementById('resultHeader');
+                resultDiv.classList.add('show');
+                resultContent.innerHTML = '';
+                
+                if (data.summary) {
+                    const summary = data.summary;
+                    const passed = summary.success || 0;
+                    const failed = summary.failed || 0;
+                    const error = summary.error || 0;
+                    
+                    resultDiv.className = 'result ' + (passed > 0 ? 'success' : 'error') + ' show';
+                    resultHeader.textContent = passed > 0 ? 'SCENARIO PASSED ✅' : 'SCENARIO FAILED ❌';
+                    
+                    let html = '<div style="font-size: 14px; line-height: 1.8;">';
+                    html += `<div style="margin-bottom: 12px;"><strong>Scenario:</strong> ${selectedScenario.name}</div>`;
+                    html += `<div style="color: ${passed > 0 ? 'var(--success)' : 'var(--error)'}; margin-bottom: 12px;"><strong>Status:</strong> ${passed > 0 ? 'Success' : 'Failed'}</div>`;
+                    
+                    // Show errors if any
+                    if (data.scenarios && data.scenarios[0] && data.scenarios[0].error) {
+                        html += `<div style="margin-top: 12px; padding: 12px; background: var(--bg); border-left: 3px solid var(--error); border-radius: 4px;">`;
+                        html += `<strong>Error:</strong><br/>${data.scenarios[0].error}`;
+                        html += `</div>`;
+                    }
+                    
+                    if (data.saved_to) {
+                        html += `<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"><strong>Report saved to:</strong><br/><code style="color: var(--accent);">${data.saved_to}</code></div>`;
+                    }
+                    
+                    html += '</div>';
+                    resultContent.innerHTML = html;
+                } else {
+                    resultDiv.className = 'result error show';
+                    resultHeader.textContent = 'ERROR';
+                    resultContent.textContent = data.message || JSON.stringify(data);
+                }
+            } catch (error) {
+                loadingDiv.classList.remove('show');
                 resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
                 document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
