@@ -5,8 +5,9 @@
 
 # folders
 /data/*
-/backend/.env
 /backend/data/*
 
 # custom files
 *mmd
+/backend/.env
+/backend/langgraph.txt

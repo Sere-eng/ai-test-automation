@@ -14,6 +14,8 @@ from config.settings import AppConfig
 import json
 import asyncio
 from datetime import datetime
+import queue
+import threading
 
 from agent.utils import make_json_serializable
 
@@ -754,6 +756,172 @@ def run_batch_test():
             "message": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+
+@app.route('/api/test/batch/stream', methods=['POST'])
+def run_batch_test_stream():
+    """
+    Esegue batch test con streaming SSE per progress real-time.
+    
+    Body JSON: vedi run_batch_test() per formato
+    
+    Returns: Server-Sent Events stream con eventi:
+    - scenario_start: inizio scenario
+    - phase_update: cambio fase (prefix/scenario)
+    - step_update: completamento step
+    - scenario_complete: fine scenario
+    - batch_complete: fine batch
+    - error: errore durante esecuzione
+    """
+    if not ORCHESTRATOR_AVAILABLE:
+        return jsonify({
+            "status": "error",
+            "message": "Orchestrator non disponibile"
+        }), 503
+    
+    try:
+        from agent.batch_runner import BatchTestRunner
+        from agent.lab_scenarios import LabScenario, LAB_SCENARIOS
+    except ImportError as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Batch runner non disponibile: {e}"
+        }), 503
+    
+    data = request.get_json()
+    
+    if not data or 'scenarios' not in data:
+        return jsonify({
+            "status": "error",
+            "message": "Body JSON richiesto con campo 'scenarios'"
+        }), 400
+    
+    scenarios_input = data['scenarios']
+    if not isinstance(scenarios_input, list) or not scenarios_input:
+        return jsonify({
+            "status": "error",
+            "message": "'scenarios' deve essere una lista non vuota"
+        }), 400
+    
+    # Converti scenari in LabScenario objects
+    scenarios = []
+    for item in scenarios_input:
+        if isinstance(item, str):
+            existing = next((s for s in LAB_SCENARIOS if s.id == item), None)
+            if existing:
+                scenarios.append(existing)
+            else:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Scenario ID '{item}' non trovato"
+                }), 400
+        elif isinstance(item, dict):
+            try:
+                scenario = LabScenario(
+                    id=item.get('id', f"dynamic_{len(scenarios) + 1}"),
+                    name=item.get('name', 'Unnamed'),
+                    execution_steps=item.get('execution_steps', []),
+                    expected_results=item.get('expected_results', []),
+                    prompt_hints=item.get('prompt_hints')
+                )
+                scenarios.append(scenario)
+            except Exception as e:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Errore nella creazione scenario: {e}"
+                }), 400
+    
+    url = data.get('url')
+    username = data.get('username')
+    password = data.get('password')
+    save_results = data.get('save_results', True)
+    
+    # Crea una queue per gli eventi SSE
+    event_queue = queue.Queue()
+    
+    def progress_callback(event_type: str, event_data: dict):
+        """Callback chiamato dal BatchTestRunner per emettere eventi."""
+        event_queue.put({
+            'event': event_type,
+            'data': event_data
+        })
+    
+    def generate():
+        """Generator function per SSE stream."""
+        try:
+            # Esegui batch in un thread separato
+            runner = BatchTestRunner(
+                url=url,
+                username=username,
+                password=password,
+                progress_callback=progress_callback
+            )
+            
+            results = {'error': None}
+            
+            def run_batch_async():
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    batch_results = loop.run_until_complete(
+                        runner.run_batch(scenarios, verbose=False)
+                    )
+                    
+                    if save_results:
+                        filepath = runner.save_results(batch_results)
+                        batch_results['saved_to'] = filepath
+                    
+                    results['data'] = batch_results
+                    
+                    # Segnala fine
+                    event_queue.put(None)
+                    
+                except Exception as e:
+                    results['error'] = str(e)
+                    event_queue.put(None)
+            
+            # Avvia thread
+            thread = threading.Thread(target=run_batch_async)
+            thread.start()
+            
+            # Stream eventi dalla queue
+            while True:
+                try:
+                    event = event_queue.get(timeout=0.5)
+                    
+                    if event is None:
+                        # Fine stream
+                        if results.get('error'):
+                            yield f"event: error\ndata: {json.dumps({'error': results['error']})}\n\n"
+                        elif results.get('data'):
+                            # Invia risultati finali
+                            final_data = results['data']
+                            yield f"event: batch_complete\ndata: {json.dumps(make_json_serializable(final_data))}\n\n"
+                        break
+                    
+                    # Emetti evento SSE
+                    event_type = event['event']
+                    event_data = make_json_serializable(event['data'])
+                    yield f"event: {event_type}\ndata: {json.dumps(event_data)}\n\n"
+                    
+                except queue.Empty:
+                    # Invia keepalive ogni 0.5s
+                    yield f": keepalive\n\n"
+                    continue
+            
+            thread.join(timeout=1)
+            
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 
 # ==================== ENDPOINT AMC LOGIN ====================
