@@ -347,6 +347,130 @@
         .lab-login-section input::placeholder { color: var(--muted); opacity: 0.8; }
         .lab-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
         .lab-actions-row .btn { flex: 0 0 auto; }
+        
+        /* File input styling */
+        input[type="file"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        input[type="file"]::-webkit-file-upload-button {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            padding: 6px 12px;
+            margin-right: 12px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        input[type="file"]::-webkit-file-upload-button:hover {
+            background: var(--bg-2);
+        }
+        
+        /* Batch Progress Styles */
+        .batch-progress {
+            margin-top: 24px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .progress-container {
+            margin-top: 16px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .progress-header #progressStatus {
+            color: var(--text);
+            font-weight: 500;
+        }
+        
+        .progress-header #progressCount {
+            color: var(--muted);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-details {
+            font-size: 13px;
+            line-height: 1.8;
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--muted);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .progress-item {
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: var(--bg);
+            border-left: 3px solid var(--border);
+            border-radius: 4px;
+        }
+        
+        .progress-item.active {
+            border-left-color: var(--accent);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .progress-item.success {
+            border-left-color: var(--success);
+        }
+        
+        .progress-item.error {
+            border-left-color: var(--error);
+        }
+        
+        .progress-item .scenario-name {
+            color: var(--text);
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .progress-item .step-info {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        .progress-item .error-message {
+            color: var(--error);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body>
@@ -360,6 +484,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="custom" onclick="switchTab('custom')">Custom test</button>
             <button class="tab" data-tab="lab" onclick="switchTab('lab')">LAB scenario</button>
+            <button class="tab" data-tab="document" onclick="switchTab('document')">Document Upload</button>
         </div>
         <div id="panel-custom" class="panel active">
             <div class="terminal-header">USER@AI-TEST:~/NEW_TEST</div>
@@ -407,6 +532,77 @@
                 <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login + scenario)</button>
             </div>
         </div>
+        
+        <!-- NEW: Document Upload Panel -->
+        <div id="panel-document" class="panel">
+            <p class="panel-desc">
+                <strong>Upload a test case document</strong> (Word or HTML from JIRA), extract scenarios automatically using AI, and run them all at once.
+            </p>
+            
+            <!-- Step 1: Upload -->
+            <div class="lab-login-section">
+                <div class="section-label">1. Upload Document</div>
+                <div class="field">
+                    <label for="docFile">Select .doc, .docx, or .html file</label>
+                    <input type="file" id="docFile" accept=".doc,.docx,.html,.htm" style="padding: 8px; cursor: pointer;">
+                </div>
+                <div class="lab-actions-row">
+                    <button class="btn btn-secondary" id="uploadBtn" onclick="uploadDocument()">Upload</button>
+                </div>
+                <div id="uploadStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
+            </div>
+            
+            <!-- Step 2: Extract Scenarios -->
+            <div class="lab-login-section" id="extractSection" style="display:none;">
+                <div class="section-label">2. Extract Scenarios (AI)</div>
+                <div class="lab-actions-row">
+                    <button class="btn btn-secondary" id="extractBtn" onclick="extractScenarios()">Extract Scenarios</button>
+                </div>
+                <div id="extractStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
+            </div>
+            
+            <!-- Step 3: Preview Scenarios -->
+            <div id="scenariosPreview" class="lab-steps" style="display:none; margin-top: 20px;">
+                <div class="section-label">Extracted Scenarios</div>
+                <div id="scenariosList" style="margin-top: 10px;"></div>
+            </div>
+            
+            <!-- Step 4: Run Batch Test -->
+            <div class="lab-login-section" id="batchSection" style="display:none;">
+                <div class="section-label">3. Run Batch Test</div>
+                <div class="field">
+                    <label for="batchUrl">URL</label>
+                    <input type="text" id="batchUrl" placeholder="https://your-lab-url.com">
+                </div>
+                <div class="field">
+                    <label for="batchUsername">Username</label>
+                    <input type="text" id="batchUsername" placeholder="username">
+                </div>
+                <div class="field">
+                    <label for="batchPassword">Password</label>
+                    <input type="password" id="batchPassword" placeholder="password">
+                </div>
+                <div class="lab-actions-row">
+                    <button class="btn btn-primary" id="runBatchBtn" onclick="runBatchTest()">Run All Scenarios</button>
+                </div>
+            </div>
+            
+            <!-- Batch Progress Display -->
+            <div class="batch-progress" id="batchProgress" style="display:none;">
+                <div class="section-label">Batch Test Progress</div>
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <span id="progressStatus">Initializing...</span>
+                        <span id="progressCount">0/0</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progressBar"></div>
+                    </div>
+                    <div class="progress-details" id="progressDetails"></div>
+                </div>
+            </div>
+        </div>
+        <!-- END Document Upload Panel -->
     </div>
     
     <div class="loading" id="loading">
@@ -644,6 +840,349 @@ Perform a search for 'carm' and verify results appear.
 
 Close the browser.`
         ];
+        
+        // ==================== DOCUMENT UPLOAD FUNCTIONS ====================
+        
+        let uploadedFilename = null;
+        let extractedScenarios = null;
+        
+        async function uploadDocument() {
+            const fileInput = document.getElementById('docFile');
+            const statusDiv = document.getElementById('uploadStatus');
+            const btn = document.getElementById('uploadBtn');
+            
+            if (!fileInput.files || !fileInput.files[0]) {
+                statusDiv.textContent = '❌ Please select a file first';
+                statusDiv.style.color = 'var(--error)';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            statusDiv.textContent = '⏳ Uploading...';
+            statusDiv.style.color = 'var(--muted)';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(API_BASE + '/api/test/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    uploadedFilename = data.filename;
+                    statusDiv.textContent = `✅ Uploaded: ${data.filename} (${(data.size_bytes / 1024).toFixed(1)} KB)`;
+                    statusDiv.style.color = 'var(--success)';
+                    
+                    // Show extract section
+                    document.getElementById('extractSection').style.display = 'block';
+                } else {
+                    statusDiv.textContent = `❌ Error: ${data.message}`;
+                    statusDiv.style.color = 'var(--error)';
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Upload failed: ${error.message}`;
+                statusDiv.style.color = 'var(--error)';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        async function extractScenarios() {
+            if (!uploadedFilename) {
+                alert('Please upload a document first');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('extractStatus');
+            const btn = document.getElementById('extractBtn');
+            const previewDiv = document.getElementById('scenariosPreview');
+            const scenariosListDiv = document.getElementById('scenariosList');
+            
+            statusDiv.textContent = '⏳ Extracting scenarios with AI... (this may take 10-30 seconds)';
+            statusDiv.style.color = 'var(--muted)';
+            btn.disabled = true;
+            previewDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(API_BASE + '/api/test/extract-scenarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file: uploadedFilename })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    extractedScenarios = data.scenarios;
+                    statusDiv.textContent = `✅ Extracted ${data.scenarios_count} scenarios from "${data.document.title}"`;
+                    statusDiv.style.color = 'var(--success)';
+                    
+                    // Show scenarios preview
+                    scenariosListDiv.innerHTML = '';
+                    data.scenarios.forEach((scenario, idx) => {
+                        const scenarioDiv = document.createElement('div');
+                        scenarioDiv.style.cssText = 'background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-bottom: 10px;';
+                        scenarioDiv.innerHTML = `
+                            <div style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">${idx + 1}. ${scenario.name}</div>
+                            <div style="font-size: 12px; color: var(--muted); margin-bottom: 6px;">ID: ${scenario.id}</div>
+                            <div style="font-size: 13px; margin-bottom: 8px;">
+                                <strong>Steps:</strong>
+                                <ul style="margin: 4px 0 0 20px;">
+                                    ${scenario.execution_steps.map(s => `<li>${s}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div style="font-size: 13px;">
+                                <strong>Expected Results:</strong>
+                                <ul style="margin: 4px 0 0 20px;">
+                                    ${scenario.expected_results.map(r => `<li>${r}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                        scenariosListDiv.appendChild(scenarioDiv);
+                    });
+                    
+                    previewDiv.style.display = 'block';
+                    document.getElementById('batchSection').style.display = 'block';
+                } else {
+                    statusDiv.textContent = `❌ Error: ${data.message}`;
+                    statusDiv.style.color = 'var(--error)';
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Extraction failed: ${error.message}`;
+                statusDiv.style.color = 'var(--error)';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        async function runBatchTest() {
+            if (!extractedScenarios || extractedScenarios.length === 0) {
+                alert('Please extract scenarios first');
+                return;
+            }
+            
+            const url = document.getElementById('batchUrl').value.trim();
+            const username = document.getElementById('batchUsername').value.trim();
+            const password = document.getElementById('batchPassword').value;
+            
+            if (!url || !username || !password) {
+                alert('Please fill in URL, username, and password');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const batchProgressDiv = document.getElementById('batchProgress');
+            const btn = document.getElementById('runBatchBtn');
+            const progressBar = document.getElementById('progressBar');
+            const progressStatus = document.getElementById('progressStatus');
+            const progressCount = document.getElementById('progressCount');
+            const progressDetails = document.getElementById('progressDetails');
+            
+            // Hide previous results, show progress
+            resultDiv.classList.remove('show');
+            loadingDiv.classList.remove('show');
+            batchProgressDiv.style.display = 'block';
+            btn.disabled = true;
+            
+            // Reset progress
+            progressBar.style.width = '0%';
+            progressStatus.textContent = 'Initializing batch test...';
+            progressCount.textContent = `0/${extractedScenarios.length}`;
+            progressDetails.innerHTML = '';
+            
+            let completedScenarios = 0;
+            let currentScenario = null;
+            const scenarioElements = {};
+            
+            function updateProgress() {
+                const percentage = (completedScenarios / extractedScenarios.length) * 100;
+                progressBar.style.width = `${percentage}%`;
+                progressCount.textContent = `${completedScenarios}/${extractedScenarios.length}`;
+            }
+            
+            function addScenarioElement(scenarioId, scenarioName) {
+                const div = document.createElement('div');
+                div.className = 'progress-item active';
+                div.id = `scenario-${scenarioId}`;
+                div.innerHTML = `
+                    <div class="scenario-name">📋 ${scenarioName}</div>
+                    <div class="step-info">Starting...</div>
+                `;
+                progressDetails.appendChild(div);
+                scenarioElements[scenarioId] = div;
+                // Scroll to bottom
+                progressDetails.scrollTop = progressDetails.scrollHeight;
+            }
+            
+            function updateScenarioElement(scenarioId, message, status = 'active') {
+                const div = scenarioElements[scenarioId];
+                if (div) {
+                    div.className = `progress-item ${status}`;
+                    const stepInfo = div.querySelector('.step-info');
+                    if (stepInfo) {
+                        stepInfo.textContent = message;
+                    }
+                    progressDetails.scrollTop = progressDetails.scrollHeight;
+                }
+            }
+            
+            function addErrorToScenario(scenarioId, error) {
+                const div = scenarioElements[scenarioId];
+                if (div) {
+                    let errorDiv = div.querySelector('.error-message');
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.className = 'error-message';
+                        div.appendChild(errorDiv);
+                    }
+                    errorDiv.textContent = `❌ ${error}`;
+                }
+            }
+            
+            try {
+                // Create EventSource for SSE
+                const eventSource = new EventSource(
+                    API_BASE + '/api/test/batch/stream?' + new URLSearchParams({
+                        data: JSON.stringify({
+                            scenarios: extractedScenarios,
+                            url: url,
+                            username: username,
+                            password: password,
+                            save_results: true
+                        })
+                    })
+                );
+                
+                // Better approach: use POST with fetch streaming
+                const response = await fetch(API_BASE + '/api/test/batch/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scenarios: extractedScenarios,
+                        url: url,
+                        username: username,
+                        password: password,
+                        save_results: true
+                    })
+                });
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('event:')) {
+                            const eventType = line.substring(7).trim();
+                            continue;
+                        }
+                        if (line.startsWith('data:')) {
+                            try {
+                                const data = JSON.parse(line.substring(5).trim());
+                                handleSSEEvent(data);
+                            } catch (e) {
+                                console.error('Failed to parse SSE data:', e);
+                            }
+                        }
+                    }
+                }
+                
+                function handleSSEEvent(eventData) {
+                    // Extract event type from data or infer from structure
+                    if (eventData.scenario_index !== undefined) {
+                        // scenario_start
+                        currentScenario = eventData.scenario_id;
+                        progressStatus.textContent = `Running scenario ${eventData.scenario_index}/${eventData.total_scenarios}...`;
+                        addScenarioElement(eventData.scenario_id, eventData.scenario_name);
+                    } else if (eventData.phase !== undefined) {
+                        // phase_update or step_update
+                        const phaseLabel = eventData.phase === 'prefix' ? 'Login' : 'Test Execution';
+                        if (eventData.message) {
+                            updateScenarioElement(eventData.scenario_id, `${phaseLabel}: ${eventData.message}`);
+                        } else if (eventData.tool) {
+                            updateScenarioElement(eventData.scenario_id, `${phaseLabel}: ${eventData.tool}`);
+                        }
+                    } else if (eventData.status !== undefined && eventData.scenario_id) {
+                        // scenario_complete
+                        completedScenarios++;
+                        updateProgress();
+                        const statusIcon = eventData.status === 'success' ? '✅' : '❌';
+                        updateScenarioElement(
+                            eventData.scenario_id,
+                            `${statusIcon} ${eventData.status === 'success' ? 'Completed successfully' : 'Failed'}`,
+                            eventData.status
+                        );
+                        if (eventData.error) {
+                            addErrorToScenario(eventData.scenario_id, eventData.error);
+                        }
+                    } else if (eventData.summary !== undefined) {
+                        // batch_complete
+                        showFinalResults(eventData);
+                    } else if (eventData.error !== undefined && !eventData.scenario_id) {
+                        // Global error
+                        progressStatus.textContent = `Error: ${eventData.error}`;
+                        throw new Error(eventData.error);
+                    } else if (eventData.error && eventData.scenario_id) {
+                        // Scenario error
+                        addErrorToScenario(eventData.scenario_id, eventData.error);
+                    }
+                }
+                
+                function showFinalResults(data) {
+                    progressStatus.textContent = 'Batch test completed!';
+                    
+                    // Show final results in result div
+                    const resultContent = document.getElementById('resultContent');
+                    const resultHeader = document.getElementById('resultHeader');
+                    resultDiv.classList.add('show');
+                    resultContent.innerHTML = '';
+                    
+                    const summary = data.summary || {};
+                    const total = data.total_scenarios || 0;
+                    const success = summary.success || 0;
+                    const failed = summary.failed || 0;
+                    const error = summary.error || 0;
+                    const successRate = total > 0 ? ((success / total) * 100).toFixed(1) : 0;
+                    
+                    resultDiv.className = 'result ' + (success === total ? 'success' : 'error') + ' show';
+                    resultHeader.textContent = `BATCH TEST RESULTS: ${success}/${total} passed (${successRate}%)`;
+                    
+                    let html = '<div style="font-size: 14px; line-height: 1.8;">';
+                    html += `<div style="margin-bottom: 12px;"><strong>Total:</strong> ${total} scenarios</div>`;
+                    html += `<div style="color: var(--success); margin-bottom: 6px;"><strong>✓ Passed:</strong> ${success}</div>`;
+                    html += `<div style="color: var(--error); margin-bottom: 6px;"><strong>✗ Failed:</strong> ${failed}</div>`;
+                    html += `<div style="color: var(--error); margin-bottom: 12px;"><strong>💥 Errors:</strong> ${error}</div>`;
+                    
+                    if (data.saved_to) {
+                        html += `<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"><strong>Report saved to:</strong><br/><code style="color: var(--accent);">${data.saved_to}</code></div>`;
+                    }
+                    
+                    html += '</div>';
+                    resultContent.innerHTML = html;
+                }
+                
+            } catch (error) {
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
+                document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        // ==================== END DOCUMENT UPLOAD FUNCTIONS ====================
         
         function loadExample(index) {
             document.getElementById('testDescription').value = examples[index];

@@ -2,3 +2,12 @@
 "" 
 ".vscode/" 
 ".idea/" 
+
+# folders
+/data/*
+/backend/data/*
+
+# custom files
+*mmd
+/backend/.env
+/backend/langgraph.txt
