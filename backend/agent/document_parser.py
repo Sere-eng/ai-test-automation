@@ -194,24 +194,16 @@ class TestDocumentParser:
         # Identifica le colonne
         col_indices = self._identify_columns(header_row)
         
+        print(f"📊 Colonne identificate: {col_indices}")
+        
         # Raggruppa righe per colore
         test_cases = []
         current_test = None
         current_color = None
-        last_non_empty_row = 1
         
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
-            # Ottieni il colore di sfondo della prima cella
-            first_cell = row[0] if row else None
-            row_color = None
-            
-            if first_cell and first_cell.fill:
-                # Ottieni il colore di riempimento
-                fill = first_cell.fill
-                if fill.start_color and fill.start_color.rgb:
-                    row_color = fill.start_color.rgb
-                elif fill.fgColor and fill.fgColor.rgb:
-                    row_color = fill.fgColor.rgb
+            # Ottieni il colore di sfondo - MIGLIORATO per guardare tutte le celle importanti
+            row_color = self._get_row_background_color(row, col_indices)
             
             # Estrai i valori delle celle
             row_values = [cell.value for cell in row]
@@ -223,11 +215,22 @@ class TestDocumentParser:
                 continue
             
             # Determina se questa riga appartiene a un nuovo test case
-            # Nuovo test se: colore diverso dal precedente O se è la prima riga non vuota
-            if current_color is None or (row_color != current_color and row_color is not None):
-                # Salva il test precedente se esiste
-                if current_test:
+            # LOGICA: cambio di colore = nuovo test
+            # Ma consideriamo solo cambi SIGNIFICATIVI (non da None a qualcosa)
+            is_new_test = False
+            
+            if current_color is None:
+                # Prima riga
+                is_new_test = True
+            elif row_color != current_color and row_color is not None:
+                # Colore cambiato
+                is_new_test = True
+            
+            if is_new_test:
+                # Salva il test precedente se esiste e ha contenuto
+                if current_test and self._test_has_content(current_test):
                     test_cases.append(current_test)
+                    print(f"✓ Test case #{len(test_cases)} salvato")
                 
                 # Inizia un nuovo test case
                 current_test = {
@@ -237,9 +240,12 @@ class TestDocumentParser:
                     'input_data': '',
                     'description': '',
                     'expected_results': '',
-                    'color': row_color
                 }
                 current_color = row_color
+                print(f"→ Nuovo test case iniziato alla riga {row_idx} (colore: {row_color})")
+            else:
+                # Riga di continuazione
+                print(f"  + Riga {row_idx} aggiunta (colore: {row_color})")
             
             # Aggiungi i valori al test corrente
             if current_test:
@@ -252,16 +258,17 @@ class TestDocumentParser:
                                 current_test[field] += '\n' + value
                             else:
                                 current_test[field] = value
-            
-            last_non_empty_row = row_idx
         
-        # Aggiungi l'ultimo test case
-        if current_test:
+        # Aggiungi l'ultimo test case se ha contenuto
+        if current_test and self._test_has_content(current_test):
             test_cases.append(current_test)
+            print(f"✓ Test case #{len(test_cases)} salvato (ultimo)")
         
         # Rimuovi il campo 'color' dai risultati (era solo per debugging)
         for tc in test_cases:
             tc.pop('color', None)
+        
+        print(f"\n📝 Totale test case estratti: {len(test_cases)}")
         
         # Crea un titolo dal nome del file
         title = self.file_path.stem.replace('_', ' ').replace('-', ' ')
@@ -273,6 +280,69 @@ class TestDocumentParser:
             'test_cases': test_cases,
             'columns_found': {k: v for k, v in col_indices.items()}
         }
+    
+    def _get_row_background_color(self, row, col_indices) -> Optional[str]:
+        """
+        Ottiene il colore di sfondo della riga controllando le celle significative.
+        Ignora celle vuote e considera solo celle con contenuto.
+        """
+        # Controlla TUTTE le celle con contenuto, non solo la prima
+        colors_found = []
+        
+        for cell in row:
+            if cell and cell.value is not None and str(cell.value).strip() != '':
+                # Questa cella ha contenuto, controlla il colore
+                if cell.fill:
+                    fill = cell.fill
+                    if fill.start_color and hasattr(fill.start_color, 'rgb') and fill.start_color.rgb:
+                        color = str(fill.start_color.rgb)
+                        if color not in ['00000000', 'FFFFFFFF']:  # Ignora bianco/trasparente
+                            colors_found.append(color)
+                    elif fill.fgColor and hasattr(fill.fgColor, 'rgb') and fill.fgColor.rgb:
+                        color = str(fill.fgColor.rgb)
+                        if color not in ['00000000', 'FFFFFFFF']:
+                            colors_found.append(color)
+        
+        # Se abbiamo trovato colori significativi, usa il più comune
+        if colors_found:
+            # Conta le occorrenze e restituisci il più frequente
+            from collections import Counter
+            most_common = Counter(colors_found).most_common(1)[0][0]
+            return most_common
+        
+        # Se non ci sono colori significativi, controlla la prima cella comunque
+        first_cell = row[0] if row else None
+        if first_cell and first_cell.fill:
+            fill = first_cell.fill
+            if fill.start_color and hasattr(fill.start_color, 'rgb') and fill.start_color.rgb:
+                return str(fill.start_color.rgb)
+            elif fill.fgColor and hasattr(fill.fgColor, 'rgb') and fill.fgColor.rgb:
+                return str(fill.fgColor.rgb)
+        
+        return '00000000'  # Default bianco/trasparente
+    
+    def _is_color_significantly_different(self, color1, color2) -> bool:
+        """
+        Verifica se due colori sono significativamente diversi.
+        Entrambi None = non diversi
+        Uno None e uno set = diversi
+        """
+        if color1 is None and color2 is None:
+            return False
+        if color1 is None or color2 is None:
+            return True
+        return color1 != color2
+    
+    def _test_has_content(self, test_case: Dict) -> bool:
+        """
+        Verifica se un test case ha contenuto utile.
+        """
+        # Almeno uno dei campi principali deve avere contenuto
+        return bool(
+            test_case.get('objective') or 
+            test_case.get('description') or 
+            test_case.get('expected_results')
+        )
     
     def _parse_dataframe_standard(self, df, file_ext: str) -> Dict[str, str]:
         """

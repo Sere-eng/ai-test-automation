@@ -621,11 +621,16 @@ def extract_scenarios_from_document():
         }), 404
     
     try:
+        print(f"📄 Inizio parsing del file: {filepath}")
+        
         # 1. Parse documento
         parsed = parse_test_document(filepath)
         
+        print(f"✓ Parsing completato - Formato: {parsed.get('format')}")
+        
         # 2. Se è un file Excel/CSV con test_cases già strutturati, convertili direttamente
         if 'test_cases' in parsed:
+            print(f"📊 File Excel/CSV rilevato - Conversione diretta dei test case")
             # File Excel/CSV con casi di test strutturati
             scenarios = []
             for i, test_case in enumerate(parsed.get('test_cases', [])):
@@ -639,6 +644,10 @@ def extract_scenarios_from_document():
                     'row_number': test_case.get('row_number')
                 }
                 scenarios.append(scenario)
+                if (i + 1) % 5 == 0:
+                    print(f"  → Convertiti {i + 1}/{len(parsed.get('test_cases', []))} test case")
+            
+            print(f"✅ Conversione completata: {len(scenarios)} scenari estratti")
             
             return jsonify({
                 "status": "success",
@@ -651,8 +660,11 @@ def extract_scenarios_from_document():
                 "scenarios": scenarios
             })
         else:
+            print(f"📝 File Word/HTML rilevato - Estrazione con LLM")
             # File Word/HTML - usa LLM per estrazione
             scenarios = extract_scenarios_from_document(parsed)
+            
+            print(f"✅ Estrazione LLM completata: {len(scenarios)} scenari")
             
             return jsonify({
                 "status": "success",
