@@ -530,7 +530,7 @@ def test_lab_scenarios_list():
 @app.route('/api/test/upload', methods=['POST'])
 def upload_test_document():
     """
-    Upload di un documento di test (Word, HTML).
+    Upload di un documento di test (Word, HTML, Excel, CSV).
     Il file viene salvato in data/test-cases/.
     """
     if 'file' not in request.files:
@@ -548,7 +548,7 @@ def upload_test_document():
         }), 400
     
     # Verifica estensione
-    allowed_extensions = {'.doc', '.docx', '.html', '.htm'}
+    allowed_extensions = {'.doc', '.docx', '.html', '.htm', '.xlsx', '.xls', '.csv'}
     file_ext = Path(file.filename).suffix.lower()
     if file_ext not in allowed_extensions:
         return jsonify({
@@ -624,18 +624,45 @@ def extract_scenarios_from_document():
         # 1. Parse documento
         parsed = parse_test_document(filepath)
         
-        # 2. Estrai scenari con LLM
-        scenarios = extract_scenarios_from_document(parsed)
-        
-        return jsonify({
-            "status": "success",
-            "document": {
-                "title": parsed.get('title'),
-                "format": parsed.get('format')
-            },
-            "scenarios_count": len(scenarios),
-            "scenarios": scenarios_to_dict(scenarios)
-        })
+        # 2. Se è un file Excel/CSV con test_cases già strutturati, convertili direttamente
+        if 'test_cases' in parsed:
+            # File Excel/CSV con casi di test strutturati
+            scenarios = []
+            for i, test_case in enumerate(parsed.get('test_cases', [])):
+                scenario = {
+                    'id': f"test_case_{i+1}",
+                    'name': test_case.get('objective', f"Test Case {i+1}"),
+                    'prerequisites': test_case.get('prerequisites', ''),
+                    'input_data': test_case.get('input_data', ''),
+                    'execution_steps': [test_case.get('description', '')],
+                    'expected_results': [test_case.get('expected_results', '')],
+                    'row_number': test_case.get('row_number')
+                }
+                scenarios.append(scenario)
+            
+            return jsonify({
+                "status": "success",
+                "document": {
+                    "title": parsed.get('title'),
+                    "format": parsed.get('format'),
+                    "test_cases_count": parsed.get('test_cases_count')
+                },
+                "scenarios_count": len(scenarios),
+                "scenarios": scenarios
+            })
+        else:
+            # File Word/HTML - usa LLM per estrazione
+            scenarios = extract_scenarios_from_document(parsed)
+            
+            return jsonify({
+                "status": "success",
+                "document": {
+                    "title": parsed.get('title'),
+                    "format": parsed.get('format')
+                },
+                "scenarios_count": len(scenarios),
+                "scenarios": scenarios_to_dict(scenarios)
+            })
     
     except Exception as e:
         return jsonify({

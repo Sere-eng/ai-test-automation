@@ -1,12 +1,12 @@
 # backend/agent/document_parser.py
 """
-Parser per documenti di test (Word, HTML).
+Parser per documenti di test (Word, HTML, Excel, CSV).
 Estrae sezioni strutturate da documenti JIRA esportati o test case manuali.
 """
 
 import re
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from bs4 import BeautifulSoup
 import chardet
 
@@ -25,11 +25,19 @@ class TestDocumentParser:
         
         Returns:
             Dict con chiavi: title, initial_conditions, test_steps, expected_results, raw_html
+            Per Excel/CSV: ritorna anche test_cases (lista di casi di test)
         """
         if not self.file_path.exists():
             raise FileNotFoundError(f"File non trovato: {self.file_path}")
         
-        # Leggi il file con encoding detection
+        # Determina il tipo di file dall'estensione
+        file_ext = self.file_path.suffix.lower()
+        
+        # Per file Excel/CSV, usa parsing strutturato
+        if file_ext in ['.xlsx', '.xls', '.csv']:
+            return self._parse_spreadsheet()
+        
+        # Per altri file, leggi il contenuto con encoding detection
         raw_bytes = self.file_path.read_bytes()
         detected = chardet.detect(raw_bytes)
         encoding = detected['encoding'] or 'utf-8'
@@ -43,7 +51,7 @@ class TestDocumentParser:
         # Determina il tipo di file
         if self._is_html():
             return self._parse_html()
-        elif self.file_path.suffix.lower() in ['.docx']:
+        elif file_ext == '.docx':
             return self._parse_docx()
         else:
             # File .doc che in realtà è HTML (come quelli esportati da JIRA)
@@ -116,6 +124,277 @@ class TestDocumentParser:
         }
         
         return sections
+    
+    def _parse_spreadsheet(self) -> Dict[str, str]:
+        """
+        Estrae informazioni da file Excel (.xlsx, .xls) o CSV.
+        
+        Formato atteso: 
+        - Colonne: OBIETTIVO, PREREQUISITI, DATI_INPUT, DESCRIZIONE, RISULTATI_ATTESI
+        - Ogni test case si estende su più righe con lo stesso colore di sfondo
+        - Righe con colore alternato (bianco/blu) indicano test diversi
+        
+        Returns:
+            Dict con test_cases (lista di dict con i test) e metadati
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError(
+                "pandas non installato. Installa con: pip install pandas openpyxl"
+            )
+        
+        file_ext = self.file_path.suffix.lower()
+        
+        # Per file Excel, usa openpyxl per accedere ai colori
+        if file_ext in ['.xlsx']:
+            return self._parse_excel_with_colors()
+        elif file_ext == '.xls':
+            # .xls vecchio formato, usa pandas standard
+            df = pd.read_excel(self.file_path)
+            return self._parse_dataframe_standard(df, file_ext)
+        elif file_ext == '.csv':
+            # CSV - parsing standard
+            # Prova diversi encoding e separatori comuni
+            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+                for sep in [';', ',', '\t']:
+                    try:
+                        df = pd.read_csv(self.file_path, encoding=encoding, sep=sep)
+                        # Verifica che abbia almeno 2 colonne
+                        if len(df.columns) >= 2:
+                            return self._parse_dataframe_standard(df, file_ext)
+                    except (UnicodeDecodeError, pd.errors.ParserError):
+                        continue
+            # Se tutti i tentativi falliscono, usa il default
+            df = pd.read_csv(self.file_path, encoding='utf-8', sep=';')
+            return self._parse_dataframe_standard(df, file_ext)
+        else:
+            raise ValueError(f"Formato file non supportato: {file_ext}")
+    
+    def _parse_excel_with_colors(self) -> Dict[str, str]:
+        """
+        Parse Excel usando openpyxl per accedere ai colori delle celle.
+        Raggruppa righe con lo stesso colore di sfondo.
+        """
+        try:
+            from openpyxl import load_workbook
+            from openpyxl.styles import Color
+        except ImportError:
+            raise ImportError(
+                "openpyxl non installato. Installa con: pip install openpyxl"
+            )
+        
+        # Carica il workbook
+        wb = load_workbook(self.file_path)
+        ws = wb.active
+        
+        # Leggi l'header (prima riga)
+        header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+        
+        # Identifica le colonne
+        col_indices = self._identify_columns(header_row)
+        
+        # Raggruppa righe per colore
+        test_cases = []
+        current_test = None
+        current_color = None
+        last_non_empty_row = 1
+        
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            # Ottieni il colore di sfondo della prima cella
+            first_cell = row[0] if row else None
+            row_color = None
+            
+            if first_cell and first_cell.fill:
+                # Ottieni il colore di riempimento
+                fill = first_cell.fill
+                if fill.start_color and fill.start_color.rgb:
+                    row_color = fill.start_color.rgb
+                elif fill.fgColor and fill.fgColor.rgb:
+                    row_color = fill.fgColor.rgb
+            
+            # Estrai i valori delle celle
+            row_values = [cell.value for cell in row]
+            
+            # Verifica se la riga è completamente vuota
+            is_empty = all(v is None or str(v).strip() == '' for v in row_values)
+            
+            if is_empty:
+                continue
+            
+            # Determina se questa riga appartiene a un nuovo test case
+            # Nuovo test se: colore diverso dal precedente O se è la prima riga non vuota
+            if current_color is None or (row_color != current_color and row_color is not None):
+                # Salva il test precedente se esiste
+                if current_test:
+                    test_cases.append(current_test)
+                
+                # Inizia un nuovo test case
+                current_test = {
+                    'row_number': row_idx,
+                    'objective': '',
+                    'prerequisites': '',
+                    'input_data': '',
+                    'description': '',
+                    'expected_results': '',
+                    'color': row_color
+                }
+                current_color = row_color
+            
+            # Aggiungi i valori al test corrente
+            if current_test:
+                for field, col_idx in col_indices.items():
+                    if col_idx is not None and col_idx < len(row_values):
+                        value = self._clean_cell_value(row_values[col_idx])
+                        if value:
+                            # Concatena con newline se già presente
+                            if current_test[field]:
+                                current_test[field] += '\n' + value
+                            else:
+                                current_test[field] = value
+            
+            last_non_empty_row = row_idx
+        
+        # Aggiungi l'ultimo test case
+        if current_test:
+            test_cases.append(current_test)
+        
+        # Rimuovi il campo 'color' dai risultati (era solo per debugging)
+        for tc in test_cases:
+            tc.pop('color', None)
+        
+        # Crea un titolo dal nome del file
+        title = self.file_path.stem.replace('_', ' ').replace('-', ' ')
+        
+        return {
+            'title': title,
+            'format': 'xlsx',
+            'test_cases_count': len(test_cases),
+            'test_cases': test_cases,
+            'columns_found': {k: v for k, v in col_indices.items()}
+        }
+    
+    def _parse_dataframe_standard(self, df, file_ext: str) -> Dict[str, str]:
+        """
+        Parse standard di dataframe per CSV o XLS senza informazioni di colore.
+        Ogni riga non vuota è considerata un test case separato.
+        """
+        import pandas as pd
+        
+        # Normalizza i nomi delle colonne
+        column_map = {}
+        for col in df.columns:
+            col_clean = str(col).strip().upper()
+            column_map[col] = col_clean
+        
+        # Identifica le colonne rilevanti
+        col_indices = {}
+        for orig_col, clean_col in column_map.items():
+            if 'OBIETTIVO' in clean_col or 'OBJECTIVE' in clean_col or 'FUNZIONE' in clean_col:
+                col_indices['objective'] = orig_col
+            elif 'PREREQUISIT' in clean_col or 'CONDIZIONI INIZIALI' in clean_col:
+                col_indices['prerequisites'] = orig_col
+            elif 'DATI' in clean_col and 'INPUT' in clean_col:
+                col_indices['input_data'] = orig_col
+            elif 'DESCRIZIONE' in clean_col or 'MODALIT' in clean_col or 'PASSI' in clean_col:
+                col_indices['description'] = orig_col
+            elif 'RISULTAT' in clean_col and 'ATTESI' in clean_col or 'EXPECTED' in clean_col or 'CONDIZIONI FINALI' in clean_col:
+                col_indices['expected_results'] = orig_col
+        
+        # Estrai i casi di test
+        test_cases = []
+        for idx, row in df.iterrows():
+            # Salta righe vuote
+            if row.isna().all() or all(str(v).strip() == '' for v in row if pd.notna(v)):
+                continue
+            
+            test_case = {
+                'row_number': int(idx) + 2,  # +2 perché idx è 0-based e prima riga è header
+                'objective': self._clean_cell_value(row.get(col_indices.get('objective'))) if 'objective' in col_indices else '',
+                'prerequisites': self._clean_cell_value(row.get(col_indices.get('prerequisites'))) if 'prerequisites' in col_indices else '',
+                'input_data': self._clean_cell_value(row.get(col_indices.get('input_data'))) if 'input_data' in col_indices else '',
+                'description': self._clean_cell_value(row.get(col_indices.get('description'))) if 'description' in col_indices else '',
+                'expected_results': self._clean_cell_value(row.get(col_indices.get('expected_results'))) if 'expected_results' in col_indices else '',
+            }
+            
+            # Aggiungi solo se c'è almeno un campo non vuoto
+            if any(test_case[k] for k in ['objective', 'description', 'expected_results']):
+                test_cases.append(test_case)
+        
+        # Crea un titolo dal nome del file
+        title = self.file_path.stem.replace('_', ' ').replace('-', ' ')
+        
+        return {
+            'title': title,
+            'format': file_ext.lstrip('.'),
+            'test_cases_count': len(test_cases),
+            'test_cases': test_cases,
+            'columns_found': col_indices
+        }
+    
+    def _identify_columns(self, header_row) -> Dict[str, int]:
+        """
+        Identifica gli indici delle colonne dall'header.
+        
+        Returns:
+            Dict con field_name -> column_index (0-based)
+        """
+        col_indices = {
+            'objective': None,
+            'prerequisites': None,
+            'input_data': None,
+            'description': None,
+            'expected_results': None
+        }
+        
+        for idx, col_name in enumerate(header_row):
+            if col_name is None:
+                continue
+            
+            col_clean = str(col_name).strip().upper()
+            
+            if 'OBIETTIVO' in col_clean or 'OBJECTIVE' in col_clean or 'FUNZIONE' in col_clean:
+                col_indices['objective'] = idx
+            elif 'PREREQUISIT' in col_clean or 'CONDIZIONI INIZIALI' in col_clean:
+                col_indices['prerequisites'] = idx
+            elif 'DATI' in col_clean and 'INPUT' in col_clean:
+                col_indices['input_data'] = idx
+            elif 'DESCRIZIONE' in col_clean or 'MODALIT' in col_clean or 'PASSI' in col_clean:
+                col_indices['description'] = idx
+            elif ('RISULTAT' in col_clean and 'ATTESI' in col_clean) or 'EXPECTED' in col_clean or 'CONDIZIONI FINALI' in col_clean:
+                col_indices['expected_results'] = idx
+        
+        return col_indices
+    
+    def _clean_cell_value(self, value) -> str:
+        """
+        Pulisce il valore di una cella Excel/CSV.
+        Gestisce NaN, None, e formattazione.
+        """
+        import pandas as pd
+        
+        if pd.isna(value) or value is None:
+            return ''
+        
+        # Converti a stringa
+        text = str(value).strip()
+        
+        # Rimuovi caratteri speciali comuni nei CSV
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Rimuovi spazi multipli
+        text = re.sub(r' +', ' ', text)
+        
+        # Rimuovi newline multiple
+        text = re.sub(r'\n\s*\n+', '\n\n', text)
+        
+        # Gestisci il carattere ^ usato spesso per indicare prerequisiti concatenati
+        # Sostituiscilo con un bullet point per migliore leggibilità
+        if text.startswith('^'):
+            text = text.replace('^', '• ', 1)
+            text = text.replace('^', '\n• ')
+        
+        return text.strip()
     
     def _extract_title(self) -> str:
         """Estrae il titolo dal documento HTML."""
