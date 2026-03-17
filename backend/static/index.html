@@ -543,7 +543,7 @@
             <div class="lab-login-section">
                 <div class="section-label">1. Upload Document</div>
                 <div class="field">
-                    <label for="docFile">Select .doc, .docx, or .html file</label>
+                    <label for="docFile">Select .doc, .docx, .xlsx, .xls, .csv, or .html file</label>
                     <input type="file" id="docFile" accept=".doc,.docx,.html,.htm,.xlsx,.xls,.csv" style="padding: 8px; cursor: pointer;">
                 </div>
                 <div class="lab-actions-row">
@@ -939,17 +939,21 @@ Close the browser.`
                         
                         // Prerequisites (for Excel files)
                         if (scenario.prerequisites && scenario.prerequisites.trim()) {
+                            // Clean up and replace \n with <br> for proper HTML rendering
+                            const prereqClean = scenario.prerequisites.trim().replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
                             htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(79, 70, 229, 0.1); border-left: 3px solid #4f46e5; padding: 10px; border-radius: 4px;">
                                 <strong style="color: #818cf8; display: block; margin-bottom: 6px;">📋 Prerequisites</strong>
-                                <div style="margin: 0; white-space: pre-wrap; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${scenario.prerequisites}</div>
+                                <div style="margin: 0; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${prereqClean}</div>
                             </div>`;
                         }
                         
                         // Input Data (for Excel files)
                         if (scenario.input_data && scenario.input_data.trim()) {
+                            // Clean up and replace \n with <br> for proper HTML rendering
+                            const inputClean = scenario.input_data.trim().replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
                             htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 10px; border-radius: 4px;">
                                 <strong style="color: #34d399; display: block; margin-bottom: 6px;">📝 Input Data</strong>
-                                <div style="margin: 0; white-space: pre-wrap; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${scenario.input_data}</div>
+                                <div style="margin: 0; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${inputClean}</div>
                             </div>`;
                         }
                         
