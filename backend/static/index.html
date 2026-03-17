@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Test Automation</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg: #0a0a0a;
@@ -20,6 +23,7 @@
             --accent-2: #ff875a;
             --success: #4ade80;
             --error: #f87171;
+            --code-bg: #111;
         }
 
         * {
@@ -27,12 +31,12 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Space Grotesk', system-ui, sans-serif;
             background: radial-gradient(1200px 600px at 80% -10%, #1f1f1f 0%, transparent 60%),
-                        radial-gradient(900px 500px at 0% 20%, #202020 0%, transparent 55%),
-                        var(--bg);
+                radial-gradient(900px 500px at 0% 20%, #202020 0%, transparent 55%),
+                var(--bg);
             color: var(--text);
             min-height: 100vh;
             display: flex;
@@ -40,13 +44,13 @@
             align-items: center;
             padding: 60px 20px;
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 60px;
             max-width: 900px;
         }
-        
+
         .logo {
             font-size: 14px;
             font-weight: 600;
@@ -54,7 +58,7 @@
             margin-bottom: 40px;
             letter-spacing: 1px;
         }
-        
+
         h1 {
             font-size: 56px;
             font-weight: 700;
@@ -62,54 +66,53 @@
             margin-bottom: 20px;
             letter-spacing: -1px;
         }
-        
+
         h1 .highlight {
             color: var(--accent);
         }
-        
+
         .subtitle {
             font-size: 18px;
             color: var(--muted);
             font-weight: 400;
         }
-        
+
         .container {
             width: 100%;
             max-width: 900px;
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 0;
             overflow: hidden;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
-        
+
         .terminal-header {
             background: var(--panel-2);
             padding: 12px 20px;
             border-bottom: 1px solid var(--border);
             font-size: 13px;
             color: #666;
-            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: 'IBM Plex Mono', monospace;
         }
-        
+
         textarea {
             width: 100%;
             background: transparent;
             border: none;
             color: #fff;
             font-size: 16px;
-            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: 'IBM Plex Mono', monospace;
             padding: 30px;
             resize: vertical;
             min-height: 200px;
             outline: none;
         }
-        
+
         textarea::placeholder {
             color: #444;
         }
-        
+
         .actions {
             padding: 20px 30px;
             border-top: 1px solid var(--border);
@@ -117,8 +120,9 @@
             display: flex;
             justify-content: flex-end;
             gap: 12px;
+            align-items: center;
         }
-        
+
         .btn {
             padding: 12px 32px;
             border: none;
@@ -129,33 +133,50 @@
             transition: all 0.2s ease;
             font-family: inherit;
         }
-        
+
         .btn-primary {
             background: var(--accent);
             color: white;
         }
-        
+
         .btn-primary:hover:not(:disabled) {
             background: var(--accent-2);
             transform: translateY(-1px);
         }
-        
+
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         .btn-secondary {
             background: transparent;
             color: var(--muted);
             border: 1px solid #333;
         }
-        
+
         .btn-secondary:hover {
             border-color: #555;
             color: #aaa;
         }
-        
+
+        .btn-icon {
+            padding: 8px 16px;
+            font-size: 13px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid #333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            border-color: #555;
+            color: #aaa;
+        }
+
         .result {
             margin-top: 30px;
             width: 100%;
@@ -166,11 +187,11 @@
             padding: 30px;
             display: none;
         }
-        
+
         .result.show {
             display: block;
         }
-        
+
         .result-header {
             font-size: 14px;
             font-weight: 600;
@@ -178,34 +199,111 @@
             padding-bottom: 15px;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .result.success .result-header {
             color: var(--success);
         }
-        
+
         .result.error .result-header {
             color: var(--error);
         }
-        
+
         .result-content {
             color: #aaa;
             line-height: 1.6;
             white-space: pre-wrap;
-            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: 'IBM Plex Mono', monospace;
             font-size: 14px;
         }
-        
+
+        /* Script section */
+        .script-section {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 900px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .script-section.show {
+            display: block;
+        }
+
+        .script-header {
+            background: var(--panel-2);
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .script-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .script-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+            background: rgba(255, 107, 53, 0.12);
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            padding: 3px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .script-title {
+            font-size: 13px;
+            color: #aaa;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .script-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .script-textarea {
+            width: 100%;
+            background: var(--code-bg);
+            border: none;
+            color: #c9d1d9;
+            font-size: 13px;
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 24px;
+            resize: vertical;
+            min-height: 340px;
+            outline: none;
+            line-height: 1.6;
+        }
+
+        .script-footer {
+            background: var(--panel-2);
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: #555;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
         .loading {
             display: none;
             text-align: center;
             margin-top: 30px;
             color: var(--muted);
         }
-        
+
         .loading.show {
             display: block;
         }
-        
+
         .spinner {
             width: 40px;
             height: 40px;
@@ -215,55 +313,19 @@
             animation: spin 0.8s linear infinite;
             margin: 0 auto 15px;
         }
-        
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .examples {
-            margin-top: 40px;
-            max-width: 900px;
-            width: 100%;
-        }
-        
-        .examples-title {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .example-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .example-item {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px 16px;
-            font-size: 14px;
-            color: var(--muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-        }
-        
-        .example-item:hover {
-            border-color: #3a3a3a;
-            color: #aaa;
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .tabs {
             display: flex;
-            gap: 0;
-            margin-bottom: 0;
             border-bottom: 1px solid var(--border);
             background: var(--panel-2);
         }
+
         .tab {
             padding: 14px 24px;
             font-size: 14px;
@@ -275,21 +337,37 @@
             font-family: inherit;
             border-bottom: 2px solid transparent;
         }
-        .tab:hover { color: #aaa; }
+
+        .tab:hover {
+            color: #aaa;
+        }
+
         .tab.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
             background: var(--panel);
         }
-        .panel { display: none; padding: 24px 30px; }
-        .panel.active { display: block; }
+
+        .panel {
+            display: none;
+            padding: 24px 30px;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
         .panel .panel-desc {
             font-size: 13px;
             color: var(--muted);
             margin-bottom: 16px;
             line-height: 1.5;
         }
-        .lab-select-wrap { margin-bottom: 20px; }
+
+        .lab-select-wrap {
+            margin-bottom: 20px;
+        }
+
         .lab-select-wrap label {
             display: block;
             font-size: 12px;
@@ -298,6 +376,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
         select.lab-scenario-select {
             width: 100%;
             padding: 12px 14px;
@@ -308,7 +387,12 @@
             font-size: 14px;
             font-family: inherit;
         }
-        select.lab-scenario-select option { background: var(--panel); color: var(--text); }
+
+        select.lab-scenario-select option {
+            background: var(--panel);
+            color: var(--text);
+        }
+
         .lab-steps {
             font-size: 13px;
             color: var(--muted);
@@ -319,6 +403,7 @@
             border: 1px solid var(--border);
             white-space: pre-wrap;
         }
+
         .lab-login-section {
             margin-bottom: 20px;
             padding: 14px;
@@ -326,6 +411,7 @@
             border-radius: 8px;
             border: 1px solid var(--border);
         }
+
         .lab-login-section .section-label {
             font-size: 12px;
             color: var(--muted);
@@ -333,8 +419,18 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .lab-login-section .field { margin-bottom: 10px; }
-        .lab-login-section label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+        .lab-login-section .field {
+            margin-bottom: 10px;
+        }
+
+        .lab-login-section label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
         .lab-login-section input {
             width: 100%;
             padding: 10px 12px;
@@ -344,10 +440,24 @@
             color: var(--text);
             font-size: 14px;
         }
-        .lab-login-section input::placeholder { color: var(--muted); opacity: 0.8; }
-        .lab-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-        .lab-actions-row .btn { flex: 0 0 auto; }
-        
+
+        .lab-login-section input::placeholder {
+            color: var(--muted);
+            opacity: 0.8;
+        }
+
+        .lab-actions-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+            align-items: center;
+        }
+
+        .lab-actions-row .btn {
+            flex: 0 0 auto;
+        }
+
         /* File input styling */
         input[type="file"] {
             width: 100%;
@@ -359,6 +469,7 @@
             font-size: 14px;
             cursor: pointer;
         }
+
         input[type="file"]::-webkit-file-upload-button {
             background: var(--panel-2);
             border: 1px solid var(--border);
@@ -369,10 +480,11 @@
             cursor: pointer;
             font-family: inherit;
         }
+
         input[type="file"]::-webkit-file-upload-button:hover {
             background: var(--bg-2);
         }
-        
+
         /* Batch Progress Styles */
         .batch-progress {
             margin-top: 24px;
@@ -381,11 +493,11 @@
             border-radius: 8px;
             padding: 20px;
         }
-        
+
         .progress-container {
             margin-top: 16px;
         }
-        
+
         .progress-header {
             display: flex;
             justify-content: space-between;
@@ -393,17 +505,17 @@
             margin-bottom: 12px;
             font-size: 14px;
         }
-        
+
         .progress-header #progressStatus {
             color: var(--text);
             font-weight: 500;
         }
-        
+
         .progress-header #progressCount {
             color: var(--muted);
             font-family: 'IBM Plex Mono', monospace;
         }
-        
+
         .progress-bar-container {
             width: 100%;
             height: 8px;
@@ -412,14 +524,14 @@
             overflow: hidden;
             margin-bottom: 16px;
         }
-        
+
         .progress-bar {
             height: 100%;
             background: linear-gradient(90deg, var(--accent), var(--accent-2));
             width: 0%;
             transition: width 0.3s ease;
         }
-        
+
         .progress-details {
             font-size: 13px;
             line-height: 1.8;
@@ -428,7 +540,7 @@
             max-height: 300px;
             overflow-y: auto;
         }
-        
+
         .progress-item {
             padding: 8px 12px;
             margin-bottom: 6px;
@@ -436,77 +548,120 @@
             border-left: 3px solid var(--border);
             border-radius: 4px;
         }
-        
+
         .progress-item.active {
             border-left-color: var(--accent);
             animation: pulse 1.5s ease-in-out infinite;
         }
-        
+
         .progress-item.success {
             border-left-color: var(--success);
         }
-        
+
         .progress-item.error {
             border-left-color: var(--error);
         }
-        
+
         .progress-item .scenario-name {
             color: var(--text);
             font-weight: 500;
             margin-bottom: 4px;
         }
-        
+
         .progress-item .step-info {
             color: var(--muted);
             font-size: 12px;
         }
-        
+
         .progress-item .error-message {
             color: var(--error);
             font-size: 12px;
             margin-top: 4px;
         }
-        
+
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        /* Checkbox generate script */
+        .generate-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .generate-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .generate-toggle span {
+            font-size: 13px;
+            color: var(--muted);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .copy-feedback {
+            font-size: 12px;
+            color: var(--success);
+            font-family: 'IBM Plex Mono', monospace;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <div class="logo">AI TEST AUTOMATION</div>
         <h1>ENABLE AI TO <span class="highlight">TEST</span> THE WEB</h1>
         <p class="subtitle">Describe your test in natural language or run a predefined LAB scenario</p>
     </div>
-    
+
     <div class="container">
         <div class="tabs">
             <button class="tab active" data-tab="custom" onclick="switchTab('custom')">Custom test</button>
             <button class="tab" data-tab="lab" onclick="switchTab('lab')">LAB scenario</button>
             <button class="tab" data-tab="document" onclick="switchTab('document')">Document Upload</button>
         </div>
+
         <div id="panel-custom" class="panel active">
             <div class="terminal-header">USER@AI-TEST:~/NEW_TEST</div>
-            <textarea 
-                id="testDescription" 
-                placeholder="Describe your task..."
-                spellcheck="false"
-            ></textarea>
+            <textarea id="testDescription" placeholder="Describe your task..." spellcheck="false"></textarea>
             <div class="actions">
                 <button class="btn btn-secondary" onclick="clearTest()">Clear</button>
                 <button class="btn btn-primary" id="runBtn" onclick="runTest()">Run Test</button>
             </div>
         </div>
+
         <div id="panel-lab" class="panel">
             <p class="panel-desc">
-                You can <strong>login first</strong>, then <strong>run a scenario</strong> separately, or run <strong>login + scenario</strong> in one shot.
+                You can <strong>login first</strong>, then <strong>run a scenario</strong> separately, or run
+                <strong>login + scenario</strong> in one shot.
             </p>
             <div class="lab-login-section">
                 <div class="section-label">1. Login (optional — leave empty to use server default)</div>
                 <div class="field">
                     <label for="labUrl">URL</label>
-                    <input type="text" id="labUrl" placeholder="e.g. https://mdrsanitalab2.eng.it/... (empty = from server)">
+                    <input type="text" id="labUrl"
+                        placeholder="e.g. https://mdrsanitalab2.eng.it/... (empty = from server)">
                 </div>
                 <div class="field">
                     <label for="labUsername">Username</label>
@@ -520,6 +675,7 @@
                     <button class="btn btn-secondary" id="runLoginBtn" onclick="runLabLogin()">Login</button>
                 </div>
             </div>
+
             <div class="lab-select-wrap">
                 <label for="labScenarioSelect">2. Scenario</label>
                 <select id="labScenarioSelect" class="lab-scenario-select">
@@ -527,46 +683,56 @@
                 </select>
             </div>
             <div id="labStepsPreview" class="lab-steps" style="display:none;"></div>
+
             <div class="actions lab-actions-row">
-                <button class="btn btn-primary" id="runScenarioBtn" onclick="runLabScenarioOnly()">Run scenario only</button>
-                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login + scenario)</button>
+                <button class="btn btn-primary" id="runScenarioBtn" onclick="runLabScenarioOnly()">Run scenario
+                    only</button>
+                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login +
+                    scenario)</button>
+                <label class="generate-toggle">
+                    <input type="checkbox" id="generateScriptToggle">
+                    <span>generate script</span>
+                </label>
             </div>
         </div>
-        
+
         <!-- NEW: Document Upload Panel -->
         <div id="panel-document" class="panel">
             <p class="panel-desc">
-                <strong>Upload a test case document</strong> (Word or HTML from JIRA), extract scenarios automatically using AI, and run them all at once.
+                <strong>Upload a test case document</strong> (Word or HTML from JIRA), extract scenarios automatically
+                using AI, and run them all at once.
             </p>
-            
+
             <!-- Step 1: Upload -->
             <div class="lab-login-section">
                 <div class="section-label">1. Upload Document</div>
                 <div class="field">
                     <label for="docFile">Select .doc, .docx, or .html file</label>
-                    <input type="file" id="docFile" accept=".doc,.docx,.html,.htm" style="padding: 8px; cursor: pointer;">
+                    <input type="file" id="docFile" accept=".doc,.docx,.html,.htm"
+                        style="padding: 8px; cursor: pointer;">
                 </div>
                 <div class="lab-actions-row">
                     <button class="btn btn-secondary" id="uploadBtn" onclick="uploadDocument()">Upload</button>
                 </div>
                 <div id="uploadStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
             </div>
-            
+
             <!-- Step 2: Extract Scenarios -->
             <div class="lab-login-section" id="extractSection" style="display:none;">
                 <div class="section-label">2. Extract Scenarios (AI)</div>
                 <div class="lab-actions-row">
-                    <button class="btn btn-secondary" id="extractBtn" onclick="extractScenarios()">Extract Scenarios</button>
+                    <button class="btn btn-secondary" id="extractBtn" onclick="extractScenarios()">Extract
+                        Scenarios</button>
                 </div>
                 <div id="extractStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
             </div>
-            
+
             <!-- Step 3: Preview Scenarios -->
             <div id="scenariosPreview" class="lab-steps" style="display:none; margin-top: 20px;">
                 <div class="section-label">Extracted Scenarios</div>
                 <div id="scenariosList" style="margin-top: 10px;"></div>
             </div>
-            
+
             <!-- Step 4: Run Batch Test -->
             <div class="lab-login-section" id="batchSection" style="display:none;">
                 <div class="section-label">3. Run Batch Test</div>
@@ -586,7 +752,7 @@
                     <button class="btn btn-primary" id="runBatchBtn" onclick="runBatchTest()">Run All Scenarios</button>
                 </div>
             </div>
-            
+
             <!-- Batch Progress Display -->
             <div class="batch-progress" id="batchProgress" style="display:none;">
                 <div class="section-label">Batch Test Progress</div>
@@ -604,20 +770,39 @@
         </div>
         <!-- END Document Upload Panel -->
     </div>
-    
+
     <div class="loading" id="loading">
         <div class="spinner"></div>
         <p id="loadingText">Running test...</p>
     </div>
-    
+
     <div class="result" id="result">
         <div class="result-header" id="resultHeader"></div>
         <div class="result-content" id="resultContent"></div>
     </div>
 
+    <!-- Script section — visibile solo se generate_script=true e passed=true -->
+    <div class="script-section" id="scriptSection">
+        <div class="script-header">
+            <div class="script-header-left">
+                <span class="script-badge">PLAYWRIGHT PY</span>
+                <span class="script-title" id="scriptFilename">test_scenario.py</span>
+            </div>
+            <div class="script-actions">
+                <span class="copy-feedback" id="copyFeedback">copied!</span>
+                <button class="btn-icon" onclick="runPlaywright()">run</button>
+                <button class="btn-icon" onclick="copyScript()">copy</button>
+                <button class="btn-icon" onclick="downloadScript()">download</button>
+            </div>
+        </div>
+        <textarea class="script-textarea" id="scriptContent" readonly spellcheck="false"></textarea>
+        <div class="script-footer" id="scriptFooter">generated from run trace · pytest-playwright · async</div>
+    </div>
+
     <script>
         const API_BASE = 'http://localhost:5000';
         let labScenarios = [];
+        let currentScenarioId = '';
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -633,37 +818,31 @@
             try {
                 const r = await fetch(API_BASE + '/api/test/lab/scenarios');
                 const data = await r.json();
-                labScenarios = (data.scenarios || []);
+                labScenarios = data.scenarios || [];
                 if (labScenarios.length === 0) {
                     select.innerHTML = '<option value="">No scenarios (server unavailable?)</option>';
                     return;
                 }
-                // Niente placeholder selezionabile: la prima opzione corrisponde a scenario_1,
-                // la seconda a scenario_2, ecc. Così "seconda opzione" = scenario_2.
                 select.innerHTML = labScenarios
                     .map((s, i) => '<option value="' + s.id + '">' + (i + 1) + '. ' + (s.name || s.id) + '</option>')
                     .join('');
-                select.onchange = function() {
-                    const id = select.value;
+                select.onchange = function () {
+                    currentScenarioId = select.value;
                     const preview = document.getElementById('labStepsPreview');
-                    if (!id) { preview.style.display = 'none'; return; }
-                    const s = labScenarios.find(x => x.id === id);
+                    if (!currentScenarioId) { preview.style.display = 'none'; return; }
+                    const s = labScenarios.find(x => x.id === currentScenarioId);
                     if (s) {
                         let text = '';
-                        if (s.execution_steps && s.execution_steps.length) {
-                            text += 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
-                        }
-                        if (s.expected_results && s.expected_results.length) {
-                            text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i+1) + '. ' + r).join('\n');
-                        }
+                        if (s.execution_steps && s.execution_steps.length)
+                            text += 'Steps:\n' + s.execution_steps.map((st, i) => (i + 1) + '. ' + st).join('\n');
+                        if (s.expected_results && s.expected_results.length)
+                            text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i + 1) + '. ' + r).join('\n');
                         preview.textContent = text || '';
                         preview.style.display = text ? 'block' : 'none';
                     } else {
                         preview.style.display = 'none';
                     }
                 };
-
-                // Mostra subito i dettagli del primo scenario (se presente)
                 if (labScenarios.length > 0) {
                     select.value = labScenarios[0].id;
                     select.onchange();
@@ -680,8 +859,13 @@
                 resultDiv.className = 'result ' + (data.passed ? 'success' : 'error') + ' show';
                 resultHeader.textContent = data.passed ? '✓ SUCCESS' : '✗ FAILED';
                 const parts = [];
+                // Nota "umana" prodotta dal modello (notes) se presente
                 const notes = data.result && (data.result.notes || data.result.final_answer);
                 if (notes) parts.push(notes);
+                // Summary deterministica dalla trace, se presente
+                if (data.result && data.result.trace_summary) {
+                    parts.push('Trace: ' + data.result.trace_summary);
+                }
                 if (data.phase) parts.push('Phase: ' + data.phase);
                 if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
                 if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
@@ -690,6 +874,99 @@
                 resultDiv.className = 'result error show';
                 resultHeader.textContent = 'ERROR';
                 resultContent.textContent = data.message || JSON.stringify(data);
+            }
+
+            if (data.playwright_script) {
+                showScript(data.playwright_script, data.scenario_id || currentScenarioId);
+            } else {
+                document.getElementById('scriptSection').classList.remove('show');
+            }
+        }
+
+        function showScript(script, scenarioId) {
+            const section = document.getElementById('scriptSection');
+            const content = document.getElementById('scriptContent');
+            const filename = document.getElementById('scriptFilename');
+            const footer = document.getElementById('scriptFooter');
+            content.value = script;
+            filename.textContent = 'test_' + (scenarioId || 'scenario') + '.py';
+            const lines = script.split('\n').length;
+            footer.textContent = 'generated from run trace · pytest-playwright · async · ' + lines + ' lines';
+            section.classList.add('show');
+        }
+
+        function copyScript() {
+            const content = document.getElementById('scriptContent').value;
+            navigator.clipboard.writeText(content).then(() => {
+                const fb = document.getElementById('copyFeedback');
+                fb.classList.add('show');
+                setTimeout(() => fb.classList.remove('show'), 2000);
+            });
+        }
+
+        function downloadScript() {
+            const content = document.getElementById('scriptContent').value;
+            const scenarioId = currentScenarioId || 'scenario';
+            const blob = new Blob([content], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'test_' + scenarioId + '.py';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        async function runPlaywright() {
+            const script = document.getElementById('scriptContent').value;
+            if (!script.trim()) {
+                alert('No script to run');
+                return;
+            }
+            const scenarioId = currentScenarioId || 'scenario';
+            const resultDiv = document.getElementById('result');
+            const resultHeader = document.getElementById('resultHeader');
+            const resultContent = document.getElementById('resultContent');
+            const loadingDiv = document.getElementById('loading');
+
+            document.getElementById('loadingText').textContent = 'Running Playwright script...';
+            loadingDiv.classList.add('show');
+            resultDiv.classList.remove('show');
+
+            try {
+                const response = await fetch(API_BASE + '/api/test/playwright/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        script,
+                        scenario_id: scenarioId
+                    })
+                });
+                const data = await response.json();
+                loadingDiv.classList.remove('show');
+
+                resultDiv.classList.add('show');
+                resultContent.innerHTML = '';
+
+                if (data.status === 'success') {
+                    resultDiv.className = 'result success show';
+                    resultHeader.textContent = '✓ PLAYWRIGHT OK';
+                } else {
+                    resultDiv.className = 'result error show';
+                    resultHeader.textContent = '✗ PLAYWRIGHT ERROR';
+                }
+
+                const out = (data.stdout || '').trim();
+                const err = (data.stderr || '').trim();
+                let text = '';
+                if (out) text += out;
+                if (err) text += (text ? '\n\n' : '') + err;
+                if (!text) text = 'No output.';
+                resultContent.textContent = text;
+            } catch (error) {
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                resultHeader.textContent = 'PLAYWRIGHT RUN ERROR';
+                resultContent.textContent = error.message || String(error);
             }
         }
 
@@ -702,6 +979,7 @@
             const password = document.getElementById('labPassword').value;
             document.getElementById('loadingText').textContent = 'Running login (prefix)…';
             resultDiv.classList.remove('show');
+            document.getElementById('scriptSection').classList.remove('show');
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
@@ -719,7 +997,6 @@
                 showLabResult(data, resultDiv, document.getElementById('resultContent'), document.getElementById('resultHeader'));
             } catch (error) {
                 loadingDiv.classList.remove('show');
-                resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
                 document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
                 document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
@@ -730,29 +1007,27 @@
 
         async function runLabScenarioOnly() {
             const scenarioId = document.getElementById('labScenarioSelect').value;
-            if (!scenarioId) {
-                alert('Select a scenario');
-                return;
-            }
+            if (!scenarioId) { alert('Select a scenario'); return; }
+            const generateScript = document.getElementById('generateScriptToggle').checked;
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const btn = document.getElementById('runScenarioBtn');
             document.getElementById('loadingText').textContent = 'Running scenario…';
             resultDiv.classList.remove('show');
+            document.getElementById('scriptSection').classList.remove('show');
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
                 const response = await fetch(API_BASE + '/api/test/lab/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ scenario_id: scenarioId })
+                    body: JSON.stringify({ scenario_id: scenarioId, generate_script: generateScript })
                 });
                 const data = await response.json();
                 loadingDiv.classList.remove('show');
                 showLabResult(data, resultDiv, document.getElementById('resultContent'), document.getElementById('resultHeader'));
             } catch (error) {
                 loadingDiv.classList.remove('show');
-                resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
                 document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
                 document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
@@ -763,15 +1038,13 @@
 
         async function runLabTest() {
             const scenarioId = document.getElementById('labScenarioSelect').value;
-            if (!scenarioId) {
-                alert('Select a scenario');
-                return;
-            }
+            if (!scenarioId) { alert('Select a scenario'); return; }
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const btn = document.getElementById('runLabBtn');
             document.getElementById('loadingText').textContent = 'Running LAB test (prefix + scenario)…';
             resultDiv.classList.remove('show');
+            document.getElementById('scriptSection').classList.remove('show');
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
@@ -794,6 +1067,9 @@
                     if (prefixNote) parts.push('Prefix: ' + prefixNote);
                     const scenarioNote = data.scenario && (data.scenario.notes || data.scenario.final_answer);
                     if (scenarioNote) parts.push('Scenario: ' + scenarioNote);
+                    if (data.scenario && data.scenario.trace_summary) {
+                        parts.push('Trace: ' + data.scenario.trace_summary);
+                    }
                     if (data.phase) parts.push('Phase: ' + data.phase);
                     if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
                     if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
@@ -805,7 +1081,6 @@
                 }
             } catch (error) {
                 loadingDiv.classList.remove('show');
-                resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
                 document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
                 document.getElementById('resultContent').textContent = 'Cannot reach server at ' + API_BASE + '. ' + error.message;
@@ -840,43 +1115,43 @@ Perform a search for 'carm' and verify results appear.
 
 Close the browser.`
         ];
-        
+
         // ==================== DOCUMENT UPLOAD FUNCTIONS ====================
-        
+
         let uploadedFilename = null;
         let extractedScenarios = null;
-        
+
         async function uploadDocument() {
             const fileInput = document.getElementById('docFile');
             const statusDiv = document.getElementById('uploadStatus');
             const btn = document.getElementById('uploadBtn');
-            
+
             if (!fileInput.files || !fileInput.files[0]) {
                 statusDiv.textContent = '❌ Please select a file first';
                 statusDiv.style.color = 'var(--error)';
                 return;
             }
-            
+
             const file = fileInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            
+
             statusDiv.textContent = '⏳ Uploading...';
             statusDiv.style.color = 'var(--muted)';
             btn.disabled = true;
-            
+
             try {
                 const response = await fetch(API_BASE + '/api/test/upload', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     uploadedFilename = data.filename;
                     statusDiv.textContent = `✅ Uploaded: ${data.filename} (${(data.size_bytes / 1024).toFixed(1)} KB)`;
                     statusDiv.style.color = 'var(--success)';
-                    
+
                     // Show extract section
                     document.getElementById('extractSection').style.display = 'block';
                 } else {
@@ -890,23 +1165,23 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         async function extractScenarios() {
             if (!uploadedFilename) {
                 alert('Please upload a document first');
                 return;
             }
-            
+
             const statusDiv = document.getElementById('extractStatus');
             const btn = document.getElementById('extractBtn');
             const previewDiv = document.getElementById('scenariosPreview');
             const scenariosListDiv = document.getElementById('scenariosList');
-            
+
             statusDiv.textContent = '⏳ Extracting scenarios with AI... (this may take 10-30 seconds)';
             statusDiv.style.color = 'var(--muted)';
             btn.disabled = true;
             previewDiv.style.display = 'none';
-            
+
             try {
                 const response = await fetch(API_BASE + '/api/test/extract-scenarios', {
                     method: 'POST',
@@ -914,12 +1189,12 @@ Close the browser.`
                     body: JSON.stringify({ file: uploadedFilename })
                 });
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     extractedScenarios = data.scenarios;
                     statusDiv.textContent = `✅ Extracted ${data.scenarios_count} scenarios from "${data.document.title}"`;
                     statusDiv.style.color = 'var(--success)';
-                    
+
                     // Show scenarios preview
                     scenariosListDiv.innerHTML = '';
                     data.scenarios.forEach((scenario, idx) => {
@@ -943,7 +1218,7 @@ Close the browser.`
                         `;
                         scenariosListDiv.appendChild(scenarioDiv);
                     });
-                    
+
                     previewDiv.style.display = 'block';
                     document.getElementById('batchSection').style.display = 'block';
                 } else {
@@ -957,22 +1232,22 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         async function runBatchTest() {
             if (!extractedScenarios || extractedScenarios.length === 0) {
                 alert('Please extract scenarios first');
                 return;
             }
-            
+
             const url = document.getElementById('batchUrl').value.trim();
             const username = document.getElementById('batchUsername').value.trim();
             const password = document.getElementById('batchPassword').value;
-            
+
             if (!url || !username || !password) {
                 alert('Please fill in URL, username, and password');
                 return;
             }
-            
+
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const batchProgressDiv = document.getElementById('batchProgress');
@@ -981,29 +1256,29 @@ Close the browser.`
             const progressStatus = document.getElementById('progressStatus');
             const progressCount = document.getElementById('progressCount');
             const progressDetails = document.getElementById('progressDetails');
-            
+
             // Hide previous results, show progress
             resultDiv.classList.remove('show');
             loadingDiv.classList.remove('show');
             batchProgressDiv.style.display = 'block';
             btn.disabled = true;
-            
+
             // Reset progress
             progressBar.style.width = '0%';
             progressStatus.textContent = 'Initializing batch test...';
             progressCount.textContent = `0/${extractedScenarios.length}`;
             progressDetails.innerHTML = '';
-            
+
             let completedScenarios = 0;
             let currentScenario = null;
             const scenarioElements = {};
-            
+
             function updateProgress() {
                 const percentage = (completedScenarios / extractedScenarios.length) * 100;
                 progressBar.style.width = `${percentage}%`;
                 progressCount.textContent = `${completedScenarios}/${extractedScenarios.length}`;
             }
-            
+
             function addScenarioElement(scenarioId, scenarioName) {
                 const div = document.createElement('div');
                 div.className = 'progress-item active';
@@ -1017,7 +1292,7 @@ Close the browser.`
                 // Scroll to bottom
                 progressDetails.scrollTop = progressDetails.scrollHeight;
             }
-            
+
             function updateScenarioElement(scenarioId, message, status = 'active') {
                 const div = scenarioElements[scenarioId];
                 if (div) {
@@ -1029,7 +1304,7 @@ Close the browser.`
                     progressDetails.scrollTop = progressDetails.scrollHeight;
                 }
             }
-            
+
             function addErrorToScenario(scenarioId, error) {
                 const div = scenarioElements[scenarioId];
                 if (div) {
@@ -1042,7 +1317,7 @@ Close the browser.`
                     errorDiv.textContent = `❌ ${error}`;
                 }
             }
-            
+
             try {
                 // Create EventSource for SSE
                 const eventSource = new EventSource(
@@ -1056,7 +1331,7 @@ Close the browser.`
                         })
                     })
                 );
-                
+
                 // Better approach: use POST with fetch streaming
                 const response = await fetch(API_BASE + '/api/test/batch/stream', {
                     method: 'POST',
@@ -1069,19 +1344,19 @@ Close the browser.`
                         save_results: true
                     })
                 });
-                
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    
+
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop(); // Keep incomplete line in buffer
-                    
+
                     for (const line of lines) {
                         if (line.startsWith('event:')) {
                             const eventType = line.substring(7).trim();
@@ -1097,7 +1372,7 @@ Close the browser.`
                         }
                     }
                 }
-                
+
                 function handleSSEEvent(eventData) {
                     // Extract event type from data or infer from structure
                     if (eventData.scenario_index !== undefined) {
@@ -1138,40 +1413,40 @@ Close the browser.`
                         addErrorToScenario(eventData.scenario_id, eventData.error);
                     }
                 }
-                
+
                 function showFinalResults(data) {
                     progressStatus.textContent = 'Batch test completed!';
-                    
+
                     // Show final results in result div
                     const resultContent = document.getElementById('resultContent');
                     const resultHeader = document.getElementById('resultHeader');
                     resultDiv.classList.add('show');
                     resultContent.innerHTML = '';
-                    
+
                     const summary = data.summary || {};
                     const total = data.total_scenarios || 0;
                     const success = summary.success || 0;
                     const failed = summary.failed || 0;
                     const error = summary.error || 0;
                     const successRate = total > 0 ? ((success / total) * 100).toFixed(1) : 0;
-                    
+
                     resultDiv.className = 'result ' + (success === total ? 'success' : 'error') + ' show';
                     resultHeader.textContent = `BATCH TEST RESULTS: ${success}/${total} passed (${successRate}%)`;
-                    
+
                     let html = '<div style="font-size: 14px; line-height: 1.8;">';
                     html += `<div style="margin-bottom: 12px;"><strong>Total:</strong> ${total} scenarios</div>`;
                     html += `<div style="color: var(--success); margin-bottom: 6px;"><strong>✓ Passed:</strong> ${success}</div>`;
                     html += `<div style="color: var(--error); margin-bottom: 6px;"><strong>✗ Failed:</strong> ${failed}</div>`;
                     html += `<div style="color: var(--error); margin-bottom: 12px;"><strong>💥 Errors:</strong> ${error}</div>`;
-                    
+
                     if (data.saved_to) {
                         html += `<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"><strong>Report saved to:</strong><br/><code style="color: var(--accent);">${data.saved_to}</code></div>`;
                     }
-                    
+
                     html += '</div>';
                     resultContent.innerHTML = html;
                 }
-                
+
             } catch (error) {
                 resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
@@ -1181,103 +1456,61 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         // ==================== END DOCUMENT UPLOAD FUNCTIONS ====================
-        
+
         function loadExample(index) {
             document.getElementById('testDescription').value = examples[index];
         }
-        
+
         function clearTest() {
             document.getElementById('testDescription').value = '';
             document.getElementById('result').classList.remove('show');
+            document.getElementById('scriptSection').classList.remove('show');
         }
 
         async function runTest() {
             const description = document.getElementById('testDescription').value.trim();
-
-            if (!description) {
-                alert('Please enter a test description');
-                return;
-            }
-
+            if (!description) { alert('Please enter a test description'); return; }
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const btn = document.getElementById('runBtn');
-
             resultDiv.classList.remove('show');
+            document.getElementById('scriptSection').classList.remove('show');
             loadingDiv.classList.add('show');
             btn.disabled = true;
-
             try {
                 const response = await fetch(API_BASE + '/api/agent/mcp/test/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        test_description: description,
-                        keep_session: false
-                    })
+                    body: JSON.stringify({ test_description: description, keep_session: false })
                 });
-
                 const data = await response.json();
-                
-                // Debug: verifica cosa arriva dal backend
-                console.log('Response data:', data);
-                console.log('Screenshot present:', !!data.screenshot);
-                if (data.screenshot) {
-                    console.log('Screenshot length:', data.screenshot.length);
-                }
-
                 loadingDiv.classList.remove('show');
                 resultDiv.classList.add('show');
-
                 const resultContent = document.getElementById('resultContent');
-                resultContent.innerHTML = ''; // Svuota contenuto precedente
-                
+                resultContent.innerHTML = '';
                 if (data.status === 'success' && data.passed) {
                     resultDiv.className = 'result success show';
                     document.getElementById('resultHeader').textContent = '✓ SUCCESS';
-                    
-                    // Aggiungi testo
                     const textNode = document.createElement('div');
                     textNode.style.whiteSpace = 'pre-wrap';
                     textNode.textContent = data.final_answer || 'Test completed successfully';
                     resultContent.appendChild(textNode);
-                    
-                    // Aggiungi immagine se presente
                     if (data.screenshot) {
-                        console.log('Creating image element...');
-                        console.log('First 100 chars of base64:', data.screenshot.substring(0, 100));
-                        
                         const imgLabel = document.createElement('div');
                         imgLabel.textContent = '📸 Final Screenshot:';
                         imgLabel.style.marginTop = '20px';
                         imgLabel.style.marginBottom = '10px';
                         imgLabel.style.color = 'var(--success)';
                         resultContent.appendChild(imgLabel);
-                        
                         const img = document.createElement('img');
-                        // Rimuovi eventuali newlines o spazi dal base64
-                        const cleanBase64 = data.screenshot.replace(/\s/g, '');
-                        img.src = 'data:image/png;base64,' + cleanBase64;
+                        img.src = 'data:image/png;base64,' + data.screenshot.replace(/\s/g, '');
                         img.style.maxWidth = '100%';
                         img.style.borderRadius = '6px';
                         img.style.border = '1px solid var(--border)';
                         img.style.display = 'block';
-                        img.onerror = function(e) {
-                            console.error('Failed to load image:', e);
-                            console.error('Image src length:', img.src.length);
-                            imgLabel.textContent = '❌ Failed to load screenshot (check console)';
-                            imgLabel.style.color = 'var(--error)';
-                        };
-                        img.onload = function() {
-                            console.log('✅ Screenshot loaded successfully!');
-                            console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-                        };
                         resultContent.appendChild(img);
-                        console.log('Image element appended to DOM');
-                    } else {
-                        console.log('No screenshot in response data');
                     }
                 } else {
                     resultDiv.className = 'result error show';
@@ -1289,17 +1522,17 @@ Close the browser.`
                 resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
                 document.getElementById('resultHeader').textContent = 'CONNECTION ERROR';
-                document.getElementById('resultContent').textContent = `Could not connect to Flask server.\nMake sure it's running on http://localhost:5000\n\n${error.message}`;
+                document.getElementById('resultContent').textContent =
+                    'Could not connect to Flask server.\nMake sure it\'s running on http://localhost:5000\n\n' + error.message;
             } finally {
                 btn.disabled = false;
             }
         }
-        
+
         document.getElementById('testDescription').addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                runTest();
-            }
+            if (e.ctrlKey && e.key === 'Enter') runTest();
         });
     </script>
 </body>
+
 </html>

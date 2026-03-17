@@ -66,14 +66,14 @@ async def wait_for_load_state(state: str = "domcontentloaded", timeout: int = 30
     return to_json(result)
 
 
-@mcp.tool()
-async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
-    """
-    Cattura screenshot full-page.
-    Se return_base64=True include base64 nel JSON (attenzione ai token).
-    """
-    result = await playwright.capture_screenshot(filename=filename, return_base64=return_base64)
-    return to_json(result)
+## @mcp.tool()
+## async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
+##     """
+##     Cattura screenshot full-page.
+##     Se return_base64=True include base64 nel JSON (attenzione ai token).
+##     """
+##     result = await playwright.capture_screenshot(filename=filename, return_base64=return_base64)
+##     return to_json(result)
 
 
 @mcp.tool()
@@ -140,6 +140,19 @@ async def get_text_by_visible_content(search_text: str, timeout: int = 10000) ->
 async def press_key(key: str) -> str:
     """Premi un tasto (Enter/Escape/etc.)."""
     result = await playwright.press_key(key=key)
+    return to_json(result)
+
+
+@mcp.tool()
+async def scroll_to_bottom(selector: str | None = None) -> str:
+    """
+    Scorre fino in fondo la pagina o un contenitore specifico.
+
+    Args:
+        selector: CSS del contenitore scrollabile (es. ".sample-table-container").
+                  Se None, esegue scroll della pagina (window).
+    """
+    result = await playwright.scroll_to_bottom(selector=selector)
     return to_json(result)
 
 

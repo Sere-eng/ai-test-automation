@@ -13,6 +13,7 @@ from typing import List, Optional
 @dataclass
 class LabScenario:
     """Uno scenario eseguibile sulla piattaforma LAB dopo il prefix fisso."""
+
     id: str
     name: str
     expected_results: List[str]
@@ -57,7 +58,7 @@ LAB_SCENARIOS: List[LabScenario] = [
             "Verifica che la pagina mostri il titolo 'Attività di dettaglio dashboard' e leggi il contatore 'Totale righe visualizzate' visualizzato in fondo alla lista.",
         ],
         prompt_hints=None,
-        ),
+    ),
     LabScenario(
         id="scenario_3",
         name="Accesso tramite filtro",
@@ -87,6 +88,27 @@ LAB_SCENARIOS: List[LabScenario] = [
             "Attendi che venga aperta la pagina 'Attività di dettaglio dashboard' con l'elenco campioni.",
             "Clicca su una riga qualsiasi dell'elenco.",
             "Attendi che venga aperta la pagina 'Attività di dettaglio del campione di laboratorio'.",
+        ],
+        prompt_hints=None,
+    ),
+    LabScenario(
+        id="scenario_5",
+        name="Creazione filtro con Piano di lavoro e Descrizione",
+        expected_results=[
+            "Il filtro creato viene salvato correttamente e risulta visibile nella dashboard (sezione Filtri / card) con il nome inserito.",
+            "Nel dettaglio del filtro risultano valorizzati i campi 'Descrizione' e almeno un valore in 'Piano di lavoro'.",
+        ],
+        execution_steps=[
+            "Dal menu laterale clicca direttamente sulla voce 'Laboratorio'.",
+            "Accedere alla dashboard di interesse selezionandola dal dropdown menu (se è presente solo una dashboard è valorizzata di default).",
+            "Accedere alla funzionalità 'Modifica'.",
+            "Creare un nuovo elemento cliccando 'Aggiungi Gruppo'.",
+            "Creare un nuovo filtro tramite 'Aggiungi filtro' (o equivalente) e attendere il popup 'Aggiungi filtro'.",
+            "Nel popup 'Aggiungi filtro' compilare il campo obbligatorio 'Nome filtro*' con un valore univoco che inizi con 'AUTO_' (es. 'AUTO_PL_<timestamp>').",
+            "Compilare il campo 'Descrizione' con il testo 'Creato da test automatico'.",
+            "Aprire il campo 'Piano di lavoro' e selezionare UNA voce (se è presente la checkbox 'Seleziona tutti' NON selezionarla).",
+            "Confermare e salvare il filtro con il pulsante 'Conferma'.",
+            "Verificare che nella dashboard sia visibile una card / voce con il nome del filtro creato (prefisso 'AUTO_').",
         ],
         prompt_hints=None,
     ),
