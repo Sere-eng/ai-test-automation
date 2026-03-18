@@ -141,7 +141,7 @@ class TestDocumentParser:
             import pandas as pd
         except ImportError:
             raise ImportError(
-                "pandas non installato. Installa con: pip install pandas openpyxl"
+                "pandas non installato. Installa con: pip install pandas openpyxl xlrd"
             )
         
         file_ext = self.file_path.suffix.lower()
@@ -150,8 +150,14 @@ class TestDocumentParser:
         if file_ext in ['.xlsx']:
             return self._parse_excel_with_colors()
         elif file_ext == '.xls':
-            # .xls vecchio formato, usa pandas standard
-            df = pd.read_excel(self.file_path)
+            # .xls vecchio formato, usa pandas con engine xlrd
+            try:
+                df = pd.read_excel(self.file_path, engine="xlrd")
+            except ImportError as exc:
+                raise ImportError(
+                    "Impossibile leggere file .xls: il pacchetto 'xlrd' non è installato. "
+                    "Installa con: pip install xlrd"
+                ) from exc
             return self._parse_dataframe_standard(df, file_ext)
         elif file_ext == '.csv':
             # CSV - parsing standard
