@@ -9,17 +9,45 @@ from agent.utils import safe_json_loads
 
 
 # Classificazione logica dei tool per la valutazione pass/fail.
+#
+# - INFRA_TOOLS: infrastruttura pura (screenshot, chiusura browser).
+#   Gli errori vengono ignorati completamente — non sono asserzioni di test.
+#
 # - SOFT_TOOLS: azioni/interazioni dove errori intermedi fanno parte del fallback naturale.
-# - PROBING_TOOLS: wait usati spesso in modalità "tentativo" prima della verifica finale.
-# - HARD_ASSERT_TOOLS: asserzioni vere e proprie; qualsiasi errore viene considerato blocccante.
+#   Tolleranza: se l'ultimo uso del tool è success, gli errori precedenti vengono ignorati.
+#
+# - PROBING_TOOLS / VERIFICATION_TOOLS: tool di verifica usati spesso in coppia
+#   (es. wait_for_text_content + get_text_by_visible_content).
+#   Tolleranza a gruppo: se l'ultimo uso di QUALSIASI tool del gruppo è success,
+#   gli errori di TUTTI i tool del gruppo vengono ignorati.
+#
+# - HARD_ASSERT_TOOLS: asserzioni vere e proprie; qualsiasi errore è bloccante.
+
+INFRA_TOOLS: set[str] = {
+    "capture_screenshot",
+    "close_browser",
+    "start_browser",
+}
+
 SOFT_TOOLS: set[str] = {
     "click_smart",
     "fill_smart",
+    "scroll_to_bottom",
     "wait_for_clickable_by_name",
     "wait_for_field_by_name",
     "wait_for_control_by_name_and_type",
 }
 
+# Tool di verifica raggruppati: se uno del gruppo finisce in success,
+# gli errori degli altri tool dello stesso gruppo vengono cancellati.
+VERIFICATION_GROUPS: list[set[str]] = [
+    {
+        "wait_for_text_content",
+        "get_text_by_visible_content",
+    },
+]
+
+# Mantenuto per compatibilità — viene assorbito da VERIFICATION_GROUPS
 PROBING_TOOLS: set[str] = {
     "wait_for_text_content",
 }
@@ -51,8 +79,10 @@ def parse_tool_output(output_raw: Any) -> Any:
     if raw is None:
         return None
     if not isinstance(raw, str):
-        # oggetto non message: non salvare il repr, solo un placeholder
-        return {"_raw_type": type(raw).__name__, "_note": "output was not string or message"}
+        return {
+            "_raw_type": type(raw).__name__,
+            "_note": "output was not string or message",
+        }
     parsed = safe_json_loads(raw)
     return parsed if parsed is not None else raw
 
@@ -67,7 +97,10 @@ def step_from_tool_end(tool_name: str, output_obj: Any) -> dict:
 
 
 def error_from_tool_output(tool_name: str, output_obj: dict) -> Optional[dict]:
-    """Se output ha status=error, restituisce il dict errore."""
+    """Se output ha status=error, restituisce il dict errore.
+    Gli errori di INFRA_TOOLS vengono ignorati a monte."""
+    if tool_name in INFRA_TOOLS:
+        return None
     if not isinstance(output_obj, dict) or output_obj.get("status") != "error":
         return None
     return {
@@ -124,12 +157,16 @@ def extract_final_answer_from_event(ev: dict) -> Optional[str]:
 def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[dict]]:
     """
     Pass/fail da steps e errori (livello avanzato: codice decide, non il modello).
+
+    Logica di tolleranza (in ordine):
+    1. INFRA_TOOLS: errori ignorati completamente (già filtrati da error_from_tool_output).
+    2. SOFT_TOOLS: se l'ultimo uso del tool è success, errori precedenti ignorati.
+    3. VERIFICATION_GROUPS: se l'ultimo uso di qualsiasi tool del gruppo è success,
+       errori di tutti i tool del gruppo vengono ignorati.
     """
     errors_out = list(errors)
 
-    # TOLLERANZA: se l'ULTIMO uso di alcuni action tool (es. click_smart/fill_smart)
-    # è andato in success, ignoriamo gli errori precedenti di quel tool.
-    # Esempio tipico: primo click_smart fallisce, il secondo sullo stesso bottone va in success.
+    # Calcola l'ultimo status per ogni tool
     last_status_by_tool: dict[str, str] = {}
     for s in steps:
         tool = s.get("tool")
@@ -140,15 +177,18 @@ def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[d
         if status in ("success", "error") and tool:
             last_status_by_tool[tool] = status
 
-    # Tool "tolleranti": SOFT_TOOLS + PROBING_TOOLS.
-    # Se l'ULTIMO utilizzo di uno di questi tool è andato in success,
-    # gli errori precedenti per quello stesso tool non causano fail.
-    tolerant_tools = SOFT_TOOLS | PROBING_TOOLS
-    for t in tolerant_tools:
+    # Tolleranza SOFT_TOOLS: ultimo uso success → cancella errori precedenti
+    for t in SOFT_TOOLS:
         if last_status_by_tool.get(t) == "success":
             errors_out = [e for e in errors_out if e.get("tool") != t]
+
+    # Tolleranza VERIFICATION_GROUPS: se almeno un tool del gruppo finisce in success,
+    # cancella errori di tutti i tool del gruppo.
+    for group in VERIFICATION_GROUPS:
+        group_has_success = any(last_status_by_tool.get(t) == "success" for t in group)
+        if group_has_success:
+            errors_out = [e for e in errors_out if e.get("tool") not in group]
 
     passed = len(errors_out) == 0
 
     return passed, errors_out
-

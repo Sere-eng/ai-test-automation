@@ -14,12 +14,20 @@ from config.settings import AppConfig
 
 def _normalize_css_selector(by: str, target: dict) -> Optional[str]:
     """Normalize CSS selector: for css_id or id-like selector (e.g. mat-input-17), prefix with #."""
-    selector = target.get("selector") or (f"#{target['id']}" if by == "css_id" and target.get("id") else None)
+    selector = target.get("selector") or (
+        f"#{target['id']}" if by == "css_id" and target.get("id") else None
+    )
     if not selector:
         return None
     # If it looks like an id (starts with letter/underscore, only alphanumeric/hyphen), ensure # prefix
     s = selector.strip()
-    if s and not s.startswith("#") and not s.startswith("[") and not s.startswith(".") and "/" not in s:
+    if (
+        s
+        and not s.startswith("#")
+        and not s.startswith("[")
+        and not s.startswith(".")
+        and "/" not in s
+    ):
         if (s[0].isalpha() or s[0] == "_") and all(c.isalnum() or c in "-_" for c in s):
             return "#" + s
     return selector
@@ -40,6 +48,7 @@ def _normalize_targets_for_mode(targets: List[Dict], mode: str) -> List[Dict]:
             normalized.append(t)
     return normalized
 
+
 def _strip_material_icon_prefix(name: str) -> str:
     """
     Rimuove il prefisso di icona Material da un accessible_name concatenato.
@@ -56,10 +65,11 @@ def _strip_material_icon_prefix(name: str) -> str:
         return parts[-1] if parts else name
     # Caso 2: concatenato senza separatore: parola lowercase breve (2-8 char)
     # seguita da testo che inizia con maiuscola o uppercase
-    m = re.match(r'^[a-z_]{2,8}([A-Z].+)$', name)
+    m = re.match(r"^[a-z_]{2,8}([A-Z].+)$", name)
     if m:
         return m.group(1).strip()
     return name
+
 
 class PlaywrightTools:
     """
@@ -90,29 +100,32 @@ class PlaywrightTools:
         """
         try:
             self.playwright = await async_playwright().start()
-            
+
             # Args: disabilitano rilevamento automazione (navigator.webdriver, feature detection)
             browser_args = [
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+                "--lang=it-IT",  # <--- aggiungi questo
             ]
-            
+
             self.browser = await self.playwright.chromium.launch(
-                headless=headless,
-                args=browser_args
+                headless=headless, args=browser_args
             )
 
             # SOLUZIONE COOKIE GOOGLE: Pre-imposta cookie di consenso
             self.context = await self.browser.new_context(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
                 locale=AppConfig.PLAYWRIGHT.LOCALE,
                 timezone_id=AppConfig.PLAYWRIGHT.TIMEZONE,
-                viewport={'width': AppConfig.PLAYWRIGHT.VIEWPORT_WIDTH,
-                          'height': AppConfig.PLAYWRIGHT.VIEWPORT_HEIGHT}
+                viewport={
+                    "width": AppConfig.PLAYWRIGHT.VIEWPORT_WIDTH,
+                    "height": AppConfig.PLAYWRIGHT.VIEWPORT_HEIGHT,
+                },
+                extra_http_headers={"Accept-Language": "it-IT,it;q=0.9"},
             )
 
             self.page = await self.context.new_page()
@@ -120,12 +133,12 @@ class PlaywrightTools:
             return {
                 "status": "success",
                 "message": "Browser avviato con successo (stealth mode)",
-                "headless": headless
+                "headless": headless,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Errore nell'avviare il browser: {str(e)}"
+                "message": f"Errore nell'avviare il browser: {str(e)}",
             }
 
     async def close_browser(self):
@@ -147,15 +160,9 @@ class PlaywrightTools:
             self.browser = None
             self.playwright = None
 
-            return {
-                "status": "success",
-                "message": "Browser chiuso correttamente"
-            }
+            return {"status": "success", "message": "Browser chiuso correttamente"}
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore nella chiusura: {str(e)}"
-            }
+            return {"status": "error", "message": f"Errore nella chiusura: {str(e)}"}
 
     async def navigate_to_url(self, url):
         """
@@ -165,7 +172,7 @@ class PlaywrightTools:
             if not self.page:
                 return {
                     "status": "error",
-                    "message": "Browser non avviato. Chiama prima start_browser()"
+                    "message": "Browser non avviato. Chiama prima start_browser()",
                 }
 
             # Importante: NON usare più "networkidle" come default.
@@ -187,13 +194,10 @@ class PlaywrightTools:
                 "status": "success",
                 "message": f"Navigato a {url}",
                 "url": current_url,
-                "page_title": page_title
+                "page_title": page_title,
             }
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore nella navigazione: {str(e)}"
-            }
+            return {"status": "error", "message": f"Errore nella navigazione: {str(e)}"}
 
     async def get_page_info(self):
         """
@@ -201,22 +205,16 @@ class PlaywrightTools:
         """
         try:
             if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
+                return {"status": "error", "message": "Browser non avviato"}
 
             return {
                 "status": "success",
                 "url": self.page.url,
                 "title": await self.page.title(),
-                "viewport": self.page.viewport_size
+                "viewport": self.page.viewport_size,
             }
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore: {str(e)}"
-            }
+            return {"status": "error", "message": f"Errore: {str(e)}"}
 
     async def capture_screenshot(self, filename=None, return_base64=False):
         """
@@ -231,10 +229,7 @@ class PlaywrightTools:
         """
         try:
             if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
+                return {"status": "error", "message": "Browser non avviato"}
 
             if not filename:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -247,13 +242,12 @@ class PlaywrightTools:
                 "status": "success",
                 "message": f"Screenshot catturato: {filename}",
                 "filename": filename,
-                "size_bytes": len(screenshot_bytes)
+                "size_bytes": len(screenshot_bytes),
             }
 
             # Include base64 SOLO se richiesto
             if return_base64:
-                screenshot_base64 = base64.b64encode(
-                    screenshot_bytes).decode('utf-8')
+                screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
                 result["base64"] = screenshot_base64
 
             return result
@@ -261,7 +255,7 @@ class PlaywrightTools:
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Errore nel catturare screenshot: {str(e)}"
+                "message": f"Errore nel catturare screenshot: {str(e)}",
             }
 
     # =====================================================================
@@ -274,25 +268,14 @@ class PlaywrightTools:
         """
         try:
             if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
+                return {"status": "error", "message": "Browser non avviato"}
 
             await self.page.keyboard.press(key)
 
-            return {
-                "status": "success",
-                "message": f"Tasto premuto: {key}",
-                "key": key
-            }
+            return {"status": "success", "message": f"Tasto premuto: {key}", "key": key}
 
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore: {str(e)}",
-                "key": key
-            }
+            return {"status": "error", "message": f"Errore: {str(e)}", "key": key}
 
     async def get_text(self, selector, selector_type="css"):
         """
@@ -300,10 +283,7 @@ class PlaywrightTools:
         """
         try:
             if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
+                return {"status": "error", "message": "Browser non avviato"}
 
             if selector_type == "css":
                 locator = self.page.locator(selector)
@@ -312,7 +292,7 @@ class PlaywrightTools:
             else:
                 return {
                     "status": "error",
-                    "message": f"Tipo selector non supportato: {selector_type}"
+                    "message": f"Tipo selector non supportato: {selector_type}",
                 }
 
             text = await locator.inner_text()
@@ -321,17 +301,19 @@ class PlaywrightTools:
                 "status": "success",
                 "message": "Testo estratto con successo",
                 "selector": selector,
-                "text": text
+                "text": text,
             }
 
         except Exception as e:
             return {
                 "status": "error",
                 "message": f"Errore nell'estrazione: {str(e)}",
-                "selector": selector
+                "selector": selector,
             }
 
-    async def get_text_by_visible_content(self, search_text: str, timeout: int = 10000) -> dict:
+    async def get_text_by_visible_content(
+        self, search_text: str, timeout: int = 10000
+    ) -> dict:
         """
         Trova il primo elemento visibile che contiene il testo search_text e ne restituisce
         il testo completo (innerText). Usare SOLO quando search_text è esplicitamente
@@ -356,6 +338,44 @@ class PlaywrightTools:
                 "status": "error",
                 "message": f"Elemento con testo '{search_text}' non trovato o non visibile: {str(e)}",
                 "search_text": search_text,
+            }
+
+    # =====================================================================
+    # SCROLL - Utility
+    # =====================================================================
+    async def scroll_to_bottom(self, selector: Optional[str] = None) -> dict:
+        """
+        Scorre fino in fondo la pagina o un contenitore specifico.
+
+        Args:
+            selector: CSS del contenitore scrollabile (es. ".sample-table-container").
+                      Se None, esegue scroll della pagina (window).
+        """
+        try:
+            if not self.page:
+                return {"status": "error", "message": "Browser non avviato"}
+
+            if selector:
+                # Use .first to avoid strict mode when multiple elements match (e.g. nested .sample-table-container)
+                locator = self.page.locator(selector).first
+                await locator.evaluate("el => { el.scrollTop = el.scrollHeight; }")
+                target = selector
+            else:
+                await self.page.evaluate(
+                    "() => { window.scrollTo(0, document.body.scrollHeight); }"
+                )
+                target = "window"
+
+            return {
+                "status": "success",
+                "message": "Scroll eseguito fino in fondo",
+                "target": target,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Errore nello scroll: {str(e)}",
+                "target": selector or "window",
             }
 
     async def wait_for_load_state(
@@ -393,7 +413,9 @@ class PlaywrightTools:
     async def wait_for_element_state(
         self,
         targets: List[Dict],
-        state: Literal["visible", "hidden", "attached", "detached", "enabled", "disabled"] = "visible",
+        state: Literal[
+            "visible", "hidden", "attached", "detached", "enabled", "disabled"
+        ] = "visible",
         timeout: Optional[int] = None,
         in_iframe: dict = None,
     ) -> dict:
@@ -433,7 +455,9 @@ class PlaywrightTools:
         # Determina context (page o iframe)
         context = self.page
         if in_iframe:
-            frame_result = await self.get_frame(**in_iframe, timeout=timeout, return_frame=True)
+            frame_result = await self.get_frame(
+                **in_iframe, timeout=timeout, return_frame=True
+            )
             if frame_result.get("status") == "error":
                 return frame_result
             context = frame_result["frame"]
@@ -567,7 +591,7 @@ class PlaywrightTools:
         Examples:
             # Iframe singolo
             frame = await get_frame(url_pattern="registry/movementreason")
-            
+
             # Iframe annidati (dashboard → payment widget → form)
             frame = await get_frame(iframe_path=[
                 {"url_pattern": "dashboard"},
@@ -585,7 +609,7 @@ class PlaywrightTools:
                 context = self.page
                 selectors_used = []
                 frame_urls = []
-                
+
                 for level_idx, level_spec in enumerate(iframe_path):
                     level_selector = None
                     if "selector" in level_spec:
@@ -593,13 +617,15 @@ class PlaywrightTools:
                     elif "url_pattern" in level_spec:
                         level_selector = f'iframe[src*="{level_spec["url_pattern"]}"]'
                     else:
-                        level_selector = 'iframe'
-                    
+                        level_selector = "iframe"
+
                     selectors_used.append(level_selector)
-                    
+
                     # Trova iframe nel context corrente (page o frame parent)
-                    iframe_element = await context.wait_for_selector(level_selector, timeout=timeout)
-                    
+                    iframe_element = await context.wait_for_selector(
+                        level_selector, timeout=timeout
+                    )
+
                     # Accedi al content_frame
                     frame = await iframe_element.content_frame()
                     if frame is None:
@@ -610,13 +636,13 @@ class PlaywrightTools:
                             "selectors_used": selectors_used,
                             "failed_at_level": level_idx + 1,
                         }
-                    
-                    await frame.wait_for_load_state('load', timeout=timeout)
+
+                    await frame.wait_for_load_state("load", timeout=timeout)
                     frame_urls.append(getattr(frame, "url", None))
-                    
+
                     # Il frame diventa il nuovo context per il prossimo livello
                     context = frame
-                
+
                 # context ora è il frame più profondo
                 result = {
                     "status": "success",
@@ -631,7 +657,7 @@ class PlaywrightTools:
                 if return_frame:
                     result["frame"] = context  # frame più profondo
                 return result
-                
+
             else:
                 # Singolo iframe (backward compatibility)
                 iframe_selector_used = None
@@ -640,18 +666,22 @@ class PlaywrightTools:
                 elif url_pattern:
                     iframe_selector_used = f'iframe[src*="{url_pattern}"]'
                 else:
-                    iframe_selector_used = 'iframe'
+                    iframe_selector_used = "iframe"
 
                 # Prova prima con il selector specifico; se non trova nulla e avevamo
                 # un url_pattern, fai fallback al primo iframe generico invece di
                 # andare in timeout per 60s.
                 try:
-                    iframe_element = await self.page.wait_for_selector(iframe_selector_used, timeout=timeout)
+                    iframe_element = await self.page.wait_for_selector(
+                        iframe_selector_used, timeout=timeout
+                    )
                 except Exception as e:
                     if url_pattern:
                         # Fallback: primo iframe disponibile
-                        iframe_selector_used = 'iframe'
-                        iframe_element = await self.page.wait_for_selector(iframe_selector_used, timeout=timeout)
+                        iframe_selector_used = "iframe"
+                        iframe_element = await self.page.wait_for_selector(
+                            iframe_selector_used, timeout=timeout
+                        )
                     else:
                         raise
 
@@ -665,7 +695,7 @@ class PlaywrightTools:
                         "timeout_ms": timeout,
                     }
 
-                await frame.wait_for_load_state('load', timeout=timeout)
+                await frame.wait_for_load_state("load", timeout=timeout)
 
                 result = {
                     "status": "success",
@@ -680,10 +710,7 @@ class PlaywrightTools:
                 return result
 
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Errore accesso iframe: {str(e)}"
-            }
+            return {"status": "error", "message": f"Errore accesso iframe: {str(e)}"}
 
     # =====================================================================
     # MEDIUM - Wait per testo
@@ -694,7 +721,7 @@ class PlaywrightTools:
         text: str,
         timeout: int = 30000,
         case_sensitive: bool = False,
-        in_iframe: dict = None
+        in_iframe: dict = None,
     ):
         """
         Aspetta che un testo specifico appaia OVUNQUE nella pagina o dentro un iframe.
@@ -717,16 +744,13 @@ class PlaywrightTools:
 
             # Dopo search in iframe Causali, aspetta risultato dentro iframe
             await wait_for_text_content(
-                "CARMAG", 
+                "CARMAG",
                 timeout=5000,
                 in_iframe={"url_pattern": "movementreason"}
             )
         """
         if not self.page:
-            return {
-                "status": "error",
-                "message": "Browser non avviato"
-            }
+            return {"status": "error", "message": "Browser non avviato"}
         try:
             # Determina il contesto (page o frame)
             context = self.page
@@ -743,7 +767,7 @@ class PlaywrightTools:
                     return frame_result
                 # Usa direttamente l'oggetto frame restituito
                 context = frame_result.get("frame", self.page)
-            
+
             # Costruisci selector Playwright per text
             if case_sensitive:
                 selector = f"text={text}"
@@ -762,7 +786,7 @@ class PlaywrightTools:
                 "status": "success",
                 "message": f"Testo '{text}' trovato e visibile",
                 "text": text,
-                "case_sensitive": case_sensitive
+                "case_sensitive": case_sensitive,
             }
 
         except Exception as e:
@@ -770,7 +794,7 @@ class PlaywrightTools:
                 "status": "error",
                 "message": f"Testo '{text}' non trovato dopo {timeout}ms",
                 "text": text,
-                "timeout_ms": timeout
+                "timeout_ms": timeout,
             }
 
     # =====================================================================
@@ -780,7 +804,7 @@ class PlaywrightTools:
         self,
         targets: List[Dict],
         timeout_per_try: int = AppConfig.AGENT.DEFAULT_TIMEOUT_PER_TRY,
-        in_iframe: dict = None
+        in_iframe: dict = None,
     ) -> dict:
         """
         Click elemento con fallback chain automatico - prova tutte le strategie fino al successo.
@@ -809,13 +833,13 @@ class PlaywrightTools:
                 {"by": "role", "role": "button", "name": "Login"},
                 {"by": "text", "text": "Login"}
             ])
-            
+
             # Click dentro iframe singolo
             result = await click_smart(
                 targets=[{"by": "role", "role": "button", "name": "Save"}],
                 in_iframe={"url_pattern": "movementreason"}
             )
-            
+
             # Click dentro iframe annidati (dashboard → widget → form)
             result = await click_smart(
                 targets=[{"by": "role", "role": "button", "name": "Submit"}],
@@ -828,13 +852,13 @@ class PlaywrightTools:
         if not self.page:
             return {
                 "status": "error",
-                "message": "Browser non avviato. Chiama start_browser() prima."
+                "message": "Browser non avviato. Chiama start_browser() prima.",
             }
-        
+
         if not targets or len(targets) == 0:
             return {
                 "status": "error",
-                "message": "Nessuna strategia fornita (targets vuoto)"
+                "message": "Nessuna strategia fornita (targets vuoto)",
             }
 
         # Accept both flat targets and raw playwright_suggestions wrappers
@@ -843,7 +867,9 @@ class PlaywrightTools:
         # Determina context (page o iframe)
         context = self.page
         if in_iframe:
-            frame_result = await self.get_frame(**in_iframe, timeout=timeout_per_try, return_frame=True)
+            frame_result = await self.get_frame(
+                **in_iframe, timeout=timeout_per_try, return_frame=True
+            )
             if frame_result["status"] == "error":
                 return frame_result
             context = frame_result["frame"]
@@ -851,11 +877,11 @@ class PlaywrightTools:
         # FALLBACK CHAIN: prova tutte le strategie fino al successo
         strategies_tried = []
         last_error_msg = ""
-        
+
         for idx, target in enumerate(targets):
             by = target.get("by")
             strategies_tried.append(by)
-            
+
             try:
                 locator = None
 
@@ -894,7 +920,7 @@ class PlaywrightTools:
                 elif by == "xpath":
                     xpath = target.get("xpath")
                     locator = context.locator(f"xpath={xpath}")
-                
+
                 if not locator:
                     last_error_msg = f"Impossibile creare locator per strategia '{by}'"
                     if idx < len(targets) - 1:
@@ -914,42 +940,95 @@ class PlaywrightTools:
                         pass
 
                     await first.click(timeout=timeout_per_try)
+
+                    # Scope detection: se il locator matcha più elementi, trova il container
+                    # padre disambiguante per generare un locator scoped nel codegen.
+                    # Es: page.locator('card-group').last.get_by_role('button', name='Aggiungi filtro')
+                    scope_info = None
+                    try:
+                        count = await locator.count()
+                        if count > 1:
+                            element = await first.element_handle(timeout=1000)
+                            if element:
+                                scope_info = await element.evaluate(
+                                    """
+                                    el => {
+                                        const scopeSelectors = [
+                                            'card-group', 'mat-card', '.mat-mdc-card',
+                                            '.filter-group', '[role="group"]',
+                                            '.mat-expansion-panel', 'mat-expansion-panel'
+                                        ];
+                                        let current = el.parentElement;
+                                        while (current && current !== document.body) {
+                                            for (const sel of scopeSelectors) {
+                                                try {
+                                                    if (current.matches(sel)) {
+                                                        const all = document.querySelectorAll(sel);
+                                                        const idx = Array.from(all).indexOf(current);
+                                                        return {
+                                                            selector: sel,
+                                                            index: idx,
+                                                            total: all.length
+                                                        };
+                                                    }
+                                                } catch(e) {}
+                                            }
+                                            current = current.parentElement;
+                                        }
+                                        return null;
+                                    }
+                                """
+                                )
+                    except Exception:
+                        # Scope detection è best-effort: se fallisce non blocca il test
+                        pass
+
+                    return_target = dict(target)
+                    if scope_info:
+                        return_target["scope"] = scope_info
+
                     return {
                         "status": "success",
                         "message": f"Clicked using {by}",
                         "strategy": by,
-                        "target": target,
+                        "target": return_target,
                         "click_type": "normal",
                         "strategies_tried": strategies_tried,
-                        "fallback_used": idx > 0
+                        "fallback_used": idx > 0,
                     }
                 except Exception as click_error:
                     # Click normale fallito - prova JS
                     error_msg = str(click_error)[:100]
                     if idx == 0:  # Log solo per prima strategia
-                        print(f"   Strategy {idx+1}/{len(targets)} ({by}): normal click failed")
-                
+                        print(
+                            f"   Strategy {idx+1}/{len(targets)} ({by}): normal click failed"
+                        )
+
                 # Try 2: JAVASCRIPT CLICK (fallback per strategia corrente)
                 try:
-                    element = await locator.first.element_handle(timeout=timeout_per_try)
+                    element = await locator.first.element_handle(
+                        timeout=timeout_per_try
+                    )
                     if element:
                         await element.evaluate("el => el.click()")
                         return {
                             "status": "success",
                             "message": f"Clicked (JS) using {by}",
                             "strategy": by,
-                            "target": target,
+                            "target": dict(target),
                             "click_type": "js",
                             "strategies_tried": strategies_tried,
-                            "fallback_used": idx > 0
+                            "fallback_used": idx > 0,
                         }
                 except Exception as js_error:
                     last_error_msg = str(js_error)[:100]
                     # Se non è l'ultima strategia, continua con la prossima
                     if idx < len(targets) - 1:
-                        print(f"   Strategy {idx+1}/{len(targets)} ({by}): failed, trying next...")
+                        print(
+                            f"   Strategy {idx+1}/{len(targets)} ({by}): failed, trying next..."
+                        )
                         continue
-            
+
             except Exception as e:
                 last_error_msg = str(e)[:150]
                 if idx < len(targets) - 1:
@@ -960,7 +1039,7 @@ class PlaywrightTools:
             "status": "error",
             "message": f"All {len(strategies_tried)} strategies failed. Last error: {last_error_msg}",
             "strategies_tried": strategies_tried,
-            "last_error": last_error_msg
+            "last_error": last_error_msg,
         }
 
     async def fill_smart(
@@ -969,7 +1048,7 @@ class PlaywrightTools:
         value: str,
         timeout_per_try: int = AppConfig.AGENT.DEFAULT_TIMEOUT_PER_TRY,
         clear_first=True,
-        in_iframe: dict = None
+        in_iframe: dict = None,
     ) -> dict:
         """
         Compila input con fallback chain automatico - prova tutte le strategie fino al successo.
@@ -999,14 +1078,14 @@ class PlaywrightTools:
                 {"by": "label", "label": "Username"},
                 {"by": "placeholder", "placeholder": "Enter username"}
             ], "test@example.com")
-            
+
             # Fill dentro iframe singolo
             result = await fill_smart(
                 targets=[{"by": "label", "label": "Codice"}],
                 value="CARM",
                 in_iframe={"url_pattern": "movementreason"}
             )
-            
+
             # Fill dentro iframe annidati (portal → dashboard → input)
             result = await fill_smart(
                 targets=[{"by": "label", "label": "Search"}],
@@ -1018,15 +1097,12 @@ class PlaywrightTools:
             )
         """
         if not self.page:
-            return {
-                "status": "error",
-                "message": "Browser non avviato"
-            }
-        
+            return {"status": "error", "message": "Browser non avviato"}
+
         if not targets or len(targets) == 0:
             return {
                 "status": "error",
-                "message": "Nessuna strategia fornita (targets vuoto)"
+                "message": "Nessuna strategia fornita (targets vuoto)",
             }
 
         # Accept both flat targets and raw playwright_suggestions wrappers
@@ -1035,7 +1111,9 @@ class PlaywrightTools:
         # Determina context (page o iframe)
         context = self.page
         if in_iframe:
-            frame_result = await self.get_frame(**in_iframe, timeout=timeout_per_try, return_frame=True)
+            frame_result = await self.get_frame(
+                **in_iframe, timeout=timeout_per_try, return_frame=True
+            )
             if frame_result["status"] == "error":
                 return frame_result
             context = frame_result["frame"]
@@ -1043,34 +1121,31 @@ class PlaywrightTools:
         # FALLBACK CHAIN: prova tutte le strategie fino al successo
         strategies_tried = []
         last_error_msg = ""
-        
+
         for idx, target in enumerate(targets):
             by = target.get("by")
             strategies_tried.append(by)
-            
+
             try:
                 locator = None
 
                 # Stesse strategie di click_smart
                 if by == "role":
                     locator = context.get_by_role(
-                        target.get("role"),
-                        name=target.get("name")
+                        target.get("role"), name=target.get("name")
                     )
                 elif by == "label":
                     locator = context.get_by_label(target.get("label"))
                 elif by == "placeholder":
-                    locator = context.get_by_placeholder(
-                        target.get("placeholder"))
+                    locator = context.get_by_placeholder(target.get("placeholder"))
                 elif by == "tfa":
-                    locator = context.locator(
-                        f'[data-tfa="{target.get("tfa")}"]')
+                    locator = context.locator(f'[data-tfa="{target.get("tfa")}"]')
                 elif by in ("css", "css_name", "css_id"):
                     selector = _normalize_css_selector(by, target)
                     locator = context.locator(selector) if selector else None
                 elif by == "xpath":
                     locator = context.locator(f"xpath={target.get('xpath')}")
-                
+
                 if not locator:
                     last_error_msg = f"Impossibile creare locator per strategia '{by}'"
                     if idx < len(targets) - 1:
@@ -1079,6 +1154,7 @@ class PlaywrightTools:
                         break  # Ultima strategia - esci
 
                 # FILL
+                
                 try:
                     # Clear first (se possibile)
                     if clear_first:
@@ -1091,35 +1167,69 @@ class PlaywrightTools:
                     # Fill
                     await locator.first.fill(value, timeout=timeout_per_try)
 
+                    # Scope detection: se il locator matcha più elementi, trova il container
+                    # padre disambiguante per generare un locator scoped nel codegen.
+                    scope_info = None
+                    try:
+                        count = await locator.count()
+                        if count > 1:
+                            element = await locator.first.element_handle(timeout=1000)
+                            if element:
+                                scope_info = await element.evaluate("""
+                                    el => {
+                                        const scopeSelectors = [
+                                            'card-group', 'mat-card', '.mat-mdc-card',
+                                            '.filter-group', '[role="group"]',
+                                            '.mat-expansion-panel', 'mat-expansion-panel'
+                                        ];
+                                        let current = el.parentElement;
+                                        while (current && current !== document.body) {
+                                            for (const sel of scopeSelectors) {
+                                                try {
+                                                    if (current.matches(sel)) {
+                                                        const all = document.querySelectorAll(sel);
+                                                        const idx = Array.from(all).indexOf(current);
+                                                        return { selector: sel, index: idx, total: all.length };
+                                                    }
+                                                } catch(e) {}
+                                            }
+                                            current = current.parentElement;
+                                        }
+                                        return null;
+                                    }
+                                """)
+                    except Exception:
+                        # Scope detection è best-effort: se fallisce non blocca il fill
+                        pass
+
+                    return_target = dict(target)
+                    if scope_info:
+                        return_target["scope"] = scope_info
+
                     return {
                         "status": "success",
                         "message": f"Filled using {by}",
                         "strategy": by,
-                        "target": target,
+                        "target": return_target,
                         "value_length": len(value),
                         "strategies_tried": strategies_tried,
-                        "fallback_used": idx > 0
+                        "fallback_used": idx > 0,
                     }
-                
+
                 except Exception as fill_error:
                     last_error_msg = str(fill_error)[:150]
                     # Se non è l'ultima strategia, continua con la prossima
                     if idx < len(targets) - 1:
-                        print(f"   Strategy {idx+1}/{len(targets)} ({by}): failed, trying next...")
+                        print(
+                            f"   Strategy {idx+1}/{len(targets)} ({by}): failed, trying next..."
+                        )
                         continue
 
             except Exception as e:
                 last_error_msg = str(e)[:150]
+                # Se non è l'ultima strategia, continua con la prossima
                 if idx < len(targets) - 1:
-                    continue  # Prova prossima strategia
-
-        # Tutte le strategie fallite
-        return {
-            "status": "error",
-            "message": f"All {len(strategies_tried)} strategies failed. Last error: {last_error_msg}",
-            "strategies_tried": strategies_tried,
-            "last_error": last_error_msg
-        }
+                    continue
 
     # =====================================================================
     # INSPECTION - Scansione elementi interattivi (per smart/advanced)
@@ -1155,10 +1265,7 @@ class PlaywrightTools:
         """
         try:
             if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
+                return {"status": "error", "message": "Browser non avviato"}
 
             # Determina il contesto: pagina principale o iframe selezionato
             context = self.page
@@ -1179,7 +1286,9 @@ class PlaywrightTools:
 
                 context = frame_result.get("frame")
                 # Aggiorna info pagina con URL del frame, se disponibile
-                page_url = frame_result.get("frame_url") or getattr(context, "url", page_url)
+                page_url = frame_result.get("frame_url") or getattr(
+                    context, "url", page_url
+                )
                 try:
                     page_title = await context.title()
                 except Exception:
@@ -1196,13 +1305,19 @@ class PlaywrightTools:
                     title = await iframe.get_attribute("title") or ""
                     name = await iframe.get_attribute("name") or ""
 
-                    iframe_info.append({
-                        "index": idx,
-                        "src": src,
-                        "title": title,
-                        "name": name,
-                        "selector": f"iframe[src*='{src.split('/')[-1][:30]}']" if src else f"iframe >> nth={idx}"
-                    })
+                    iframe_info.append(
+                        {
+                            "index": idx,
+                            "src": src,
+                            "title": title,
+                            "name": name,
+                            "selector": (
+                                f"iframe[src*='{src.split('/')[-1][:30]}']"
+                                if src
+                                else f"iframe >> nth={idx}"
+                            ),
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting iframe {idx}: {e}")
                     continue
@@ -1220,7 +1335,8 @@ class PlaywrightTools:
             for idx, elem in enumerate(clickables):
                 try:
                     tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-                    accessible_name = await elem.evaluate("""
+                    accessible_name = await elem.evaluate(
+                        """
                         el => {
                             if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
                             if (el.getAttribute('aria-labelledby')) {
@@ -1233,13 +1349,18 @@ class PlaywrightTools:
                             if (el.value) return el.value;
                             return null;
                         }
-                    """)
+                    """
+                    )
                     role = await elem.get_attribute("role")
                     aria_label = await elem.get_attribute("aria-label")
                     data_tfa = await elem.get_attribute("data-tfa")
-                    effective_role = role if role else {
-                        'button': 'button', 'a': 'link', 'input': 'button'
-                    }.get(tag, None)
+                    effective_role = (
+                        role
+                        if role
+                        else {"button": "button", "a": "link", "input": "button"}.get(
+                            tag, None
+                        )
+                    )
                     visible_text = ""
                     try:
                         visible_text = await elem.inner_text()
@@ -1249,57 +1370,88 @@ class PlaywrightTools:
                     suggestions = []
                     if effective_role and accessible_name:
                         clean_name = _strip_material_icon_prefix(accessible_name)
-                        suggestions.append({
-                            "strategy": "role",
-                            "click_smart": {"by": "role", "role": effective_role, "name": clean_name}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "role",
+                                "click_smart": {
+                                    "by": "role",
+                                    "role": effective_role,
+                                    "name": clean_name,
+                                },
+                            }
+                        )
                     if aria_label:
-                        suggestions.append({
-                            "strategy": "css_aria",
-                            "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_aria",
+                                "click_smart": {
+                                    "by": "css",
+                                    "selector": f'[aria-label="{aria_label}"]',
+                                },
+                            }
+                        )
                     # Icon+label buttons (e.g. "add\n\nAGGIUNGI FILTRO"): add text with label only first,
                     # so get_by_text("AGGIUNGI FILTRO") is tried before the full string (which often times out).
                     if visible_text and "\n" in visible_text:
-                        parts = [p.strip() for p in visible_text.split("\n") if p.strip()]
+                        parts = [
+                            p.strip() for p in visible_text.split("\n") if p.strip()
+                        ]
                         if parts:
                             label_only = parts[-1]
-                            if len(label_only) >= 2 and label_only != visible_text.strip():
-                                suggestions.append({
-                                    "strategy": "text",
-                                    "click_smart": {"by": "text", "text": label_only}
-                                })
+                            if (
+                                len(label_only) >= 2
+                                and label_only != visible_text.strip()
+                            ):
+                                suggestions.append(
+                                    {
+                                        "strategy": "text",
+                                        "click_smart": {
+                                            "by": "text",
+                                            "text": label_only,
+                                        },
+                                    }
+                                )
                     if visible_text:
-                        suggestions.append({
-                            "strategy": "text",
-                            "click_smart": {"by": "text", "text": visible_text}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "text",
+                                "click_smart": {"by": "text", "text": visible_text},
+                            }
+                        )
                     if data_tfa:
-                        suggestions.append({
-                            "strategy": "tfa",
-                            "click_smart": {"by": "tfa", "tfa": data_tfa}
-                        })
-                    clickable_info.append({
-                        "index": idx, "tag": tag, "role": effective_role,
-                        "accessible_name": accessible_name, "text": visible_text,
-                        "aria_label": aria_label, "data_tfa": data_tfa,
-                        "playwright_suggestions": suggestions
-                    })
+                        suggestions.append(
+                            {
+                                "strategy": "tfa",
+                                "click_smart": {"by": "tfa", "tfa": data_tfa},
+                            }
+                        )
+                    clickable_info.append(
+                        {
+                            "index": idx,
+                            "tag": tag,
+                            "role": effective_role,
+                            "accessible_name": accessible_name,
+                            "text": visible_text,
+                            "aria_label": aria_label,
+                            "data_tfa": data_tfa,
+                            "playwright_suggestions": suggestions,
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting clickable {idx}: {e}")
                     continue
 
             # === 2b. RIGHE DI TABELLA CLICCABILI (euristica per liste campioni) ===
             try:
-                row_selector = "table tbody tr, tr[role='row'], .mat-row, .mat-mdc-row, .cdk-row"
+                row_selector = (
+                    "table tbody tr, tr[role='row'], .mat-row, .mat-mdc-row, .cdk-row"
+                )
                 rows = await context.locator(row_selector).all()
                 base_index = len(clickable_info)
                 for r_idx, row in enumerate(rows):
                     try:
                         # Salta eventuali righe di intestazione
-                        in_header = await row.evaluate(
-                            "el => !!el.closest('thead')"
-                        )
+                        in_header = await row.evaluate("el => !!el.closest('thead')")
                         if in_header:
                             continue
 
@@ -1332,21 +1484,28 @@ class PlaywrightTools:
                             """
                         )
                         if nth_selector:
-                            suggestions.append({
-                                "strategy": "css_row",
-                                "click_smart": {"by": "css", "selector": nth_selector}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "css_row",
+                                    "click_smart": {
+                                        "by": "css",
+                                        "selector": nth_selector,
+                                    },
+                                }
+                            )
 
-                        clickable_info.append({
-                            "index": base_index + r_idx,
-                            "tag": "tr",
-                            "role": "row",
-                            "accessible_name": short_text,
-                            "text": short_text,
-                            "aria_label": None,
-                            "data_tfa": None,
-                            "playwright_suggestions": suggestions
-                        })
+                        clickable_info.append(
+                            {
+                                "index": base_index + r_idx,
+                                "tag": "tr",
+                                "role": "row",
+                                "accessible_name": short_text,
+                                "text": short_text,
+                                "aria_label": None,
+                                "data_tfa": None,
+                                "playwright_suggestions": suggestions,
+                            }
+                        )
                     except Exception as e:
                         print(f"Error inspecting table row {r_idx}: {e}")
                         continue
@@ -1359,8 +1518,11 @@ class PlaywrightTools:
             for idx, field in enumerate(form_fields):
                 try:
                     tag = await field.evaluate("el => el.tagName.toLowerCase()")
-                    field_type = await field.get_attribute("type") if tag == "input" else tag
-                    accessible_name = await field.evaluate("""
+                    field_type = (
+                        await field.get_attribute("type") if tag == "input" else tag
+                    )
+                    accessible_name = await field.evaluate(
+                        """
                         el => {
                             if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
                             if (el.id) {
@@ -1371,61 +1533,101 @@ class PlaywrightTools:
                             if (el.name) return el.name;
                             return null;
                         }
-                    """)
+                    """
+                    )
                     aria_label = await field.get_attribute("aria-label")
                     placeholder = await field.get_attribute("placeholder") or ""
                     name = await field.get_attribute("name") or ""
                     input_id = await field.get_attribute("id") or ""
                     suggestions = []
                     if accessible_name:
-                        suggestions.append({
-                            "strategy": "label",
-                            "fill_smart": {"by": "label", "label": accessible_name}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "label",
+                                "fill_smart": {"by": "label", "label": accessible_name},
+                            }
+                        )
                     if placeholder:
-                        suggestions.append({
-                            "strategy": "placeholder",
-                            "fill_smart": {"by": "placeholder", "placeholder": placeholder}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "placeholder",
+                                "fill_smart": {
+                                    "by": "placeholder",
+                                    "placeholder": placeholder,
+                                },
+                            }
+                        )
                     if field_type:
                         role_map = {
-                            "text": "textbox", "email": "textbox", "password": "textbox",
-                            "search": "searchbox", "tel": "textbox", "url": "textbox",
-                            "select": "combobox", "textarea": "textbox"
+                            "text": "textbox",
+                            "email": "textbox",
+                            "password": "textbox",
+                            "search": "searchbox",
+                            "tel": "textbox",
+                            "url": "textbox",
+                            "select": "combobox",
+                            "textarea": "textbox",
                         }
                         role_name = role_map.get(field_type)
                         if role_name and accessible_name:
-                            suggestions.append({
-                                "strategy": "role",
-                                "fill_smart": {"by": "role", "role": role_name, "name": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "role",
+                                    "fill_smart": {
+                                        "by": "role",
+                                        "role": role_name,
+                                        "name": accessible_name,
+                                    },
+                                }
+                            )
                     if name:
-                        suggestions.append({
-                            "strategy": "css_name",
-                            "fill_smart": {"by": "css", "selector": f'[name="{name}"]'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_name",
+                                "fill_smart": {
+                                    "by": "css",
+                                    "selector": f'[name="{name}"]',
+                                },
+                            }
+                        )
                     if input_id:
-                        suggestions.append({
-                            "strategy": "css_id",
-                            "fill_smart": {"by": "css", "selector": f'#{input_id}'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_id",
+                                "fill_smart": {"by": "css", "selector": f"#{input_id}"},
+                            }
+                        )
                     if aria_label:
-                        suggestions.append({
-                            "strategy": "css_aria",
-                            "fill_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_aria",
+                                "fill_smart": {
+                                    "by": "css",
+                                    "selector": f'[aria-label="{aria_label}"]',
+                                },
+                            }
+                        )
                     data_tfa = await field.get_attribute("data-tfa")
                     if data_tfa:
-                        suggestions.append({
-                            "strategy": "tfa",
-                            "fill_smart": {"by": "tfa", "tfa": data_tfa}
-                        })
-                    field_info.append({
-                        "index": idx, "tag": tag, "type": field_type,
-                        "accessible_name": accessible_name, "aria_label": aria_label,
-                        "placeholder": placeholder, "name": name, "id": input_id,
-                        "playwright_suggestions": suggestions
-                    })
+                        suggestions.append(
+                            {
+                                "strategy": "tfa",
+                                "fill_smart": {"by": "tfa", "tfa": data_tfa},
+                            }
+                        )
+                    field_info.append(
+                        {
+                            "index": idx,
+                            "tag": tag,
+                            "type": field_type,
+                            "accessible_name": accessible_name,
+                            "aria_label": aria_label,
+                            "placeholder": placeholder,
+                            "name": name,
+                            "id": input_id,
+                            "playwright_suggestions": suggestions,
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting field {idx}: {e}")
                     continue
@@ -1441,10 +1643,13 @@ class PlaywrightTools:
             for idx, elem in enumerate(interactives):
                 try:
                     tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-                    elem_type = await elem.get_attribute("type") if tag == "input" else tag
+                    elem_type = (
+                        await elem.get_attribute("type") if tag == "input" else tag
+                    )
                     role = await elem.get_attribute("role")
                     effective_type = role if role else elem_type
-                    accessible_name = await elem.evaluate("""
+                    accessible_name = await elem.evaluate(
+                        """
                         el => {
                             if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
                             if (el.id) {
@@ -1460,7 +1665,8 @@ class PlaywrightTools:
                             if (el.name) return el.name;
                             return null;
                         }
-                    """)
+                    """
+                    )
                     aria_label = await elem.get_attribute("aria-label")
                     name = await elem.get_attribute("name") or ""
                     elem_id = await elem.get_attribute("id") or ""
@@ -1477,62 +1683,108 @@ class PlaywrightTools:
                         for opt in option_elements:
                             opt_text = await opt.inner_text()
                             opt_value = await opt.get_attribute("value")
-                            options.append({"text": opt_text.strip(), "value": opt_value})
+                            options.append(
+                                {"text": opt_text.strip(), "value": opt_value}
+                            )
                     suggestions = []
                     if effective_type in ["checkbox", "radio", "switch", "tab"]:
                         if accessible_name:
-                            suggestions.append({
-                                "strategy": "role",
-                                "click_smart": {"by": "role", "role": effective_type, "name": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "role",
+                                    "click_smart": {
+                                        "by": "role",
+                                        "role": effective_type,
+                                        "name": accessible_name,
+                                    },
+                                }
+                            )
                         if accessible_name and tag == "input":
-                            suggestions.append({
-                                "strategy": "label",
-                                "click_smart": {"by": "label", "label": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "label",
+                                    "click_smart": {
+                                        "by": "label",
+                                        "label": accessible_name,
+                                    },
+                                }
+                            )
                         if accessible_name:
-                            suggestions.append({
-                                "strategy": "text",
-                                "click_smart": {"by": "text", "text": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "text",
+                                    "click_smart": {
+                                        "by": "text",
+                                        "text": accessible_name,
+                                    },
+                                }
+                            )
                         if aria_label:
-                            suggestions.append({
-                                "strategy": "css_aria",
-                                "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "css_aria",
+                                    "click_smart": {
+                                        "by": "css",
+                                        "selector": f'[aria-label="{aria_label}"]',
+                                    },
+                                }
+                            )
                         if name:
-                            suggestions.append({
-                                "strategy": "css_name",
-                                "click_smart": {"by": "css", "selector": f'[name="{name}"]'}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "css_name",
+                                    "click_smart": {
+                                        "by": "css",
+                                        "selector": f'[name="{name}"]',
+                                    },
+                                }
+                            )
                         if data_tfa:
-                            suggestions.append({
-                                "strategy": "tfa",
-                                "click_smart": {"by": "tfa", "tfa": data_tfa}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "tfa",
+                                    "click_smart": {"by": "tfa", "tfa": data_tfa},
+                                }
+                            )
                     elif tag == "select":
-                        suggestions.append({
-                            "strategy": "note", "action": "select_option",
-                            "message": "Use fill_smart with value, or click_smart to open dropdown then click option"
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "note",
+                                "action": "select_option",
+                                "message": "Use fill_smart with value, or click_smart to open dropdown then click option",
+                            }
+                        )
                     elif elem_type == "file":
-                        suggestions.append({
-                            "strategy": "note", "action": "set_input_files",
-                            "message": "File upload requires dedicated tool (not yet implemented)"
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "note",
+                                "action": "set_input_files",
+                                "message": "File upload requires dedicated tool (not yet implemented)",
+                            }
+                        )
                     elif elem_type in ["range", "color"] and accessible_name:
-                        suggestions.append({
-                            "strategy": "fill",
-                            "fill_smart": {"by": "label", "label": accessible_name}
-                        })
-                    interactive_info.append({
-                        "index": idx, "tag": tag, "type": effective_type,
-                        "accessible_name": accessible_name, "aria_label": aria_label,
-                        "name": name, "id": elem_id, "data_tfa": data_tfa,
-                        "checked": checked, "selected": selected,
-                        "options": options if options else None,
-                        "playwright_suggestions": suggestions
-                    })
+                        suggestions.append(
+                            {
+                                "strategy": "fill",
+                                "fill_smart": {"by": "label", "label": accessible_name},
+                            }
+                        )
+                    interactive_info.append(
+                        {
+                            "index": idx,
+                            "tag": tag,
+                            "type": effective_type,
+                            "accessible_name": accessible_name,
+                            "aria_label": aria_label,
+                            "name": name,
+                            "id": elem_id,
+                            "data_tfa": data_tfa,
+                            "checked": checked,
+                            "selected": selected,
+                            "options": options if options else None,
+                            "playwright_suggestions": suggestions,
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting interactive {idx}: {e}")
                     continue
@@ -1544,13 +1796,10 @@ class PlaywrightTools:
                 "iframes": iframe_info,
                 "clickable_elements": clickable_info,
                 "interactive_controls": interactive_info,
-                "form_fields": field_info
+                "form_fields": field_info,
             }
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Error inspecting page: {str(e)}"
-            }
+            return {"status": "error", "message": f"Error inspecting page: {str(e)}"}
 
     async def inspect_region(self, root_selector: str, in_iframe: dict = None) -> dict:
         """
@@ -1566,10 +1815,7 @@ class PlaywrightTools:
         """
         try:
             if not self.page:
-                return {
-                    "status": "error",
-                    "message": "Browser non avviato"
-                }
+                return {"status": "error", "message": "Browser non avviato"}
 
             # Determina il contesto: pagina principale o iframe selezionato
             context = self.page
@@ -1588,7 +1834,9 @@ class PlaywrightTools:
                     return frame_result
 
                 context = frame_result.get("frame")
-                page_url = frame_result.get("frame_url") or getattr(context, "url", page_url)
+                page_url = frame_result.get("frame_url") or getattr(
+                    context, "url", page_url
+                )
                 try:
                     page_title = await context.title()
                 except Exception:
@@ -1598,11 +1846,18 @@ class PlaywrightTools:
             try:
                 root = context.locator(root_selector).first
                 # forza l'esistenza con una wait corta
-                await root.wait_for(state="attached", timeout=AppConfig.PLAYWRIGHT.DEFAULT_TIMEOUT_PER_TRY if hasattr(AppConfig.PLAYWRIGHT, "DEFAULT_TIMEOUT_PER_TRY") else 2000)
+                await root.wait_for(
+                    state="attached",
+                    timeout=(
+                        AppConfig.PLAYWRIGHT.DEFAULT_TIMEOUT_PER_TRY
+                        if hasattr(AppConfig.PLAYWRIGHT, "DEFAULT_TIMEOUT_PER_TRY")
+                        else 2000
+                    ),
+                )
             except Exception:
                 return {
                     "status": "error",
-                    "message": f"Contenitore non trovato per selector '{root_selector}'"
+                    "message": f"Contenitore non trovato per selector '{root_selector}'",
                 }
 
             # === 1. ELEMENTI CLICCABILI NELLA REGIONE ===
@@ -1618,7 +1873,8 @@ class PlaywrightTools:
             for idx, elem in enumerate(clickables):
                 try:
                     tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-                    accessible_name = await elem.evaluate("""
+                    accessible_name = await elem.evaluate(
+                        """
                         el => {
                             if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
                             if (el.getAttribute('aria-labelledby')) {
@@ -1631,13 +1887,18 @@ class PlaywrightTools:
                             if (el.value) return el.value;
                             return null;
                         }
-                    """)
+                    """
+                    )
                     role = await elem.get_attribute("role")
                     aria_label = await elem.get_attribute("aria-label")
                     data_tfa = await elem.get_attribute("data-tfa")
-                    effective_role = role if role else {
-                        'button': 'button', 'a': 'link', 'input': 'button'
-                    }.get(tag, None)
+                    effective_role = (
+                        role
+                        if role
+                        else {"button": "button", "a": "link", "input": "button"}.get(
+                            tag, None
+                        )
+                    )
                     visible_text = ""
                     try:
                         visible_text = await elem.inner_text()
@@ -1647,54 +1908,85 @@ class PlaywrightTools:
                     suggestions = []
                     if effective_role and accessible_name:
                         clean_name = _strip_material_icon_prefix(accessible_name)
-                        suggestions.append({
-                            "strategy": "role",
-                            "click_smart": {"by": "role", "role": effective_role, "name": clean_name}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "role",
+                                "click_smart": {
+                                    "by": "role",
+                                    "role": effective_role,
+                                    "name": clean_name,
+                                },
+                            }
+                        )
                     if aria_label:
-                        suggestions.append({
-                            "strategy": "css_aria",
-                            "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_aria",
+                                "click_smart": {
+                                    "by": "css",
+                                    "selector": f'[aria-label="{aria_label}"]',
+                                },
+                            }
+                        )
                     if visible_text and "\n" in visible_text:
-                        parts = [p.strip() for p in visible_text.split("\n") if p.strip()]
+                        parts = [
+                            p.strip() for p in visible_text.split("\n") if p.strip()
+                        ]
                         if parts:
                             label_only = parts[-1]
-                            if len(label_only) >= 2 and label_only != visible_text.strip():
-                                suggestions.append({
-                                    "strategy": "text",
-                                    "click_smart": {"by": "text", "text": label_only}
-                                })
+                            if (
+                                len(label_only) >= 2
+                                and label_only != visible_text.strip()
+                            ):
+                                suggestions.append(
+                                    {
+                                        "strategy": "text",
+                                        "click_smart": {
+                                            "by": "text",
+                                            "text": label_only,
+                                        },
+                                    }
+                                )
                     if visible_text:
-                        suggestions.append({
-                            "strategy": "text",
-                            "click_smart": {"by": "text", "text": visible_text}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "text",
+                                "click_smart": {"by": "text", "text": visible_text},
+                            }
+                        )
                     if data_tfa:
-                        suggestions.append({
-                            "strategy": "tfa",
-                            "click_smart": {"by": "tfa", "tfa": data_tfa}
-                        })
-                    clickable_info.append({
-                        "index": idx, "tag": tag, "role": effective_role,
-                        "accessible_name": accessible_name, "text": visible_text,
-                        "aria_label": aria_label, "data_tfa": data_tfa,
-                        "playwright_suggestions": suggestions
-                    })
+                        suggestions.append(
+                            {
+                                "strategy": "tfa",
+                                "click_smart": {"by": "tfa", "tfa": data_tfa},
+                            }
+                        )
+                    clickable_info.append(
+                        {
+                            "index": idx,
+                            "tag": tag,
+                            "role": effective_role,
+                            "accessible_name": accessible_name,
+                            "text": visible_text,
+                            "aria_label": aria_label,
+                            "data_tfa": data_tfa,
+                            "playwright_suggestions": suggestions,
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting regional clickable {idx}: {e}")
                     continue
 
             # === 1b. RIGHE DI TABELLA CLICCABILI NELLA REGIONE (euristica per liste campioni) ===
             try:
-                row_selector = "table tbody tr, tr[role='row'], .mat-row, .mat-mdc-row, .cdk-row"
+                row_selector = (
+                    "table tbody tr, tr[role='row'], .mat-row, .mat-mdc-row, .cdk-row"
+                )
                 rows = await root.locator(row_selector).all()
                 base_index = len(clickable_info)
                 for r_idx, row in enumerate(rows):
                     try:
-                        in_header = await row.evaluate(
-                            "el => !!el.closest('thead')"
-                        )
+                        in_header = await row.evaluate("el => !!el.closest('thead')")
                         if in_header:
                             continue
 
@@ -1725,21 +2017,28 @@ class PlaywrightTools:
                             """
                         )
                         if nth_selector:
-                            suggestions.append({
-                                "strategy": "css_row",
-                                "click_smart": {"by": "css", "selector": nth_selector}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "css_row",
+                                    "click_smart": {
+                                        "by": "css",
+                                        "selector": nth_selector,
+                                    },
+                                }
+                            )
 
-                        clickable_info.append({
-                            "index": base_index + r_idx,
-                            "tag": "tr",
-                            "role": "row",
-                            "accessible_name": short_text,
-                            "text": short_text,
-                            "aria_label": None,
-                            "data_tfa": None,
-                            "playwright_suggestions": suggestions
-                        })
+                        clickable_info.append(
+                            {
+                                "index": base_index + r_idx,
+                                "tag": "tr",
+                                "role": "row",
+                                "accessible_name": short_text,
+                                "text": short_text,
+                                "aria_label": None,
+                                "data_tfa": None,
+                                "playwright_suggestions": suggestions,
+                            }
+                        )
                     except Exception as e:
                         print(f"Error inspecting table row in region {r_idx}: {e}")
                         continue
@@ -1752,8 +2051,11 @@ class PlaywrightTools:
             for idx, field in enumerate(form_fields):
                 try:
                     tag = await field.evaluate("el => el.tagName.toLowerCase()")
-                    field_type = await field.get_attribute("type") if tag == "input" else tag
-                    accessible_name = await field.evaluate("""
+                    field_type = (
+                        await field.get_attribute("type") if tag == "input" else tag
+                    )
+                    accessible_name = await field.evaluate(
+                        """
                         el => {
                             if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
                             if (el.id) {
@@ -1764,61 +2066,101 @@ class PlaywrightTools:
                             if (el.name) return el.name;
                             return null;
                         }
-                    """)
+                    """
+                    )
                     aria_label = await field.get_attribute("aria-label")
                     placeholder = await field.get_attribute("placeholder") or ""
                     name = await field.get_attribute("name") or ""
                     input_id = await field.get_attribute("id") or ""
                     suggestions = []
                     if accessible_name:
-                        suggestions.append({
-                            "strategy": "label",
-                            "fill_smart": {"by": "label", "label": accessible_name}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "label",
+                                "fill_smart": {"by": "label", "label": accessible_name},
+                            }
+                        )
                     if placeholder:
-                        suggestions.append({
-                            "strategy": "placeholder",
-                            "fill_smart": {"by": "placeholder", "placeholder": placeholder}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "placeholder",
+                                "fill_smart": {
+                                    "by": "placeholder",
+                                    "placeholder": placeholder,
+                                },
+                            }
+                        )
                     if field_type:
                         role_map = {
-                            "text": "textbox", "email": "textbox", "password": "textbox",
-                            "search": "searchbox", "tel": "textbox", "url": "textbox",
-                            "select": "combobox", "textarea": "textbox"
+                            "text": "textbox",
+                            "email": "textbox",
+                            "password": "textbox",
+                            "search": "searchbox",
+                            "tel": "textbox",
+                            "url": "textbox",
+                            "select": "combobox",
+                            "textarea": "textbox",
                         }
                         role_name = role_map.get(field_type)
                         if role_name and accessible_name:
-                            suggestions.append({
-                                "strategy": "role",
-                                "fill_smart": {"by": "role", "role": role_name, "name": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "role",
+                                    "fill_smart": {
+                                        "by": "role",
+                                        "role": role_name,
+                                        "name": accessible_name,
+                                    },
+                                }
+                            )
                     if name:
-                        suggestions.append({
-                            "strategy": "css_name",
-                            "fill_smart": {"by": "css", "selector": f'[name="{name}"]'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_name",
+                                "fill_smart": {
+                                    "by": "css",
+                                    "selector": f'[name="{name}"]',
+                                },
+                            }
+                        )
                     if input_id:
-                        suggestions.append({
-                            "strategy": "css_id",
-                            "fill_smart": {"by": "css", "selector": f'#{input_id}'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_id",
+                                "fill_smart": {"by": "css", "selector": f"#{input_id}"},
+                            }
+                        )
                     if aria_label:
-                        suggestions.append({
-                            "strategy": "css_aria",
-                            "fill_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "css_aria",
+                                "fill_smart": {
+                                    "by": "css",
+                                    "selector": f'[aria-label="{aria_label}"]',
+                                },
+                            }
+                        )
                     data_tfa = await field.get_attribute("data-tfa")
                     if data_tfa:
-                        suggestions.append({
-                            "strategy": "tfa",
-                            "fill_smart": {"by": "tfa", "tfa": data_tfa}
-                        })
-                    field_info.append({
-                        "index": idx, "tag": tag, "type": field_type,
-                        "accessible_name": accessible_name, "aria_label": aria_label,
-                        "placeholder": placeholder, "name": name, "id": input_id,
-                        "playwright_suggestions": suggestions
-                    })
+                        suggestions.append(
+                            {
+                                "strategy": "tfa",
+                                "fill_smart": {"by": "tfa", "tfa": data_tfa},
+                            }
+                        )
+                    field_info.append(
+                        {
+                            "index": idx,
+                            "tag": tag,
+                            "type": field_type,
+                            "accessible_name": accessible_name,
+                            "aria_label": aria_label,
+                            "placeholder": placeholder,
+                            "name": name,
+                            "id": input_id,
+                            "playwright_suggestions": suggestions,
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting regional field {idx}: {e}")
                     continue
@@ -1834,10 +2176,13 @@ class PlaywrightTools:
             for idx, elem in enumerate(interactives):
                 try:
                     tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-                    elem_type = await elem.get_attribute("type") if tag == "input" else tag
+                    elem_type = (
+                        await elem.get_attribute("type") if tag == "input" else tag
+                    )
                     role = await elem.get_attribute("role")
                     effective_type = role if role else elem_type
-                    accessible_name = await elem.evaluate("""
+                    accessible_name = await elem.evaluate(
+                        """
                         el => {
                             if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
                             if (el.id) {
@@ -1853,7 +2198,8 @@ class PlaywrightTools:
                             if (el.name) return el.name;
                             return null;
                         }
-                    """)
+                    """
+                    )
                     aria_label = await elem.get_attribute("aria-label")
                     name = await elem.get_attribute("name") or ""
                     elem_id = await elem.get_attribute("id") or ""
@@ -1870,62 +2216,108 @@ class PlaywrightTools:
                         for opt in option_elements:
                             opt_text = await opt.inner_text()
                             opt_value = await opt.get_attribute("value")
-                            options.append({"text": opt_text.strip(), "value": opt_value})
+                            options.append(
+                                {"text": opt_text.strip(), "value": opt_value}
+                            )
                     suggestions = []
                     if effective_type in ["checkbox", "radio", "switch", "tab"]:
                         if accessible_name:
-                            suggestions.append({
-                                "strategy": "role",
-                                "click_smart": {"by": "role", "role": effective_type, "name": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "role",
+                                    "click_smart": {
+                                        "by": "role",
+                                        "role": effective_type,
+                                        "name": accessible_name,
+                                    },
+                                }
+                            )
                         if accessible_name and tag == "input":
-                            suggestions.append({
-                                "strategy": "label",
-                                "click_smart": {"by": "label", "label": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "label",
+                                    "click_smart": {
+                                        "by": "label",
+                                        "label": accessible_name,
+                                    },
+                                }
+                            )
                         if accessible_name:
-                            suggestions.append({
-                                "strategy": "text",
-                                "click_smart": {"by": "text", "text": accessible_name}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "text",
+                                    "click_smart": {
+                                        "by": "text",
+                                        "text": accessible_name,
+                                    },
+                                }
+                            )
                         if aria_label:
-                            suggestions.append({
-                                "strategy": "css_aria",
-                                "click_smart": {"by": "css", "selector": f'[aria-label="{aria_label}"]'}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "css_aria",
+                                    "click_smart": {
+                                        "by": "css",
+                                        "selector": f'[aria-label="{aria_label}"]',
+                                    },
+                                }
+                            )
                         if name:
-                            suggestions.append({
-                                "strategy": "css_name",
-                                "click_smart": {"by": "css", "selector": f'[name="{name}"]'}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "css_name",
+                                    "click_smart": {
+                                        "by": "css",
+                                        "selector": f'[name="{name}"]',
+                                    },
+                                }
+                            )
                         if data_tfa:
-                            suggestions.append({
-                                "strategy": "tfa",
-                                "click_smart": {"by": "tfa", "tfa": data_tfa}
-                            })
+                            suggestions.append(
+                                {
+                                    "strategy": "tfa",
+                                    "click_smart": {"by": "tfa", "tfa": data_tfa},
+                                }
+                            )
                     elif tag == "select":
-                        suggestions.append({
-                            "strategy": "note", "action": "select_option",
-                            "message": "Use fill_smart with value, or click_smart to open dropdown then click option"
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "note",
+                                "action": "select_option",
+                                "message": "Use fill_smart with value, or click_smart to open dropdown then click option",
+                            }
+                        )
                     elif elem_type == "file":
-                        suggestions.append({
-                            "strategy": "note", "action": "set_input_files",
-                            "message": "File upload requires dedicated tool (not yet implemented)"
-                        })
+                        suggestions.append(
+                            {
+                                "strategy": "note",
+                                "action": "set_input_files",
+                                "message": "File upload requires dedicated tool (not yet implemented)",
+                            }
+                        )
                     elif elem_type in ["range", "color"] and accessible_name:
-                        suggestions.append({
-                            "strategy": "fill",
-                            "fill_smart": {"by": "label", "label": accessible_name}
-                        })
-                    interactive_info.append({
-                        "index": idx, "tag": tag, "type": effective_type,
-                        "accessible_name": accessible_name, "aria_label": aria_label,
-                        "name": name, "id": elem_id, "data_tfa": data_tfa,
-                        "checked": checked, "selected": selected,
-                        "options": options if options else None,
-                        "playwright_suggestions": suggestions
-                    })
+                        suggestions.append(
+                            {
+                                "strategy": "fill",
+                                "fill_smart": {"by": "label", "label": accessible_name},
+                            }
+                        )
+                    interactive_info.append(
+                        {
+                            "index": idx,
+                            "tag": tag,
+                            "type": effective_type,
+                            "accessible_name": accessible_name,
+                            "aria_label": aria_label,
+                            "name": name,
+                            "id": elem_id,
+                            "data_tfa": data_tfa,
+                            "checked": checked,
+                            "selected": selected,
+                            "options": options if options else None,
+                            "playwright_suggestions": suggestions,
+                        }
+                    )
                 except Exception as e:
                     print(f"Error inspecting regional interactive {idx}: {e}")
                     continue
@@ -1937,12 +2329,12 @@ class PlaywrightTools:
                 "root_selector": root_selector,
                 "clickable_elements": clickable_info,
                 "interactive_controls": interactive_info,
-                "form_fields": field_info
+                "form_fields": field_info,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Error inspecting region '{root_selector}': {str(e)}"
+                "message": f"Error inspecting region '{root_selector}': {str(e)}",
             }
 
     # =====================================================================
@@ -2149,7 +2541,11 @@ class PlaywrightTools:
                 controls = result.get("interactive_controls") or []
 
                 for ctrl in controls:
-                    ctrl_type = (ctrl.get("type") or "").lower() if case_insensitive else (ctrl.get("type") or "")
+                    ctrl_type = (
+                        (ctrl.get("type") or "").lower()
+                        if case_insensitive
+                        else (ctrl.get("type") or "")
+                    )
                     raw_name = ctrl.get("accessible_name") or ""
                     haystack = raw_name.lower() if case_insensitive else raw_name
 
@@ -2162,7 +2558,11 @@ class PlaywrightTools:
                         ]
 
                         # Fallback: prova role+name se non ci sono suggerimenti
-                        if not targets and ctrl.get("type") and ctrl.get("accessible_name"):
+                        if (
+                            not targets
+                            and ctrl.get("type")
+                            and ctrl.get("accessible_name")
+                        ):
                             targets = [
                                 {
                                     "by": "role",
@@ -2259,8 +2659,7 @@ class PlaywrightTools:
                         field.get("name") or "",
                     ]
                     haystacks = [
-                        c.lower() if case_insensitive else c
-                        for c in candidates
+                        c.lower() if case_insensitive else c for c in candidates
                     ]
 
                     if any(needle in h for h in haystacks if h):
@@ -2323,7 +2722,7 @@ class PlaywrightTools:
         if not self.page:
             return {
                 "status": "error",
-                "message": "Browser non avviato. Chiama start_browser() prima."
+                "message": "Browser non avviato. Chiama start_browser() prima.",
             }
 
         # Default: prova tutte le strategie comuni
@@ -2339,19 +2738,19 @@ class PlaywrightTools:
                 "button:has-text('Aceptar')",
                 "button:has-text('Akzeptieren')",
                 "a:has-text('Accept')",
-                "a:has-text('Accetta')"
+                "a:has-text('Accetta')",
             ],
             "generic_agree": [
                 "button:has-text('Agree')",
                 "button:has-text('Acconsento')",
                 "button:has-text('I agree')",
-                "button:has-text('Sono d\\'accordo')"
+                "button:has-text('Sono d\\'accordo')",
             ],
             "reject_all": [
                 "button:has-text('Reject all')",
                 "button:has-text('Rifiuta tutto')",
-                "button:has-text('Refuse')"
-            ]
+                "button:has-text('Refuse')",
+            ],
         }
 
         try:
@@ -2384,7 +2783,7 @@ class PlaywrightTools:
                             "message": f"Cookie banner gestito con strategia '{strategy}'",
                             "strategy": strategy,
                             "selector": selector,
-                            "clicked": True
+                            "clicked": True,
                         }
 
                     except Exception:
@@ -2397,7 +2796,7 @@ class PlaywrightTools:
                 "message": "Nessun cookie banner trovato (o già accettato)",
                 "strategy": None,
                 "selector": None,
-                "clicked": False
+                "clicked": False,
             }
 
         except Exception as e:
@@ -2405,7 +2804,7 @@ class PlaywrightTools:
                 "status": "error",
                 "message": f"Errore durante gestione cookie banner: {str(e)}",
                 "strategy": None,
-                "clicked": False
+                "clicked": False,
             }
 
     async def wait_for_dom_change(
@@ -2438,10 +2837,7 @@ class PlaywrightTools:
             in_iframe: opzionale dict per osservare dentro un iframe.
         """
         if not self.page:
-            return {
-                "status": "error",
-                "message": "Browser non avviato"
-            }
+            return {"status": "error", "message": "Browser non avviato"}
 
         if timeout is None:
             timeout = AppConfig.PLAYWRIGHT.TIMEOUT
@@ -2539,7 +2935,9 @@ class PlaywrightTools:
         if result.get("status") != "success":
             return {
                 "status": "error",
-                "message": result.get("message", "Errore sconosciuto da MutationObserver"),
+                "message": result.get(
+                    "message", "Errore sconosciuto da MutationObserver"
+                ),
                 "root_selector": root_selector,
             }
 
@@ -2585,11 +2983,12 @@ class PlaywrightTools:
             case_sensitive=False,
             in_iframe=in_iframe,
         )
-        overall_status = "success" if text_result.get("status") == "success" else "error"
+        overall_status = (
+            "success" if text_result.get("status") == "success" else "error"
+        )
         return {
             "status": overall_status,
             "message": text_result.get("message"),
             "click": click_result,
             "text_check": text_result,
         }
-

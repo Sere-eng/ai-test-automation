@@ -1,6 +1,6 @@
 # backend/agent/document_parser.py
 """
-Parser per documenti di test (Word, HTML, Excel, CSV).
+Parser per documenti di test (Word, HTML, XLSX).
 Estrae sezioni strutturate da documenti JIRA esportati o test case manuali.
 """
 

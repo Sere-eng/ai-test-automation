@@ -1,9 +1,12 @@
 {
-    "python-envs.pythonProjects": [],
     "python.analysis.extraPaths": [
         "./backend"
     ],
     "cursorpyright.analysis.extraPaths": [
         "./backend"
-    ]
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    }
 }

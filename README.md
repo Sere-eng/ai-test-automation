@@ -10,7 +10,7 @@ L'obiettivo è avere un **tester virtuale** che, dato un requisito funzionale in
 2. navigare l'applicazione web
 3. eseguire i passi UI
 4. verificare i risultati attesi
-5. restituire un report strutturato (JSON + screenshot)
+5. restituire un report strutturato (JSON)
 
 ---
 
@@ -34,7 +34,7 @@ Pattern di esecuzione tipico:
 3. `inspect_interactive_elements` (discovery-first)
 4. `click_smart` (fallback su ARIA role, accessible name, label, CSS validato)
 5. `fill_smart` (solo campi obbligatori identificati dinamicamente)
-6. `wait_for_dom_change`
+6. `wait_for_dom_change` (non consigliato su Angular/LAB; preferire wait mirate)
 7. validazione strutturata tramite `evaluation.py`
 
 Il pass/fail è determinato in modo **deterministico** dai risultati dei tool (JSON strutturato), non dall’output testuale del modello.
@@ -107,7 +107,7 @@ Orchestrator (orchestrator.py)
    Chromium
          │
          ▼
-JSON response + screenshot
+JSON response
 ```
 
 Pass/fail deciso da `evaluation.py` sui tool results — non dall'output testuale del modello.

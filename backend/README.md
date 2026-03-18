@@ -14,7 +14,7 @@ Sistema di test automation intelligente che usa **MCP (Model Context Protocol)**
 - [Struttura del Progetto](#struttura-del-progetto)
 - [Setup](#setup)
 - [Configurazione](#configurazione)
-- [Tool Playwright (21 tools)](#tool-playwright)
+- [Tool Playwright (23 tools)](#tool-playwright)
 - [Orchestratore LAB](#orchestratore-lab)
 - [API Endpoints](#api-endpoints)
 - [MCP: Locale vs Remoto](#mcp-locale-vs-remoto)
@@ -53,6 +53,69 @@ Playwright Async (Chromium)
 Il pass/fail è deciso da `evaluation.py` sui tool results, non dall'output testuale del modello.
 
 ---
+
+### Codegen Playwright deterministico (senza LLM)
+
+Quando abiliti la generazione dello script Playwright, il flusso è:
+
+```
+run_lab_scenario()
+    └─ produce scenario_result["steps"]
+           │
+           ▼
+    codegen/trace_extractor.py
+    extract_trace(steps)
+           │  filtra: solo tool_end + status=success
+           │  esclude: infrastruttura (start_browser, screenshot, ecc.)
+           │  normalizza: [{tool, args, result}, ...]
+           ▼
+    codegen/trace_to_playwright.py
+    generate_script_from_trace(trace)
+           │  header imports
+           │  helper do_login_and_go_to_laboratory() — template fisso
+           │  per ogni step → _compile_step(tool, args)
+           │       └─ _pick_locator_from_targets(targets)
+           ▼
+    script Python sync pronto (pytest + playwright.sync_api)
+           │
+           ▼
+    codegen/script_generator.py
+    generate_playwright_script()  ← unico punto di ingresso da app.py
+```
+
+Tutta la compilazione trace → script è **deterministica**: non viene mai chiamato un LLM in questa fase, e le regole di traduzione MCP → Playwright vivono unicamente in `trace_to_playwright.py`.
+
+**Dettagli importanti (pratici):**
+
+- **Trace = success-only**: `extract_trace(...)` include solo step `tool_end` con `output.status="success"`.
+  Se uno step necessario fallisce/non viene eseguito durante la run (es. click su un contatore o un wait), **non apparirà nello script generato**.
+- **Strict mode Playwright**: per evitare errori quando un locator risolve a più elementi (es. due bottoni con lo stesso nome),
+  il codegen applica `.first` ai locator `get_by_*` quando non sono già scoped.
+  Quando disponibile, usa anche `target["scope"]` (scope detection best-effort di `click_smart`/`fill_smart`) per generare un locator scoped
+  del tipo `page.locator("<scope>").nth(i).get_by_role(...)`.
+- **Scroll esplicito**: `scroll_to_bottom(selector=...)` è mappato nel codegen e viene emesso nello script (scroll del contenitore o della window).
+
+**Esempi rapidi (trace → Playwright):**
+
+1) `click_smart` (locator ambiguo → `.first`):
+
+```python
+# trace step (semplificato)
+{"tool": "click_smart", "result": {"target": {"by": "role", "role": "button", "name": "Aggiungi filtro"}}}
+
+# codice generato
+page.get_by_role("button", name="Aggiungi filtro").first.click()
+```
+
+2) `scroll_to_bottom` su contenitore:
+
+```python
+# trace step (semplificato)
+{"tool": "scroll_to_bottom", "args": {"selector": ".sample-table-container"}}
+
+# codice generato
+page.locator(".sample-table-container").first.evaluate("el => { el.scrollTop = el.scrollHeight; }")
+```
 
 ## Struttura del Progetto
 
@@ -182,7 +245,7 @@ Il MCP server espone **23 tool async**. Fonte unica: `mcp_servers/tool_names.py`
 | `get_text(selector, selector_type)` | Estrae testo da elemento |
 | `get_text_by_visible_content(search_text, timeout)` | Trova il primo elemento visibile che contiene `search_text` ed estrae il testo completo (innerText). Usare solo per testi espliciti negli expected results dello scenario. |
 | `press_key(key)` | Simula pressione tasto (Enter, Escape, ...) |
-| `capture_screenshot(filename, return_base64)` | Screenshot full-page; `return_base64=False` per default (risparmia token) |
+| `capture_screenshot(filename, return_base64)` | (Deprecated nel setup LAB) Screenshot full-page; normalmente NON usato. |
 | `handle_cookie_banner(strategies, timeout)` | Gestione banner cookie con strategie multiple |
 
 ### Wait
@@ -269,6 +332,7 @@ print(result["errors"])   # lista errori per tool
 | `scenario_2` | Accesso tramite contatori |
 | `scenario_3` | Accesso tramite filtro |
 | `scenario_4` | Pagina di dettaglio campione |
+| `scenario_5` | Creazione filtro con Piano di lavoro e Descrizione |
 
 **Struttura risultato:**
 ```python
@@ -278,10 +342,16 @@ print(result["errors"])   # lista errori per tool
     "prefix": { ... },   # risultato Prefix Agent
     "scenario": { ... }, # risultato Scenario Agent
     "errors": [],
-    "artifacts": [{"type": "screenshot", "filename": "test_success.png"}],
+    "artifacts": [],
     "duration_ms": 18400,
 }
 ```
+
+### Note importanti sulla codegen
+
+- La generazione Playwright è **deterministica** e deriva solo dalla **trace MCP**.
+- `extract_trace(...)` include solo step `tool_end` con `output.status="success"`: se uno step necessario fallisce/non viene eseguito durante la run, **non apparirà nello script generato**.
+- Per evitare errori di Playwright strict mode su locator ambigui, il codegen applica `.first` ai locator `get_by_*` quando necessario; quando disponibile, usa anche `target["scope"]` (scope detection best-effort di `click_smart`/`fill_smart`) per generare locator scoped.
 
 ---
 

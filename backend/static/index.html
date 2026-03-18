@@ -20,6 +20,7 @@
             --accent-2: #ff875a;
             --success: #4ade80;
             --error: #f87171;
+            --code-bg: #111;
         }
 
         * {
@@ -155,6 +156,23 @@
             border-color: #555;
             color: #aaa;
         }
+
+        .btn-icon {
+            padding: 8px 16px;
+            font-size: 13px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid #333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            border-color: #555;
+            color: #aaa;
+        }
         
         .result {
             margin-top: 30px;
@@ -195,6 +213,118 @@
             font-size: 14px;
         }
         
+        /* Script section per Playwright */
+        .script-section {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 900px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .script-section.show {
+            display: block;
+        }
+
+        .script-header {
+            background: var(--panel-2);
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .script-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .script-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+            background: rgba(255, 107, 53, 0.12);
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            padding: 3px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .script-title {
+            font-size: 13px;
+            color: #aaa;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .script-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .script-textarea {
+            width: 100%;
+            background: var(--code-bg);
+            border: none;
+            color: #c9d1d9;
+            font-size: 13px;
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 24px;
+            resize: vertical;
+            min-height: 340px;
+            outline: none;
+            line-height: 1.6;
+        }
+
+        .script-footer {
+            background: var(--panel-2);
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: #555;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* Checkbox generate script */
+        .generate-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .generate-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .generate-toggle span {
+            font-size: 13px;
+            color: var(--muted);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .copy-feedback {
+            font-size: 12px;
+            color: var(--success);
+            font-family: 'IBM Plex Mono', monospace;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
+        }
+
         .loading {
             display: none;
             text-align: center;
@@ -218,43 +348,6 @@
         
         @keyframes spin {
             to { transform: rotate(360deg); }
-        }
-        
-        .examples {
-            margin-top: 40px;
-            max-width: 900px;
-            width: 100%;
-        }
-        
-        .examples-title {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .example-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .example-item {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px 16px;
-            font-size: 14px;
-            color: var(--muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-        }
-        
-        .example-item:hover {
-            border-color: #3a3a3a;
-            color: #aaa;
         }
 
         .tabs {
@@ -345,7 +438,7 @@
             font-size: 14px;
         }
         .lab-login-section input::placeholder { color: var(--muted); opacity: 0.8; }
-        .lab-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .lab-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center;}
         .lab-actions-row .btn { flex: 0 0 auto; }
         
         /* File input styling */
@@ -527,19 +620,22 @@
                 </select>
             </div>
             <div id="labStepsPreview" class="lab-steps" style="display:none;"></div>
+            
             <div class="actions lab-actions-row">
                 <button class="btn btn-primary" id="runScenarioBtn" onclick="runLabScenarioOnly()">Run scenario only</button>
                 <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login + scenario)</button>
+                <label class="generate-toggle">
+                    <input type="checkbox" id="generateScriptToggle">
+                    <span>generate script</span>
+                </label>
             </div>
         </div>
         
-        <!-- NEW: Document Upload Panel -->
         <div id="panel-document" class="panel">
             <p class="panel-desc">
                 <strong>Upload a test case document</strong> (Word, HTML, Excel, or CSV), extract scenarios automatically, and run them all at once.
             </p>
             
-            <!-- Step 1: Upload -->
             <div class="lab-login-section">
                 <div class="section-label">1. Upload Document</div>
                 <div class="field">
@@ -552,7 +648,6 @@
                 <div id="uploadStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
             </div>
             
-            <!-- Step 2: Extract Scenarios -->
             <div class="lab-login-section" id="extractSection" style="display:none;">
                 <div class="section-label">2. Extract Scenarios (AI)</div>
                 <div class="lab-actions-row">
@@ -560,7 +655,6 @@
                 </div>
                 <div id="extractStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
                 
-                <!-- Extraction Progress -->
                 <div id="extractionProgress" style="display:none; margin-top: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
                         <span id="extractProgressStatus" style="color: var(--text); font-weight: 500;">Processing...</span>
@@ -573,13 +667,11 @@
                 </div>
             </div>
             
-            <!-- Step 3: Preview Scenarios -->
             <div id="scenariosPreview" class="lab-steps" style="display:none; margin-top: 20px;">
                 <div class="section-label">Extracted Scenarios</div>
                 <div id="scenariosList" style="margin-top: 10px;"></div>
             </div>
             
-            <!-- Step 4: Run Test(s) -->
             <div class="lab-login-section" id="batchSection" style="display:none;">
                 <div class="section-label">3. Run Test(s)</div>
                 <div class="field">
@@ -606,7 +698,6 @@
                 </div>
             </div>
             
-            <!-- Batch Progress Display -->
             <div class="batch-progress" id="batchProgress" style="display:none;">
                 <div class="section-label">Batch Test Progress</div>
                 <div class="progress-container">
@@ -621,8 +712,7 @@
                 </div>
             </div>
         </div>
-        <!-- END Document Upload Panel -->
-    </div>
+        </div>
     
     <div class="loading" id="loading">
         <div class="spinner"></div>
@@ -634,9 +724,27 @@
         <div class="result-content" id="resultContent"></div>
     </div>
 
+    <div class="script-section" id="scriptSection">
+        <div class="script-header">
+            <div class="script-header-left">
+                <span class="script-badge">PLAYWRIGHT PY</span>
+                <span class="script-title" id="scriptFilename">test_scenario.py</span>
+            </div>
+            <div class="script-actions">
+                <span class="copy-feedback" id="copyFeedback">copied!</span>
+                <button class="btn-icon" onclick="runPlaywright()">run</button>
+                <button class="btn-icon" onclick="copyScript()">copy</button>
+                <button class="btn-icon" onclick="downloadScript()">download</button>
+            </div>
+        </div>
+        <textarea class="script-textarea" id="scriptContent" readonly spellcheck="false"></textarea>
+        <div class="script-footer" id="scriptFooter">generated from run trace · pytest-playwright · async</div>
+    </div>
+
     <script>
         const API_BASE = 'http://localhost:5000';
         let labScenarios = [];
+        let currentScenarioId = '';
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -657,13 +765,12 @@
                     select.innerHTML = '<option value="">No scenarios (server unavailable?)</option>';
                     return;
                 }
-                // Niente placeholder selezionabile: la prima opzione corrisponde a scenario_1,
-                // la seconda a scenario_2, ecc. Così "seconda opzione" = scenario_2.
                 select.innerHTML = labScenarios
                     .map((s, i) => '<option value="' + s.id + '">' + (i + 1) + '. ' + (s.name || s.id) + '</option>')
                     .join('');
                 select.onchange = function() {
                     const id = select.value;
+                    currentScenarioId = id;
                     const preview = document.getElementById('labStepsPreview');
                     if (!id) { preview.style.display = 'none'; return; }
                     const s = labScenarios.find(x => x.id === id);
@@ -682,7 +789,6 @@
                     }
                 };
 
-                // Mostra subito i dettagli del primo scenario (se presente)
                 if (labScenarios.length > 0) {
                     select.value = labScenarios[0].id;
                     select.onchange();
@@ -710,7 +816,104 @@
                 resultHeader.textContent = 'ERROR';
                 resultContent.textContent = data.message || JSON.stringify(data);
             }
+
+            // Aggiunto dalla collega: mostra lo script Playwright se presente
+            if (data.playwright_script) {
+                showScript(data.playwright_script, data.scenario_id || currentScenarioId);
+            } else {
+                const scriptSec = document.getElementById('scriptSection');
+                if(scriptSec) scriptSec.classList.remove('show');
+            }
         }
+
+        // --- FUNZIONI PLAYWRIGHT AGGIUNTE DALLA COLLEGA ---
+        function showScript(script, scenarioId) {
+            const section = document.getElementById('scriptSection');
+            const content = document.getElementById('scriptContent');
+            const filename = document.getElementById('scriptFilename');
+            const footer = document.getElementById('scriptFooter');
+            content.value = script;
+            filename.textContent = 'test_' + (scenarioId || 'scenario') + '.py';
+            const lines = script.split('\n').length;
+            footer.textContent = 'generated from run trace · pytest-playwright · async · ' + lines + ' lines';
+            section.classList.add('show');
+        }
+
+        function copyScript() {
+            const content = document.getElementById('scriptContent').value;
+            navigator.clipboard.writeText(content).then(() => {
+                const fb = document.getElementById('copyFeedback');
+                fb.classList.add('show');
+                setTimeout(() => fb.classList.remove('show'), 2000);
+            });
+        }
+
+        function downloadScript() {
+            const content = document.getElementById('scriptContent').value;
+            const scenarioId = currentScenarioId || 'scenario';
+            const blob = new Blob([content], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'test_' + scenarioId + '.py';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        async function runPlaywright() {
+            const script = document.getElementById('scriptContent').value;
+            if (!script.trim()) {
+                alert('No script to run');
+                return;
+            }
+            const scenarioId = currentScenarioId || 'scenario';
+            const resultDiv = document.getElementById('result');
+            const resultHeader = document.getElementById('resultHeader');
+            const resultContent = document.getElementById('resultContent');
+            const loadingDiv = document.getElementById('loading');
+
+            document.getElementById('loadingText').textContent = 'Running Playwright script...';
+            loadingDiv.classList.add('show');
+            resultDiv.classList.remove('show');
+
+            try {
+                const response = await fetch(API_BASE + '/api/test/playwright/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        script,
+                        scenario_id: scenarioId
+                    })
+                });
+                const data = await response.json();
+                loadingDiv.classList.remove('show');
+
+                resultDiv.classList.add('show');
+                resultContent.innerHTML = '';
+
+                if (data.status === 'success') {
+                    resultDiv.className = 'result success show';
+                    resultHeader.textContent = '✓ PLAYWRIGHT OK';
+                } else {
+                    resultDiv.className = 'result error show';
+                    resultHeader.textContent = '✗ PLAYWRIGHT ERROR';
+                }
+
+                const out = (data.stdout || '').trim();
+                const err = (data.stderr || '').trim();
+                let text = '';
+                if (out) text += out;
+                if (err) text += (text ? '\n\n' : '') + err;
+                if (!text) text = 'No output.';
+                resultContent.textContent = text;
+            } catch (error) {
+                loadingDiv.classList.remove('show');
+                resultDiv.classList.add('show');
+                resultDiv.className = 'result error show';
+                resultHeader.textContent = 'PLAYWRIGHT RUN ERROR';
+                resultContent.textContent = error.message || String(error);
+            }
+        }
+        // ----------------------------------------------------
 
         async function runLabLogin() {
             const resultDiv = document.getElementById('result');
@@ -721,6 +924,10 @@
             const password = document.getElementById('labPassword').value;
             document.getElementById('loadingText').textContent = 'Running login (prefix)…';
             resultDiv.classList.remove('show');
+            
+            const scriptSec = document.getElementById('scriptSection');
+            if(scriptSec) scriptSec.classList.remove('show');
+            
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
@@ -753,18 +960,27 @@
                 alert('Select a scenario');
                 return;
             }
+            
+            // Supporto checkbox Playwright
+            const generateScriptEl = document.getElementById('generateScriptToggle');
+            const generateScript = generateScriptEl ? generateScriptEl.checked : false;
+
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const btn = document.getElementById('runScenarioBtn');
             document.getElementById('loadingText').textContent = 'Running scenario…';
             resultDiv.classList.remove('show');
+            
+            const scriptSec = document.getElementById('scriptSection');
+            if(scriptSec) scriptSec.classList.remove('show');
+            
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
                 const response = await fetch(API_BASE + '/api/test/lab/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ scenario_id: scenarioId })
+                    body: JSON.stringify({ scenario_id: scenarioId, generate_script: generateScript })
                 });
                 const data = await response.json();
                 loadingDiv.classList.remove('show');
@@ -791,6 +1007,10 @@
             const btn = document.getElementById('runLabBtn');
             document.getElementById('loadingText').textContent = 'Running LAB test (prefix + scenario)…';
             resultDiv.classList.remove('show');
+            
+            const scriptSec = document.getElementById('scriptSection');
+            if(scriptSec) scriptSec.classList.remove('show');
+            
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
@@ -860,7 +1080,7 @@ Perform a search for 'carm' and verify results appear.
 Close the browser.`
         ];
         
-        // ==================== DOCUMENT UPLOAD FUNCTIONS ====================
+        // ==================== DOCUMENT UPLOAD FUNCTIONS (TUO LAVORO) ====================
         
         let uploadedFilename = null;
         let extractedScenarios = null;
@@ -993,7 +1213,6 @@ Close the browser.`
                         
                         // Prerequisites (for Excel files)
                         if (scenario.prerequisites && scenario.prerequisites.trim()) {
-                            // Clean up and replace \n with <br> for proper HTML rendering
                             const prereqClean = scenario.prerequisites.trim().replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
                             htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(79, 70, 229, 0.1); border-left: 3px solid #4f46e5; padding: 10px; border-radius: 4px;">
                                 <strong style="color: #818cf8; display: block; margin-bottom: 6px;">📋 Prerequisites</strong>
@@ -1003,7 +1222,6 @@ Close the browser.`
                         
                         // Input Data (for Excel files)
                         if (scenario.input_data && scenario.input_data.trim()) {
-                            // Clean up and replace \n with <br> for proper HTML rendering
                             const inputClean = scenario.input_data.trim().replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
                             htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 10px; border-radius: 4px;">
                                 <strong style="color: #34d399; display: block; margin-bottom: 6px;">📝 Input Data</strong>
@@ -1111,7 +1329,6 @@ Close the browser.`
                 `;
                 progressDetails.appendChild(div);
                 scenarioElements[scenarioId] = div;
-                // Scroll to bottom
                 progressDetails.scrollTop = progressDetails.scrollHeight;
             }
             
@@ -1141,7 +1358,6 @@ Close the browser.`
             }
             
             try {
-                // Create EventSource for SSE
                 const eventSource = new EventSource(
                     API_BASE + '/api/test/batch/stream?' + new URLSearchParams({
                         data: JSON.stringify({
@@ -1154,7 +1370,6 @@ Close the browser.`
                     })
                 );
                 
-                // Better approach: use POST with fetch streaming
                 const response = await fetch(API_BASE + '/api/test/batch/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1177,11 +1392,10 @@ Close the browser.`
                     
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
-                    buffer = lines.pop(); // Keep incomplete line in buffer
+                    buffer = lines.pop(); 
                     
                     for (const line of lines) {
                         if (line.startsWith('event:')) {
-                            const eventType = line.substring(7).trim();
                             continue;
                         }
                         if (line.startsWith('data:')) {
@@ -1196,14 +1410,11 @@ Close the browser.`
                 }
                 
                 function handleSSEEvent(eventData) {
-                    // Extract event type from data or infer from structure
                     if (eventData.scenario_index !== undefined) {
-                        // scenario_start
                         currentScenario = eventData.scenario_id;
                         progressStatus.textContent = `Running scenario ${eventData.scenario_index}/${eventData.total_scenarios}...`;
                         addScenarioElement(eventData.scenario_id, eventData.scenario_name);
                     } else if (eventData.phase !== undefined) {
-                        // phase_update or step_update
                         const phaseLabel = eventData.phase === 'prefix' ? 'Login' : 'Test Execution';
                         if (eventData.message) {
                             updateScenarioElement(eventData.scenario_id, `${phaseLabel}: ${eventData.message}`);
@@ -1211,7 +1422,6 @@ Close the browser.`
                             updateScenarioElement(eventData.scenario_id, `${phaseLabel}: ${eventData.tool}`);
                         }
                     } else if (eventData.status !== undefined && eventData.scenario_id) {
-                        // scenario_complete
                         completedScenarios++;
                         updateProgress();
                         const statusIcon = eventData.status === 'success' ? '✅' : '❌';
@@ -1224,14 +1434,11 @@ Close the browser.`
                             addErrorToScenario(eventData.scenario_id, eventData.error);
                         }
                     } else if (eventData.summary !== undefined) {
-                        // batch_complete
                         showFinalResults(eventData);
                     } else if (eventData.error !== undefined && !eventData.scenario_id) {
-                        // Global error
                         progressStatus.textContent = `Error: ${eventData.error}`;
                         throw new Error(eventData.error);
                     } else if (eventData.error && eventData.scenario_id) {
-                        // Scenario error
                         addErrorToScenario(eventData.scenario_id, eventData.error);
                     }
                 }
@@ -1239,7 +1446,6 @@ Close the browser.`
                 function showFinalResults(data) {
                     progressStatus.textContent = 'Batch test completed!';
                     
-                    // Show final results in result div
                     const resultContent = document.getElementById('resultContent');
                     const resultHeader = document.getElementById('resultHeader');
                     resultDiv.classList.add('show');
@@ -1345,7 +1551,6 @@ Close the browser.`
                     html += `<div style="margin-bottom: 12px;"><strong>Scenario:</strong> ${selectedScenario.name}</div>`;
                     html += `<div style="color: ${passed > 0 ? 'var(--success)' : 'var(--error)'}; margin-bottom: 12px;"><strong>Status:</strong> ${passed > 0 ? 'Success' : 'Failed'}</div>`;
                     
-                    // Show errors if any
                     if (data.scenarios && data.scenarios[0] && data.scenarios[0].error) {
                         html += `<div style="margin-top: 12px; padding: 12px; background: var(--bg); border-left: 3px solid var(--error); border-radius: 4px;">`;
                         html += `<strong>Error:</strong><br/>${data.scenarios[0].error}`;
@@ -1383,6 +1588,8 @@ Close the browser.`
         function clearTest() {
             document.getElementById('testDescription').value = '';
             document.getElementById('result').classList.remove('show');
+            const scriptSec = document.getElementById('scriptSection');
+            if(scriptSec) scriptSec.classList.remove('show');
         }
 
         async function runTest() {
@@ -1398,6 +1605,9 @@ Close the browser.`
             const btn = document.getElementById('runBtn');
 
             resultDiv.classList.remove('show');
+            const scriptSec = document.getElementById('scriptSection');
+            if(scriptSec) scriptSec.classList.remove('show');
+            
             loadingDiv.classList.add('show');
             btn.disabled = true;
 
@@ -1413,34 +1623,22 @@ Close the browser.`
 
                 const data = await response.json();
                 
-                // Debug: verifica cosa arriva dal backend
-                console.log('Response data:', data);
-                console.log('Screenshot present:', !!data.screenshot);
-                if (data.screenshot) {
-                    console.log('Screenshot length:', data.screenshot.length);
-                }
-
                 loadingDiv.classList.remove('show');
                 resultDiv.classList.add('show');
 
                 const resultContent = document.getElementById('resultContent');
-                resultContent.innerHTML = ''; // Svuota contenuto precedente
+                resultContent.innerHTML = ''; 
                 
                 if (data.status === 'success' && data.passed) {
                     resultDiv.className = 'result success show';
                     document.getElementById('resultHeader').textContent = '✓ SUCCESS';
                     
-                    // Aggiungi testo
                     const textNode = document.createElement('div');
                     textNode.style.whiteSpace = 'pre-wrap';
                     textNode.textContent = data.final_answer || 'Test completed successfully';
                     resultContent.appendChild(textNode);
                     
-                    // Aggiungi immagine se presente
                     if (data.screenshot) {
-                        console.log('Creating image element...');
-                        console.log('First 100 chars of base64:', data.screenshot.substring(0, 100));
-                        
                         const imgLabel = document.createElement('div');
                         imgLabel.textContent = '📸 Final Screenshot:';
                         imgLabel.style.marginTop = '20px';
@@ -1449,7 +1647,6 @@ Close the browser.`
                         resultContent.appendChild(imgLabel);
                         
                         const img = document.createElement('img');
-                        // Rimuovi eventuali newlines o spazi dal base64
                         const cleanBase64 = data.screenshot.replace(/\s/g, '');
                         img.src = 'data:image/png;base64,' + cleanBase64;
                         img.style.maxWidth = '100%';
@@ -1457,19 +1654,10 @@ Close the browser.`
                         img.style.border = '1px solid var(--border)';
                         img.style.display = 'block';
                         img.onerror = function(e) {
-                            console.error('Failed to load image:', e);
-                            console.error('Image src length:', img.src.length);
                             imgLabel.textContent = '❌ Failed to load screenshot (check console)';
                             imgLabel.style.color = 'var(--error)';
                         };
-                        img.onload = function() {
-                            console.log('✅ Screenshot loaded successfully!');
-                            console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-                        };
                         resultContent.appendChild(img);
-                        console.log('Image element appended to DOM');
-                    } else {
-                        console.log('No screenshot in response data');
                     }
                 } else {
                     resultDiv.className = 'result error show';

@@ -17,6 +17,8 @@ from config.settings import AppConfig
 from agent.system_prompt import get_prefix_prompt, get_lab_optimized_prompt
 from agent.test_agent_mcp import TestAgentMCP
 from agent.lab_scenarios import get_scenario_by_id, LabScenario
+from codegen.trace_extractor import extract_trace
+from codegen.trace_to_playwright import summarize_trace
 
 
 # Istruzione per il Prefix Agent (URL e credenziali parametrizzabili, con fallback da config)
@@ -67,8 +69,7 @@ def _scenario_instruction(scenario: LabScenario) -> str:
         f"Steps:\n{steps}\n\n"
         f"Expected results (for verification):\n{results}\n"
         f"{hints_section}\n"
-        "After completing all steps: capture_screenshot(\"test_success.png\", return_base64=False), "
-        "then close_browser(), then ONE short sentence. "
+        "After completing all steps: call close_browser(), then output ONE short neutral sentence. "
         "Do NOT say 'need more steps' or 'sorry' when you have finished the steps."
     )
 
@@ -139,6 +140,24 @@ async def run_lab_scenario(
     result["phase"] = "scenario"
     result["scenario_id"] = scenario.id
     result["scenario_name"] = scenario.name
+
+    # Testo naturale prodotto dal modello (per uso "umano")
+    model_notes = result.get("notes")
+
+    # Summary deterministica derivata direttamente dalla trace MCP (steps)
+    steps = result.get("steps") or []
+    trace = extract_trace(steps)
+    if trace:
+        result["trace_summary"] = summarize_trace(
+            trace, scenario_id=scenario_id, scenario_name=scenario.name
+        )
+
+    # Esponi entrambi:
+    # - notes: frase naturale del modello (per compatibilità/UI)
+    # - trace_summary: riepilogo tecnico dalla trace
+    if model_notes:
+        result["notes"] = model_notes
+
     return result
 
 
