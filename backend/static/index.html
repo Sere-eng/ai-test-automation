@@ -559,6 +559,18 @@
                     <button class="btn btn-secondary" id="extractBtn" onclick="extractScenarios()">Extract Scenarios</button>
                 </div>
                 <div id="extractStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
+                
+                <!-- Extraction Progress -->
+                <div id="extractionProgress" style="display:none; margin-top: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+                        <span id="extractProgressStatus" style="color: var(--text); font-weight: 500;">Processing...</span>
+                        <span id="extractProgressCount" style="color: var(--muted); font-family: 'IBM Plex Mono', monospace;">0/0</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+                        <div id="extractProgressBar" style="height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <div id="extractProgressDetails" style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); max-height: 150px; overflow-y: auto; line-height: 1.6;"></div>
+                </div>
             </div>
             
             <!-- Step 3: Preview Scenarios -->
@@ -908,11 +920,44 @@ Close the browser.`
             const btn = document.getElementById('extractBtn');
             const previewDiv = document.getElementById('scenariosPreview');
             const scenariosListDiv = document.getElementById('scenariosList');
+            const progressDiv = document.getElementById('extractionProgress');
+            const progressBar = document.getElementById('extractProgressBar');
+            const progressStatus = document.getElementById('extractProgressStatus');
+            const progressCount = document.getElementById('extractProgressCount');
+            const progressDetails = document.getElementById('extractProgressDetails');
             
-            statusDiv.textContent = '⏳ Extracting scenarios... Please wait, this may take a moment.';
+            statusDiv.textContent = '⏳ Starting extraction...';
             statusDiv.style.color = 'var(--muted)';
             btn.disabled = true;
             previewDiv.style.display = 'none';
+            
+            // Show progress UI
+            progressDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressStatus.textContent = 'Analyzing document...';
+            progressCount.textContent = '0/0';
+            progressDetails.innerHTML = '';
+            
+            // Simulate progress steps
+            let currentStep = 0;
+            const steps = [
+                { text: 'Reading document...', progress: 10 },
+                { text: 'Analyzing structure...', progress: 30 },
+                { text: 'Extracting test cases...', progress: 50 },
+                { text: 'Processing scenarios...', progress: 70 },
+                { text: 'Finalizing...', progress: 90 }
+            ];
+            
+            const progressInterval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    const step = steps[currentStep];
+                    progressBar.style.width = step.progress + '%';
+                    progressStatus.textContent = step.text;
+                    progressDetails.innerHTML += `<div style="margin-bottom: 4px;">${step.text}</div>`;
+                    progressDetails.scrollTop = progressDetails.scrollHeight;
+                    currentStep++;
+                }
+            }, 400);
             
             try {
                 const response = await fetch(API_BASE + '/api/test/extract-scenarios', {
@@ -922,8 +967,17 @@ Close the browser.`
                 });
                 const data = await response.json();
                 
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                
                 if (data.status === 'success') {
                     extractedScenarios = data.scenarios;
+                    
+                    // Update final status
+                    progressStatus.textContent = `✅ Extraction complete!`;
+                    progressCount.textContent = `${data.scenarios_count}/${data.scenarios_count}`;
+                    progressDetails.innerHTML += `<div style="margin-top: 8px; color: var(--success); font-weight: 500;">✅ Successfully extracted ${data.scenarios_count} test case(s) from "${data.document.title}"</div>`;
+                    
                     statusDiv.textContent = `✅ Extracted ${data.scenarios_count} scenarios from "${data.document.title}"`;
                     statusDiv.style.color = 'var(--success)';
                     
@@ -988,6 +1042,12 @@ Close the browser.`
                     statusDiv.style.color = 'var(--error)';
                 }
             } catch (error) {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressBar.style.background = 'var(--error)';
+                progressStatus.textContent = '❌ Extraction failed';
+                progressDetails.innerHTML += `<div style="margin-top: 8px; color: var(--error); font-weight: 500;">❌ Error: ${error.message}</div>`;
+                
                 statusDiv.textContent = `❌ Extraction failed: ${error.message}`;
                 statusDiv.style.color = 'var(--error)';
             } finally {
