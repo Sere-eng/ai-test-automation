@@ -10,4 +10,7 @@
 # custom files
 *mmd
 /backend/.env
+*.xlsx
+*.csv
+*.xls
 /backend/langgraph.txt

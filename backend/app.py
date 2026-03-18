@@ -5,6 +5,8 @@ Espone endpoint REST per l'AI Agent MCP e i tool Playwright.
 """
 
 import re
+import traceback
+from pathlib import Path
 from flask import (
     Flask,
     jsonify,
@@ -1180,6 +1182,442 @@ def run_batch_test_stream():
     )
 
 
+# ==================== ENDPOINT DOCUMENT PROCESSING & BATCH TEST ====================
+
+@app.route('/api/test/upload', methods=['POST'])
+def upload_test_document():
+    """
+    Upload di un documento di test (Word, HTML, Excel, CSV).
+    Il file viene salvato in data/test-cases/.
+    """
+    if 'file' not in request.files:
+        return jsonify({
+            "status": "error",
+            "message": "Nessun file fornito. Usa 'file' come nome campo multipart."
+        }), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({
+            "status": "error",
+            "message": "Nessun file selezionato"
+        }), 400
+    
+    # Verifica estensione
+    allowed_extensions = {'.doc', '.docx', '.html', '.htm', '.xlsx', '.xls', '.csv'}
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        return jsonify({
+            "status": "error",
+            "message": f"Formato non supportato. Formati accettati: {', '.join(allowed_extensions)}"
+        }), 400
+    
+    # Salva file
+    upload_dir = Path("data/test-cases")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    filepath = upload_dir / file.filename
+    file.save(str(filepath))
+    
+    return jsonify({
+        "status": "success",
+        "message": "File caricato con successo",
+        "filename": file.filename,
+        "path": str(filepath),
+        "size_bytes": filepath.stat().st_size
+    })
+
+
+@app.route('/api/test/extract-scenarios', methods=['POST'])
+def extract_scenarios_from_document():
+    """
+    Estrae scenari da un documento di test usando LLM.
+    
+    Body JSON:
+    {
+        "file": "nome_file.doc"  (file in data/test-cases/)
+        oppure
+        "filepath": "/path/assoluto/al/file"
+    }
+    
+    Returns: Lista di scenari estratti
+    """
+    try:
+        from agent.document_parser import parse_test_document
+        from agent.scenario_extractor import extract_scenarios_from_document, scenarios_to_dict
+    except ImportError as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Moduli non disponibili: {e}. Installa: pip install beautifulsoup4 chardet"
+        }), 503
+    
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "Body JSON richiesto"
+        }), 400
+    
+    # Determina filepath
+    if 'filepath' in data:
+        filepath = data['filepath']
+    elif 'file' in data:
+        filepath = str(Path("data/test-cases") / data['file'])
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Specificare 'file' o 'filepath'"
+        }), 400
+    
+    if not Path(filepath).exists():
+        return jsonify({
+            "status": "error",
+            "message": f"File non trovato: {filepath}"
+        }), 404
+    
+    try:
+        print(f"📄 Inizio parsing del file: {filepath}")
+        
+        # 1. Parse documento
+        parsed = parse_test_document(filepath)
+        
+        print(f"✓ Parsing completato - Formato: {parsed.get('format')}")
+        
+        # 2. Se è un file Excel/CSV con test_cases già strutturati, convertili direttamente
+        if 'test_cases' in parsed:
+            print(f"📊 File Excel/CSV rilevato - Conversione diretta dei test case")
+            # File Excel/CSV con casi di test strutturati
+            scenarios = []
+            for i, test_case in enumerate(parsed.get('test_cases', [])):
+                scenario = {
+                    'id': f"test_case_{i+1}",
+                    'name': test_case.get('objective', f"Test Case {i+1}"),
+                    'prerequisites': test_case.get('prerequisites', ''),
+                    'input_data': test_case.get('input_data', ''),
+                    'execution_steps': [test_case.get('description', '')],
+                    'expected_results': [test_case.get('expected_results', '')],
+                    'row_number': test_case.get('row_number')
+                }
+                scenarios.append(scenario)
+                if (i + 1) % 5 == 0:
+                    print(f"  → Convertiti {i + 1}/{len(parsed.get('test_cases', []))} test case")
+            
+            print(f"✅ Conversione completata: {len(scenarios)} scenari estratti")
+            
+            return jsonify({
+                "status": "success",
+                "document": {
+                    "title": parsed.get('title'),
+                    "format": parsed.get('format'),
+                    "test_cases_count": parsed.get('test_cases_count')
+                },
+                "scenarios_count": len(scenarios),
+                "scenarios": scenarios
+            })
+        else:
+            print(f"📝 File Word/HTML rilevato - Estrazione con LLM")
+            # File Word/HTML - usa LLM per estrazione
+            scenarios = extract_scenarios_from_document(parsed)
+            
+            print(f"✅ Estrazione LLM completata: {len(scenarios)} scenari")
+            
+            return jsonify({
+                "status": "success",
+                "document": {
+                    "title": parsed.get('title'),
+                    "format": parsed.get('format')
+                },
+                "scenarios_count": len(scenarios),
+                "scenarios": scenarios_to_dict(scenarios)
+            })
+    
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route('/api/test/batch', methods=['POST'])
+def run_batch_test():
+    """
+    Esegue batch test di scenari LAB.
+    
+    Body JSON:
+    {
+        "scenarios": [  // Lista di scenari (come dict o solo ID)
+            {"id": "scenario_1", "name": "...", "execution_steps": [...], "expected_results": [...]},
+            // oppure solo ID per scenari già definiti in lab_scenarios.py:
+            "scenario_2"
+        ],
+        "url": "https://...",  // opzionale
+        "username": "...",     // opzionale
+        "password": "...",     // opzionale
+        "save_results": true   // opzionale, default true
+    }
+    """
+    if not ORCHESTRATOR_AVAILABLE:
+        return jsonify({
+            "status": "error",
+            "message": "Orchestrator non disponibile"
+        }), 503
+    
+    try:
+        from agent.batch_runner import run_batch_sync
+        from agent.lab_scenarios import LabScenario, LAB_SCENARIOS
+    except ImportError as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Batch runner non disponibile: {e}"
+        }), 503
+    
+    data = request.get_json()
+    
+    if not data or 'scenarios' not in data:
+        return jsonify({
+            "status": "error",
+            "message": "Body JSON richiesto con campo 'scenarios'"
+        }), 400
+    
+    scenarios_input = data['scenarios']
+    if not isinstance(scenarios_input, list) or not scenarios_input:
+        return jsonify({
+            "status": "error",
+            "message": "'scenarios' deve essere una lista non vuota"
+        }), 400
+    
+    # Converti scenari in LabScenario objects
+    scenarios = []
+    for item in scenarios_input:
+        if isinstance(item, str):
+            # È un ID, cerca negli scenari esistenti
+            existing = next((s for s in LAB_SCENARIOS if s.id == item), None)
+            if existing:
+                scenarios.append(existing)
+            else:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Scenario ID '{item}' non trovato",
+                    "available_scenarios": [s.id for s in LAB_SCENARIOS]
+                }), 400
+        elif isinstance(item, dict):
+            # È un dict completo, crea LabScenario
+            try:
+                scenario = LabScenario(
+                    id=item.get('id', f"dynamic_{len(scenarios) + 1}"),
+                    name=item.get('name', 'Unnamed'),
+                    execution_steps=item.get('execution_steps', []),
+                    expected_results=item.get('expected_results', []),
+                    prompt_hints=item.get('prompt_hints')
+                )
+                scenarios.append(scenario)
+            except Exception as e:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Errore nella creazione scenario: {e}"
+                }), 400
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"Formato scenario non valido: {type(item)}"
+            }), 400
+    
+    # Parametri opzionali
+    url = data.get('url')
+    username = data.get('username')
+    password = data.get('password')
+    save_results = data.get('save_results', True)
+    
+    try:
+        # Esegui batch (sincrono, bloccante)
+        results = run_batch_sync(
+            scenarios=scenarios,
+            url=url,
+            username=username,
+            password=password,
+            verbose=False,  # Non stampare in console per API
+            save_results=save_results
+        )
+        
+        return jsonify(results)
+    
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route('/api/test/batch/stream', methods=['POST'])
+def run_batch_test_stream():
+    """
+    Esegue batch test con streaming SSE per progress real-time.
+    
+    Body JSON: vedi run_batch_test() per formato
+    
+    Returns: Server-Sent Events stream con eventi:
+    - scenario_start: inizio scenario
+    - phase_update: cambio fase (prefix/scenario)
+    - step_update: completamento step
+    - scenario_complete: fine scenario
+    - batch_complete: fine batch
+    - error: errore durante esecuzione
+    """
+    if not ORCHESTRATOR_AVAILABLE:
+        return jsonify({
+            "status": "error",
+            "message": "Orchestrator non disponibile"
+        }), 503
+    
+    try:
+        from agent.batch_runner import BatchTestRunner
+        from agent.lab_scenarios import LabScenario, LAB_SCENARIOS
+    except ImportError as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Batch runner non disponibile: {e}"
+        }), 503
+    
+    data = request.get_json()
+    
+    if not data or 'scenarios' not in data:
+        return jsonify({
+            "status": "error",
+            "message": "Body JSON richiesto con campo 'scenarios'"
+        }), 400
+    
+    scenarios_input = data['scenarios']
+    if not isinstance(scenarios_input, list) or not scenarios_input:
+        return jsonify({
+            "status": "error",
+            "message": "'scenarios' deve essere una lista non vuota"
+        }), 400
+    
+    # Converti scenari in LabScenario objects
+    scenarios = []
+    for item in scenarios_input:
+        if isinstance(item, str):
+            existing = next((s for s in LAB_SCENARIOS if s.id == item), None)
+            if existing:
+                scenarios.append(existing)
+            else:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Scenario ID '{item}' non trovato"
+                }), 400
+        elif isinstance(item, dict):
+            try:
+                scenario = LabScenario(
+                    id=item.get('id', f"dynamic_{len(scenarios) + 1}"),
+                    name=item.get('name', 'Unnamed'),
+                    execution_steps=item.get('execution_steps', []),
+                    expected_results=item.get('expected_results', []),
+                    prompt_hints=item.get('prompt_hints')
+                )
+                scenarios.append(scenario)
+            except Exception as e:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Errore nella creazione scenario: {e}"
+                }), 400
+    
+    url = data.get('url')
+    username = data.get('username')
+    password = data.get('password')
+    save_results = data.get('save_results', True)
+    
+    # Crea una queue per gli eventi SSE
+    event_queue = queue.Queue()
+    
+    def progress_callback(event_type: str, event_data: dict):
+        """Callback chiamato dal BatchTestRunner per emettere eventi."""
+        event_queue.put({
+            'event': event_type,
+            'data': event_data
+        })
+    
+    def generate():
+        """Generator function per SSE stream."""
+        try:
+            # Esegui batch in un thread separato
+            runner = BatchTestRunner(
+                url=url,
+                username=username,
+                password=password,
+                progress_callback=progress_callback
+            )
+            
+            results = {'error': None}
+            
+            def run_batch_async():
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    batch_results = loop.run_until_complete(
+                        runner.run_batch(scenarios, verbose=False)
+                    )
+                    
+                    if save_results:
+                        filepath = runner.save_results(batch_results)
+                        batch_results['saved_to'] = filepath
+                    
+                    results['data'] = batch_results
+                    
+                    # Segnala fine
+                    event_queue.put(None)
+                    
+                except Exception as e:
+                    results['error'] = str(e)
+                    event_queue.put(None)
+            
+            # Avvia thread
+            thread = threading.Thread(target=run_batch_async)
+            thread.start()
+            
+            # Stream eventi dalla queue
+            while True:
+                try:
+                    event = event_queue.get(timeout=0.5)
+                    
+                    if event is None:
+                        # Fine stream
+                        if results.get('error'):
+                            yield f"event: error\ndata: {json.dumps({'error': results['error']})}\n\n"
+                        elif results.get('data'):
+                            # Invia risultati finali
+                            final_data = results['data']
+                            yield f"event: batch_complete\ndata: {json.dumps(make_json_serializable(final_data))}\n\n"
+                        break
+                    
+                    # Emetti evento SSE
+                    event_type = event['event']
+                    event_data = make_json_serializable(event['data'])
+                    yield f"event: {event_type}\ndata: {json.dumps(event_data)}\n\n"
+                    
+                except queue.Empty:
+                    # Invia keepalive ogni 0.5s
+                    yield f": keepalive\n\n"
+                    continue
+            
+            thread.join(timeout=1)
+            
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
+
+
 # ==================== ENDPOINT AMC LOGIN ====================
 
 
@@ -1368,8 +1806,13 @@ if __name__ == "__main__":
             print(f"  Credenziali configurate: {AppConfig.AMC.USERNAME}")
         else:
             print(
-                f"  Credenziali NON configurate (aggiungi AMC_USERNAME/PASSWORD in .env)"
-            )
+                f"  Credenziali NON configurate (aggiungi AMC_USERNAME/PASSWORD in .env)")
+        
+        print("\n[DOCUMENT PROCESSING & BATCH TEST]")
+        print("   - POST /api/test/upload           → Upload documento test (Word/HTML)")
+        print("   - POST /api/test/extract-scenarios → Estrai scenari da documento (LLM)")
+        print("   - POST /api/test/batch            → Esegui batch di scenari")
+        print("   - GET  /api/test/lab/scenarios    → Lista scenari LAB disponibili")
     else:
         print("\n[AI AGENT MCP] Non disponibile")
         print("   Installa: pip install mcp==1.12.3 langchain-mcp-adapters==0.1.7")

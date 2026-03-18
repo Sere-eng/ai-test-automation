@@ -62,6 +62,8 @@ REGOLE:
 - Gli execution_steps devono essere azioni concrete e sequenziali
 - Gli expected_results devono essere verificabili
 - Usa id sequenziali: scenario_1, scenario_2, ecc.
+- **IGNORA le sezioni "History" che contengono note di revisione con date (es. "15/01/2025 Ripristinate le tipologie...")**
+- Le sezioni History sono commenti del team di test e NON fanno parte del caso di test da automatizzare
 
 FORMATO OUTPUT:
 Rispondi SOLO con un JSON array valido (no markdown, no spiegazioni):

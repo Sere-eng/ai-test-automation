@@ -28,7 +28,8 @@ def create_llm():
             api_version=AppConfig.LLM.AZURE_API_VERSION,
             api_key=AppConfig.LLM.AZURE_API_KEY,
             temperature=AppConfig.LLM.TEMPERATURE,
-            max_tokens=AppConfig.LLM.MAX_TOKENS,
+            max_tokens=AppConfig.LLM.MAX_TOKENS, #fixme: CAMBIO PER REASONING MODELS OAI
+            #max_completion_tokens=AppConfig.LLM.MAX_TOKENS # for reasoning models
         )
     if provider == "ollama":
         return ChatOpenAI(
