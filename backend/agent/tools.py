@@ -1855,6 +1855,22 @@ class PlaywrightTools:
                     ),
                 )
             except Exception:
+                # Fallback: se il contenuto è "inline" (non in dialog), root_selector può non esistere.
+                # Per non bloccare l'esecuzione, degradamo automaticamente a una ispezione globale.
+                try:
+                    global_result = await self.inspect_interactive_elements(in_iframe=in_iframe)
+                    if isinstance(global_result, dict) and global_result.get("status") == "success":
+                        global_result["fallback_used"] = True
+                        global_result["root_selector_missing"] = True
+                        global_result["fallback_from"] = root_selector
+                        global_result["message"] = (
+                            f"Fallback: root '{root_selector}' non trovato (probabile contenuto inline). "
+                            f"Ispezione globale eseguita."
+                        )
+                        return global_result
+                except Exception:
+                    pass
+
                 return {
                     "status": "error",
                     "message": f"Contenitore non trovato per selector '{root_selector}'",

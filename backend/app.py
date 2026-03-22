@@ -972,7 +972,7 @@ def run_batch_test():
             url=url,
             username=username,
             password=password,
-            verbose=False,  # Non stampare in console per API
+            verbose=True,  # Non stampare in console per API
             save_results=save_results
         )
         
@@ -1092,7 +1092,7 @@ def run_batch_test_stream():
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     batch_results = loop.run_until_complete(
-                        runner.run_batch(scenarios, verbose=False)
+                        runner.run_batch(scenarios, verbose=True)
                     )
                     
                     if save_results:

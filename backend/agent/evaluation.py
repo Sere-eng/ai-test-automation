@@ -101,6 +101,15 @@ def error_from_tool_output(tool_name: str, output_obj: dict) -> Optional[dict]:
     Gli errori di INFRA_TOOLS vengono ignorati a monte."""
     if tool_name in INFRA_TOOLS:
         return None
+
+    # inspect_region: se il contenitore specifico non esiste perché il contenuto è reso
+    # "inline" e non in dialog, la tool docstring suggerisce di NON considerarlo un blocco.
+    # In quel caso ignoriamo quell'errore per non far fallire l'intero scenario.
+    if tool_name == "inspect_region" and isinstance(output_obj, dict):
+        msg = output_obj.get("message", "") or ""
+        if output_obj.get("status") == "error" and "Contenitore non trovato per selector" in msg:
+            return None
+
     if not isinstance(output_obj, dict) or output_obj.get("status") != "error":
         return None
     return {

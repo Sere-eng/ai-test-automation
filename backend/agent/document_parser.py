@@ -509,18 +509,49 @@ class TestDocumentParser:
             Testo della sezione pulito
         """
         for label in labels:
-            # Cerca td con il label in bold
+            label_lower = label.lower().strip()
+
+            # Passo 1: versione "rigida" (bgcolor="#f0f0f0") per mantenere compatibilità
             cells = self.soup.find_all('td', bgcolor="#f0f0f0")
             for cell in cells:
+                # Alcuni export hanno la label in <b> mentre altre varianti usano <span>/<strong>
+                text = ""
                 b_tag = cell.find('b')
-                if b_tag and label.lower() in b_tag.get_text(strip=True).lower():
-                    # Trova la cella successiva (stesso tr)
+                if b_tag:
+                    text = b_tag.get_text(strip=True)
+                else:
+                    # fallback locale: prendi tutto il testo della cella se non c'è <b>
+                    text = cell.get_text(strip=True)
+
+                if text and label_lower in text.lower():
                     tr = cell.parent
                     tds = tr.find_all('td')
                     if len(tds) >= 2:
                         content_cell = tds[1]
                         return self._clean_html_text(content_cell)
-        
+
+            # Passo 2: fallback "tollerante" (non dipende dal bgcolor)
+            # Cerca tag che contengono la label (es. <b>Condizioni Iniziali:</span>)
+            for tag in self.soup.find_all(['b', 'strong', 'span']):
+                try:
+                    tag_text = tag.get_text(strip=True)
+                except Exception:
+                    tag_text = ""
+                if not tag_text:
+                    continue
+                if label_lower not in tag_text.lower():
+                    continue
+
+                td = tag.find_parent('td')
+                if not td:
+                    continue
+
+                tr = td.parent
+                tds = tr.find_all('td')
+                if len(tds) >= 2:
+                    content_cell = tds[1]
+                    return self._clean_html_text(content_cell)
+
         return ""
     
     def _clean_html_text(self, element) -> str:
