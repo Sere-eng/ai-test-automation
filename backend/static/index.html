@@ -1209,7 +1209,29 @@ Close the browser.`
                         
                         // Build HTML with all available fields
                         let htmlContent = `<div style="font-weight: 600; color: var(--accent); margin-bottom: 4px;">${idx + 1}. ${scenario.name}</div>`;
-                        htmlContent += `<div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">ID: ${scenario.id}${scenario.row_number ? ` | Row: ${scenario.row_number}` : ''}</div>`;
+                        
+                        // Metadata row: ID, Row, Codice, Modulo, Ambiente, Criticità
+                        let metaParts = [`ID: ${scenario.id}`];
+                        if (scenario.row_number) metaParts.push(`Row: ${scenario.row_number}`);
+                        if (scenario.modulo)   metaParts.push(`Modulo: ${scenario.modulo}`);
+                        if (scenario.ambiente) metaParts.push(`Ambiente: ${scenario.ambiente}`);
+                        if (scenario.criticita) metaParts.push(`Criticità: ${scenario.criticita}`);
+                        if (scenario.versione_inizio) metaParts.push(`Ver. inizio: ${scenario.versione_inizio}`);
+                        htmlContent += `<div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">${metaParts.join(' | ')}</div>`;
+                        
+                        // Obiettivo (formato strutturato)
+                        if (scenario.objective && scenario.objective.trim()) {
+                            const objClean = scenario.objective.trim().replace(/\n/g, '<br>');
+                            htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(251, 191, 36, 0.08); border-left: 3px solid #fbbf24; padding: 10px; border-radius: 4px;">
+                                <strong style="color: #fbbf24; display: block; margin-bottom: 6px;">🎯 Obiettivo</strong>
+                                <div style="margin: 0; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${objClean}</div>
+                            </div>`;
+                        }
+                        
+                        // Funzione (formato strutturato)
+                        if (scenario.funzione && scenario.funzione.trim()) {
+                            htmlContent += `<div style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">⚙️ <strong>Funzione:</strong> ${scenario.funzione.trim()}</div>`;
+                        }
                         
                         // Prerequisites (for Excel files)
                         if (scenario.prerequisites && scenario.prerequisites.trim()) {
@@ -1231,12 +1253,20 @@ Close the browser.`
                         
                         // Execution Steps
                         if (scenario.execution_steps && scenario.execution_steps.length > 0) {
-                            htmlContent += `<div style="font-size: 13px; margin-bottom: 6px;"><strong>Steps:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${scenario.execution_steps.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
+                            const stepsHtml = scenario.execution_steps.map(s => {
+                                const sClean = s.replace(/\n/g, '<br>');
+                                return `<li style="margin-bottom: 6px;">${sClean}</li>`;
+                            }).join('');
+                            htmlContent += `<div style="font-size: 13px; margin-bottom: 6px;"><strong>Steps:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${stepsHtml}</ul></div>`;
                         }
                         
                         // Expected Results
                         if (scenario.expected_results && scenario.expected_results.length > 0) {
-                            htmlContent += `<div style="font-size: 13px;"><strong>Expected Results:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${scenario.expected_results.map(r => `<li>${r}</li>`).join('')}</ul></div>`;
+                            const resHtml = scenario.expected_results.map(r => {
+                                const rClean = r.replace(/\n/g, '<br>');
+                                return `<li style="margin-bottom: 6px;">${rClean}</li>`;
+                            }).join('');
+                            htmlContent += `<div style="font-size: 13px;"><strong>Expected Results:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${resHtml}</ul></div>`;
                         }
                         
                         scenarioDiv.innerHTML = htmlContent;
