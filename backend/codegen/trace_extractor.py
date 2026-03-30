@@ -3,7 +3,31 @@
 Normalizza la lista steps prodotta da evaluation.py in una trace pulita
 adatta al codegen (solo tool call andati a buon fine, campi essenziali).
 """
+import re
+from typing import Any
+
 from agent.utils import make_json_serializable
+
+# LangChain / export JSON possono lasciare sequenze \\uXXXX come caratteri letterali
+# (es. backslash + "u00e0") invece del carattere Unicode. json.generato con repr() romperebbe
+# get_by_text nel pytest. Normalizziamo a caratteri reali.
+_MANGLED_U_ESC = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def _fix_mangled_json_unicode_escapes(s: str) -> str:
+    if not s or "\\u" not in s:
+        return s
+    return _MANGLED_U_ESC.sub(lambda m: chr(int(m.group(1), 16)), s)
+
+
+def _deep_fix_unicode_strings(obj: Any) -> Any:
+    if isinstance(obj, str):
+        return _fix_mangled_json_unicode_escapes(obj)
+    if isinstance(obj, list):
+        return [_deep_fix_unicode_strings(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _deep_fix_unicode_strings(v) for k, v in obj.items()}
+    return obj
 
 
 # Tool che non producono interazioni Playwright utili nello script finale.
@@ -75,8 +99,10 @@ def extract_trace(steps: list[dict]) -> list[dict]:
         # "input" viene popolato dal pending_inputs patch in test_agent_mcp.py.
         # Fallback su "args" per compatibilità con run pre-patch.
         raw_args = step.get("input") or step.get("args") or {}
-        args = _strip_internal_args(make_json_serializable(raw_args))
-        result = _clean_result(tool, output)
+        args = _deep_fix_unicode_strings(
+            _strip_internal_args(make_json_serializable(raw_args))
+        )
+        result = _deep_fix_unicode_strings(_clean_result(tool, output))
 
         trace.append(
             {

@@ -47,8 +47,8 @@ def do_login_and_go_to_laboratory(page: Page) -> None:
     page.get_by_text('Preanalitica').first.wait_for(timeout=60000)
 
 
-def test_scenario_2(page: Page):
-    """Scenario: SMPLIST_001 - Dashboard, elenco campione e dettaglio campione - Scenario 2 (scenario_2)"""
+def test_scenario_4(page: Page):
+    """Scenario: SMPLIST_001 - Dashboard, elenco campione e dettaglio campione - Scenario 4 (scenario_4)"""
     # Perform login and navigate to Laboratory dashboard
     do_login_and_go_to_laboratory(page)
 
@@ -61,14 +61,7 @@ def test_scenario_2(page: Page):
     page.get_by_text('Campioni con Check-in').first.click()
     # wait_for_load_state
     page.wait_for_load_state('domcontentloaded')
-    # wait_for_text_content
-    page.get_by_text('Attività di dettaglio dashboard').first.wait_for()
-    # scroll_to_bottom (wrapper elenco campioni: lista + footer)
-    _sr = page.locator('sample-table div.search-results')
-    if _sr.count() > 0:
-        _sr.first.evaluate('el => { el.scrollTop = el.scrollHeight; }')
-    _foot = page.get_by_text('Totale righe visualizzate', exact=False)
-    if _foot.count() > 0:
-        _foot.first.scroll_into_view_if_needed()
-    # get_text_by_visible_content (valore letto, non assertito)
-    _tmp_text = page.get_by_text('Totale righe visualizzate').first.inner_text()
+    # click_smart (strategy=text)
+    page.get_by_text('check_box_outline_blank 2026000018 202601000004 30/09/2024 21:42 0100000407 OLW0000000813201 FELICE MERLUZZO Check-In').first.click()
+    # wait_for_load_state
+    page.wait_for_load_state('domcontentloaded')

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from config.settings import AppConfig
+
 
 # Nomi di icone Material che appaiono come testo accessibile ma non sono
 # interazioni utente reali (es. click su "menu", "science", "add").
@@ -503,10 +505,28 @@ def _compile_step(
     elif tool == "scroll_to_bottom":
         selector = args.get("selector")
         if selector:
-            lines.append("    # scroll_to_bottom (container)")
-            lines.append(
-                f"    page.locator({repr(selector)}).first.evaluate('el => {{ el.scrollTop = el.scrollHeight; }}')"
-            )
+            s = selector.strip()
+            if AppConfig.PLAYWRIGHT.is_scroll_sample_table_wrapper(s):
+                lines.append(
+                    "    # scroll_to_bottom (wrapper elenco campioni: lista + footer)"
+                )
+                list_loc = AppConfig.PLAYWRIGHT.get_scroll_sample_table_list_locator()
+                foot_txt = AppConfig.PLAYWRIGHT.get_scroll_sample_table_footer_text()
+                lines.append(f"    _sr = page.locator({repr(list_loc)})")
+                lines.append("    if _sr.count() > 0:")
+                lines.append(
+                    "        _sr.first.evaluate('el => { el.scrollTop = el.scrollHeight; }')"
+                )
+                lines.append(
+                    f"    _foot = page.get_by_text({repr(foot_txt)}, exact=False)"
+                )
+                lines.append("    if _foot.count() > 0:")
+                lines.append("        _foot.first.scroll_into_view_if_needed()")
+            else:
+                lines.append("    # scroll_to_bottom (container)")
+                lines.append(
+                    f"    page.locator({repr(selector)}).first.evaluate('el => {{ el.scrollTop = el.scrollHeight; }}')"
+                )
         else:
             lines.append("    # scroll_to_bottom (window)")
             lines.append(

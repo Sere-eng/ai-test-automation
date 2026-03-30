@@ -151,6 +151,8 @@ async def scroll_to_bottom(selector: str | None = None) -> str:
     Args:
         selector: CSS del contenitore scrollabile (es. ".sample-table-container").
                   Se None, esegue scroll della pagina (window).
+                  Per i wrapper elenco campioni (PlaywrightConfig): scroll sulla lista configurata
+                  e scroll_into_view del testo footer, con fallback sul selettore passato.
     """
     result = await playwright.scroll_to_bottom(selector=selector)
     return to_json(result)

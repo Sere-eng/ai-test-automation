@@ -1,6 +1,14 @@
 # backend/agent/scenario_extractor.py
 """
-Scenario Extractor - Usa LLM per convertire documenti di test in scenari strutturati.
+Scenario Extractor - Converte documenti di test in scenari strutturati usando LLM.
+
+Il LLM viene usato SOLO per:
+- Ricomporre frasi frammentate (problema strutturale dei docx Word)
+- Identificare i confini tra scenari multipli
+- Strutturare l'output in JSON
+
+Il LLM NON deve riscrivere, parafrasare o sintetizzare il testo originale.
+Vedi EXTRACTION_SYSTEM_PROMPT per le regole di fedeltà al testo.
 """
 
 import json
@@ -12,11 +20,12 @@ from agent.lab_scenarios import LabScenario
 
 
 def get_llm_for_extraction():
-    """Crea istanza LLM per estrazione scenari (usa stesse configurazioni di test agent)."""
+    """Crea istanza LLM per estrazione scenari."""
     provider = LLMConfig.get_provider()
-    
+
     if provider == "openrouter":
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             model=LLMConfig.OPENROUTER_MODEL,
             api_key=LLMConfig.OPENROUTER_API_KEY,
@@ -26,6 +35,7 @@ def get_llm_for_extraction():
         )
     elif provider == "azure":
         from langchain_openai import AzureChatOpenAI
+
         return AzureChatOpenAI(
             azure_deployment=LLMConfig.AZURE_DEPLOYMENT,
             api_version=LLMConfig.AZURE_API_VERSION,
@@ -36,6 +46,7 @@ def get_llm_for_extraction():
         )
     elif provider == "openai":
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             model=LLMConfig.OPENAI_MODEL,
             api_key=LLMConfig.OPENAI_API_KEY,
@@ -52,18 +63,31 @@ Il tuo compito è identificare e strutturare gli scenari di test contenuti nel d
 
 Per ogni scenario devi estrarre:
 1. **id**: un identificatore univoco (es. "scenario_1", "scenario_2")
-2. **name**: nome descrittivo dello scenario
-3. **execution_steps**: lista di passi da eseguire (frasi concise, imperative)
-4. **expected_results**: lista di risultati attesi (cosa deve succedere)
+2. **name**: nome descrittivo dello scenario, ricavato dal titolo del documento
+3. **execution_steps**: lista di passi da eseguire
+4. **expected_results**: lista di risultati attesi
 
-REGOLE:
-- Se il documento contiene scenari numerati (primo, secondo, terzo, quarto), crea uno scenario separato per ognuno
-- Se il documento descrive un unico flusso, crea un solo scenario
-- Gli execution_steps devono essere azioni concrete e sequenziali
-- Gli expected_results devono essere verificabili
+REGOLA FONDAMENTALE — FEDELTÀ AL TESTO ORIGINALE:
+- Copia i passi e i risultati VERBATIM dal documento sorgente.
+- NON parafrasare, NON riformulare, NON sintetizzare, NON tradurre.
+- Il tuo unico compito strutturale è:
+  (a) ricomporre frasi che appaiono frammentate su righe separate a causa
+      della formattazione interna del documento Word (ogni run con stile
+      diverso diventa paragrafo separato) — uniscile in un'unica stringa;
+  (b) identificare dove inizia e finisce ogni scenario;
+  (c) restituire il testo esattamente come appare nel documento, solo ripulito
+      dai marker bullet (·, •, -, *) e dai caratteri di formattazione.
+- NON aggiungere parole tue. Se il documento dice "clicca su 'Conferma'",
+  l'output deve dire esattamente "clicca su 'Conferma'", non "premere il
+  pulsante di conferma" o qualsiasi altra variante.
+
+REGOLE STRUTTURALI:
+- Se il documento contiene scenari numerati (primo, secondo, terzo...), crea
+  uno scenario separato per ognuno.
+- Se il documento descrive un unico flusso, crea un solo scenario.
 - Usa id sequenziali: scenario_1, scenario_2, ecc.
-- **IGNORA le sezioni "History" che contengono note di revisione con date (es. "15/01/2025 Ripristinate le tipologie...")**
-- Le sezioni History sono commenti del team di test e NON fanno parte del caso di test da automatizzare
+- IGNORA le sezioni "History" con note di revisione e date (es. "15/01/2025
+  Ripristinate le tipologie...") — sono commenti del team, non passi di test.
 
 FORMATO OUTPUT:
 Rispondi SOLO con un JSON array valido (no markdown, no spiegazioni):
@@ -71,40 +95,36 @@ Rispondi SOLO con un JSON array valido (no markdown, no spiegazioni):
 [
   {
     "id": "scenario_1",
-    "name": "Nome descrittivo",
+    "name": "Nome ricavato dal titolo - Scenario 1",
     "execution_steps": [
-      "Passo 1",
-      "Passo 2"
+      "Testo verbatim del passo 1",
+      "Testo verbatim del passo 2"
     ],
     "expected_results": [
-      "Risultato atteso 1",
-      "Risultato atteso 2"
+      "Testo verbatim del risultato atteso 1"
     ]
-  },
-  ...
+  }
 ]"""
 
 
 def extract_scenarios_with_llm(
-    title: str,
-    initial_conditions: str,
-    test_steps: str,
-    expected_results: str
+    title: str, initial_conditions: str, test_steps: str, expected_results: str
 ) -> List[LabScenario]:
     """
     Usa LLM per estrarre scenari strutturati da testo libero.
-    
+
+    Il LLM ricompone le frasi frammentate (problema strutturale dei docx Word)
+    e identifica i confini tra scenari, ma NON riscrive il testo originale.
+
     Args:
         title: Titolo del caso di test
         initial_conditions: Prerequisiti
         test_steps: Passi di esecuzione (può contenere più scenari)
         expected_results: Risultati attesi (può contenere più scenari)
-    
+
     Returns:
-        Lista di LabScenario oggetti
+        Lista di LabScenario con testo fedele all'originale
     """
-    
-    # Costruisci il prompt utente
     user_prompt = f"""Documento di Test Case:
 
 TITOLO: {title}
@@ -120,61 +140,65 @@ RISULTATI ATTESI:
 
 ---
 
-Estrai gli scenari di test da questo documento e restituiscili come JSON array."""
-    
-    # Chiama LLM
+Estrai gli scenari di test da questo documento.
+Ricorda: copia il testo VERBATIM, ricomponi solo i frammenti spezzati dalla
+formattazione Word, non riscrivere nulla."""
+
     llm = get_llm_for_extraction()
-    
+
     messages = [
         SystemMessage(content=EXTRACTION_SYSTEM_PROMPT),
-        HumanMessage(content=user_prompt)
+        HumanMessage(content=user_prompt),
     ]
-    
+
     response = llm.invoke(messages)
     response_text = response.content
-    
-    # Pulisci la risposta (rimuovi markdown code blocks se presenti)
+
+    # Pulisci eventuale markdown code block
     response_text = response_text.strip()
-    response_text = re.sub(r'^```json\s*', '', response_text)
-    response_text = re.sub(r'^```\s*', '', response_text)
-    response_text = re.sub(r'\s*```$', '', response_text)
-    
-    # Parse JSON
+    response_text = re.sub(r"^```json\s*", "", response_text)
+    response_text = re.sub(r"^```\s*", "", response_text)
+    response_text = re.sub(r"\s*```$", "", response_text)
+
     try:
         scenarios_data = json.loads(response_text)
     except json.JSONDecodeError as e:
-        raise ValueError(f"LLM ha restituito JSON non valido: {e}\n\nRisposta:\n{response_text}")
-    
-    # Converti in LabScenario objects
+        raise ValueError(
+            f"LLM ha restituito JSON non valido: {e}\n\nRisposta:\n{response_text}"
+        )
+
     scenarios = []
     for data in scenarios_data:
         scenario = LabScenario(
-            id=data.get('id', f"scenario_{len(scenarios) + 1}"),
-            name=data.get('name', 'Unnamed scenario'),
-            execution_steps=data.get('execution_steps', []),
-            expected_results=data.get('expected_results', []),
-            prompt_hints=None  # Opzionale, può essere aggiunto manualmente dopo
+            id=data.get("id", f"scenario_{len(scenarios) + 1}"),
+            name=data.get("name", "Unnamed scenario"),
+            execution_steps=data.get("execution_steps", []),
+            expected_results=data.get("expected_results", []),
+            prompt_hints=None,
         )
         scenarios.append(scenario)
-    
+
     return scenarios
 
 
 def extract_scenarios_from_document(parsed_doc: Dict[str, str]) -> List[LabScenario]:
     """
     Estrae scenari da un documento già parsato.
-    
+
+    Usa LLM per ricomporre frasi frammentate e strutturare gli scenari,
+    ma il testo originale viene preservato verbatim (vedi EXTRACTION_SYSTEM_PROMPT).
+
     Args:
         parsed_doc: Output di document_parser.parse()
-    
+
     Returns:
         Lista di LabScenario
     """
     return extract_scenarios_with_llm(
-        title=parsed_doc.get('title', 'Untitled'),
-        initial_conditions=parsed_doc.get('initial_conditions', ''),
-        test_steps=parsed_doc.get('test_steps', ''),
-        expected_results=parsed_doc.get('expected_results', '')
+        title=parsed_doc.get("title", "Untitled"),
+        initial_conditions=parsed_doc.get("initial_conditions", ""),
+        test_steps=parsed_doc.get("test_steps", ""),
+        expected_results=parsed_doc.get("expected_results", ""),
     )
 
 
@@ -182,11 +206,11 @@ def scenarios_to_dict(scenarios: List[LabScenario]) -> List[Dict]:
     """Converte lista di LabScenario in lista di dict (per JSON serialization)."""
     return [
         {
-            'id': s.id,
-            'name': s.name,
-            'execution_steps': s.execution_steps,
-            'expected_results': s.expected_results,
-            'prompt_hints': s.prompt_hints
+            "id": s.id,
+            "name": s.name,
+            "execution_steps": s.execution_steps,
+            "expected_results": s.expected_results,
+            "prompt_hints": s.prompt_hints,
         }
         for s in scenarios
     ]
@@ -195,30 +219,28 @@ def scenarios_to_dict(scenarios: List[LabScenario]) -> List[Dict]:
 def scenarios_to_python_code(scenarios: List[LabScenario]) -> str:
     """
     Genera codice Python per aggiungere gli scenari a lab_scenarios.py.
-    
     Utile per review manuale prima di committare.
     """
     lines = []
     lines.append("# Scenari estratti automaticamente\n")
-    
+
     for s in scenarios:
         lines.append(f"LabScenario(")
-        lines.append(f"    id=\"{s.id}\",")
-        lines.append(f"    name=\"{s.name}\",")
+        lines.append(f'    id="{s.id}",')
+        lines.append(f'    name="{s.name}",')
         lines.append(f"    expected_results=[")
         for result in s.expected_results:
-            # Escape quotes
             result_escaped = result.replace('"', '\\"')
-            lines.append(f"        \"{result_escaped}\",")
+            lines.append(f'        "{result_escaped}",')
         lines.append(f"    ],")
         lines.append(f"    execution_steps=[")
         for step in s.execution_steps:
             step_escaped = step.replace('"', '\\"')
-            lines.append(f"        \"{step_escaped}\",")
+            lines.append(f'        "{step_escaped}",')
         lines.append(f"    ],")
         lines.append(f"    prompt_hints=None,")
         lines.append(f"),\n")
-    
+
     return "\n".join(lines)
 
 
@@ -226,38 +248,36 @@ def scenarios_to_python_code(scenarios: List[LabScenario]) -> str:
 if __name__ == "__main__":
     import sys
     from agent.document_parser import parse_test_document
-    
+
     if len(sys.argv) < 2:
         print("Uso: python scenario_extractor.py <file_path>")
-        print("\nEstrae scenari da un documento di test usando LLM")
+        print("\nEstrae scenari da un documento di test usando LLM (testo verbatim)")
         sys.exit(1)
-    
+
     file_path = sys.argv[1]
-    
+
     try:
-        # 1. Parse documento
         print(f"📄 Parsing documento: {file_path}")
         parsed = parse_test_document(file_path)
         print(f"✓ Titolo: {parsed['title']}\n")
-        
-        # 2. Estrai scenari con LLM
-        print("🤖 Estrazione scenari con LLM...")
+
+        print("🤖 Estrazione scenari con LLM (verbatim)...")
         scenarios = extract_scenarios_from_document(parsed)
         print(f"✓ Estratti {len(scenarios)} scenari\n")
-        
-        # 3. Mostra risultati
+
         print("=" * 60)
         print("SCENARI ESTRATTI (JSON)")
         print("=" * 60)
         print(json.dumps(scenarios_to_dict(scenarios), indent=2, ensure_ascii=False))
-        
+
         print("\n" + "=" * 60)
         print("CODICE PYTHON (per lab_scenarios.py)")
         print("=" * 60)
         print(scenarios_to_python_code(scenarios))
-        
+
     except Exception as e:
         print(f"❌ Errore: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
