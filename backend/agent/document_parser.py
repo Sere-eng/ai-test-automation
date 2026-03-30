@@ -187,6 +187,8 @@ class TestDocumentParser:
         """
         Parse Excel usando openpyxl per accedere ai colori delle celle.
         Raggruppa righe con lo stesso colore di sfondo.
+        Rileva automaticamente il formato strutturato (una riga = un test case)
+        dal formato con colori (più righe per test case).
         """
         try:
             from openpyxl import load_workbook
@@ -203,10 +205,17 @@ class TestDocumentParser:
         # Leggi l'header (prima riga)
         header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
         
+        # Rilevamento automatico del formato:
+        # Se l'header contiene "Codice" e "Modulo" => formato strutturato (una riga = un test)
+        header_normalized = [str(h).strip().upper() if h else '' for h in header_row]
+        if 'CODICE' in header_normalized and 'MODULO' in header_normalized:
+            print("Formato strutturato rilevato (Codice/Modulo header) - ogni riga e' un test case")
+            return self._parse_excel_structured(ws, header_row)
+        
         # Identifica le colonne
         col_indices = self._identify_columns(header_row)
         
-        print(f"📊 Colonne identificate: {col_indices}")
+        print(f"Colonne identificate: {col_indices}")
         
         # Raggruppa righe per colore
         test_cases = []
@@ -242,7 +251,7 @@ class TestDocumentParser:
                 # Salva il test precedente se esiste e ha contenuto
                 if current_test and self._test_has_content(current_test):
                     test_cases.append(current_test)
-                    print(f"✓ Test case #{len(test_cases)} salvato")
+                    print(f"Test case #{len(test_cases)} salvato")
                 
                 # Inizia un nuovo test case
                 current_test = {
@@ -254,10 +263,10 @@ class TestDocumentParser:
                     'expected_results': '',
                 }
                 current_color = row_color
-                print(f"→ Nuovo test case iniziato alla riga {row_idx} (colore: {row_color})")
+                print(f"Nuovo test case iniziato alla riga {row_idx} (colore: {row_color})")
             else:
                 # Riga di continuazione
-                print(f"  + Riga {row_idx} aggiunta (colore: {row_color})")
+                print(f"  Riga {row_idx} aggiunta (colore: {row_color})")
             
             # Aggiungi i valori al test corrente
             if current_test:
@@ -274,13 +283,13 @@ class TestDocumentParser:
         # Aggiungi l'ultimo test case se ha contenuto
         if current_test and self._test_has_content(current_test):
             test_cases.append(current_test)
-            print(f"✓ Test case #{len(test_cases)} salvato (ultimo)")
+            print(f"Test case #{len(test_cases)} salvato (ultimo)")
         
         # Rimuovi il campo 'color' dai risultati (era solo per debugging)
         for tc in test_cases:
             tc.pop('color', None)
         
-        print(f"\n📝 Totale test case estratti: {len(test_cases)}")
+        print(f"Totale test case estratti: {len(test_cases)}")
         
         # Crea un titolo dal nome del file
         title = self.file_path.stem.replace('_', ' ').replace('-', ' ')
@@ -293,6 +302,145 @@ class TestDocumentParser:
             'columns_found': {k: v for k, v in col_indices.items()}
         }
     
+    def _parse_excel_structured(self, ws, header_row) -> Dict[str, str]:
+        """
+        Parse Excel con formato strutturato: ogni riga = un test case.
+        
+        Formato atteso (colonne):
+        Codice | Modulo | Ambiente | Criticita (F,P,N) | Obiettivo | Funzione |
+        Prerequisiti | Dati Input | Modalita esecuzione | Risultati attesi |
+        Versione Inizio | Versione Fine
+        
+        Returns:
+            Dict con test_cases (lista di dict) e metadati
+        """
+        # Mappa colonne -> indice
+        col_map = {}
+        for idx, col_name in enumerate(header_row):
+            if col_name is None:
+                continue
+            col_clean = str(col_name).strip().upper()
+            if col_clean == 'CODICE':
+                col_map['codice'] = idx
+            elif col_clean == 'MODULO':
+                col_map['modulo'] = idx
+            elif col_clean == 'AMBIENTE':
+                col_map['ambiente'] = idx
+            elif 'CRITICITA' in col_clean or 'CRITICITÀ' in col_clean:
+                col_map['criticita'] = idx
+            elif col_clean == 'OBIETTIVO':
+                col_map['objective'] = idx
+            elif col_clean == 'FUNZIONE':
+                col_map['funzione'] = idx
+            elif 'PREREQUISIT' in col_clean:
+                col_map['prerequisites'] = idx
+            elif 'DATI' in col_clean and 'INPUT' in col_clean:
+                col_map['input_data'] = idx
+            elif 'MODALITA' in col_clean or 'MODALITÀ' in col_clean or 'ESECUZIONE' in col_clean:
+                col_map['description'] = idx
+            elif 'RISULTAT' in col_clean and 'ATTESI' in col_clean:
+                col_map['expected_results'] = idx
+            elif 'VERSIONE' in col_clean and 'INIZIO' in col_clean:
+                col_map['versione_inizio'] = idx
+            elif 'VERSIONE' in col_clean and 'FINE' in col_clean:
+                col_map['versione_fine'] = idx
+        
+        print(f"Colonne strutturate identificate: {col_map}")
+        
+        test_cases = []
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # Salta righe completamente vuote
+            if all(v is None or str(v).strip() == '' for v in row):
+                continue
+            
+            def get(field):
+                idx = col_map.get(field)
+                if idx is None or idx >= len(row):
+                    return ''
+                return self._clean_cell_value(row[idx])
+            
+            test_case = {
+                'row_number': row_idx,
+                'codice':           get('codice'),
+                'modulo':           get('modulo'),
+                'ambiente':         get('ambiente'),
+                'criticita':        get('criticita'),
+                'objective':        get('objective'),
+                'funzione':         get('funzione'),
+                'prerequisites':    get('prerequisites'),
+                'input_data':       get('input_data'),
+                'description':      get('description'),
+                'expected_results': get('expected_results'),
+                'versione_inizio':  get('versione_inizio'),
+                'versione_fine':    get('versione_fine'),
+            }
+            
+            # Includi solo se ha contenuto significativo e NON è un test API
+            if any(test_case[k] for k in ['objective', 'funzione', 'description', 'expected_results', 'codice']):
+                if self._is_api_test(test_case):
+                    print(f"  [SKIP API test] riga {row_idx} - codice: {test_case.get('codice', '')}")
+                else:
+                    test_cases.append(test_case)
+        
+        print(f"Totale test case GUI estratti: {len(test_cases)} (API/non-GUI saltati: vedi righe [SKIP] sopra)")
+        
+        title = self.file_path.stem.replace('_', ' ').replace('-', ' ')
+        
+        return {
+            'title': title,
+            'format': 'xlsx_structured',
+            'test_cases_count': len(test_cases),
+            'test_cases': test_cases,
+            'columns_found': col_map,
+        }
+    
+    def _is_api_test(self, test_case: Dict) -> bool:
+        """
+        Determina se un test case riguarda chiamate API (Postman, REST, payload)
+        piuttosto che interazione GUI da automatizzare con Playwright.
+
+        Segnali rilevati tramite regex:
+        - Codice contiene "_API_" o inizia con "TST_API"
+        - Modulo/Funzione contiene "API"
+        - Prerequisiti o Steps menzionano Postman, bearer token, payload, curl,
+          richieste HTTP esplicite (POST/GET/PUT/DELETE + URL)
+        """
+        api_patterns = re.compile(
+            r'postman'
+            r'|bearer\s*token'
+            r'|\bpayload\b'
+            r'|\bcurl\b'
+            r'|\bswagger\b'
+            r'|authorization\s*header'
+            r'|eseguire\s+una\s+(post|get|put|delete|patch)'
+            r'|effettuare\s+una\s+(post|get|put|delete|patch)'
+            r'|inviare\s+una\s+(post|get|put|delete|patch)'
+            r'|chiamata\s+(rest|api|http)'
+            r'|https?://[^\s]+/api/'
+            r'|content-type:\s*application/json'
+            r'|"juuids"'
+            r'|access[_\s]token'
+            r'|api[_\s]key',
+            re.IGNORECASE
+        )
+
+        # Controlla il codice: pattern TST_API_* o *_API_*
+        codice = test_case.get('codice', '')
+        if re.search(r'(^|_)api(_|$)', codice, re.IGNORECASE):
+            return True
+
+        # Controlla il modulo/funzione
+        for field in ('modulo', 'funzione', 'objective'):
+            if api_patterns.search(test_case.get(field, '') or ''):
+                return True
+
+        # Controlla i campi operativi (prerequisiti, steps, risultati)
+        for field in ('prerequisites', 'description', 'expected_results', 'input_data'):
+            if api_patterns.search(test_case.get(field, '') or ''):
+                return True
+
+        return False
+
     def _get_row_background_color(self, row, col_indices) -> Optional[str]:
         """
         Ottiene il colore di sfondo della riga controllando le celle significative.
@@ -692,6 +840,7 @@ if __name__ == "__main__":
     
     try:
         result = parse_test_document(file_path)
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
         print(json.dumps(result, indent=2, ensure_ascii=False))
     except Exception as e:
         print(f"Errore: {e}")
