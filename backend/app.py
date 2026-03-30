@@ -46,7 +46,7 @@ AGENT_MCP_AVAILABLE = False
 # Prova a importare l'AI Agent MCP
 try:
     from agent.test_agent_mcp import TestAgentMCP
-    from agent.orchestrator import run_full_sync, run_prefix_to_home, run_lab_scenario
+    from agent.pipelines.lab import run_full_sync, run_prefix_to_home, run_lab_scenario
     from agent.lab_scenarios import LAB_SCENARIOS
     from codegen.script_generator import generate_playwright_script
 
@@ -88,6 +88,17 @@ def api_info():
                 "mcp_protocol": "1.12.3",
             },
             "timestamp": datetime.now().isoformat(),
+        }
+    )
+
+
+@app.route("/api/ui/lab/home-modules", methods=["GET"])
+def ui_lab_home_modules():
+    """Preset moduli/tile LAB per la UI (no hardcode in index.html)."""
+    return jsonify(
+        {
+            "status": "ok",
+            "modules": AppConfig.LAB_UI.get_home_module_presets(),
         }
     )
 
@@ -803,8 +814,8 @@ def extract_scenarios_from_document():
     Returns: Lista di scenari estratti
     """
     try:
-        from agent.document_parser import parse_test_document
-        from agent.scenario_extractor import (
+        from agent.extraction.document_parser import parse_test_document
+        from agent.extraction.scenario_extractor import (
             extract_scenarios_from_document,
             scenarios_to_dict,
         )
@@ -955,7 +966,7 @@ def run_batch_test():
         )
 
     try:
-        from agent.batch_runner import run_batch_sync
+        from agent.pipelines.batch import run_batch_sync
         from agent.lab_scenarios import LabScenario, LAB_SCENARIOS
     except ImportError as e:
         return (
@@ -1135,7 +1146,7 @@ def run_batch_test_stream():
         )
 
     try:
-        from agent.batch_runner import BatchTestRunner
+        from agent.pipelines.batch import BatchTestRunner
         from agent.lab_scenarios import LabScenario, LAB_SCENARIOS
     except ImportError as e:
         return (

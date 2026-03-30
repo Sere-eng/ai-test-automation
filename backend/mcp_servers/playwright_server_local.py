@@ -136,6 +136,21 @@ async def press_key(key: str) -> str:
 
 
 @mcp.tool()
+async def scroll_to_bottom(selector: str | None = None) -> str:
+    """
+    Scorre fino in fondo la pagina o un contenitore specifico.
+
+    Args:
+        selector: CSS del contenitore scrollabile (es. ".sample-table-container").
+                  Se None, esegue scroll della pagina (window).
+                  Per i wrapper elenco campioni (PlaywrightConfig): scroll sulla lista configurata
+                  e scroll_into_view del testo footer, con fallback sul selettore passato.
+    """
+    result = await playwright.scroll_to_bottom(selector=selector)
+    return to_json(result)
+
+
+@mcp.tool()
 async def wait_for_clickable_by_name(name_substring: str, timeout: int = None, case_insensitive: bool = True) -> str:
     """Attende che compaia un elemento cliccabile il cui nome contiene name_substring (usa inspect)."""
     result = await playwright.wait_for_clickable_by_name(name_substring=name_substring, timeout=timeout, case_insensitive=case_insensitive)

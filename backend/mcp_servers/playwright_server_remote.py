@@ -66,14 +66,14 @@ async def wait_for_load_state(state: str = "domcontentloaded", timeout: int = 30
     return to_json(result)
 
 
-## @mcp.tool()
-## async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
-##     """
-##     Cattura screenshot full-page.
-##     Se return_base64=True include base64 nel JSON (attenzione ai token).
-##     """
-##     result = await playwright.capture_screenshot(filename=filename, return_base64=return_base64)
-##     return to_json(result)
+@mcp.tool()
+async def capture_screenshot(filename: str = None, return_base64: bool = False) -> str:
+    """
+    Cattura screenshot full-page.
+    Se return_base64=True include base64 nel JSON (attenzione ai token).
+    """
+    result = await playwright.capture_screenshot(filename=filename, return_base64=return_base64)
+    return to_json(result)
 
 
 @mcp.tool()

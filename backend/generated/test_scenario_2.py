@@ -61,8 +61,6 @@ def test_scenario_2(page: Page):
     page.get_by_text('Campioni con Check-in').first.click()
     # wait_for_load_state
     page.wait_for_load_state('domcontentloaded')
-    # wait_for_text_content
-    page.get_by_text('Attività di dettaglio dashboard').first.wait_for()
     # scroll_to_bottom (wrapper elenco campioni: lista + footer)
     _sr = page.locator('sample-table div.search-results')
     if _sr.count() > 0:

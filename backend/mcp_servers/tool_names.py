@@ -9,6 +9,7 @@ TOOL_NAMES = [
 
     # RAW - elementi, tastiera, load state, iframe
     "press_key",
+    "scroll_to_bottom",
     "get_text",
     "get_text_by_visible_content",
     "wait_for_load_state",

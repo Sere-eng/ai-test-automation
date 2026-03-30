@@ -28,6 +28,7 @@ Tool definiti in `tools.py` ed esposti dal server MCP (`mcp_servers/tool_names.p
 | `get_text` | Base | `status`, `text` |
 | `get_text_by_visible_content` | Base | `status`, `text`, `search_text` |
 | `press_key` | Base | `status`, `key` |
+| `scroll_to_bottom` | Base | `status`, scroll su window o contenitore |
 | `handle_cookie_banner` | Base | `status`, `strategy_used` |
 | `get_frame` | Base | `status`, `url`, `selector` |
 

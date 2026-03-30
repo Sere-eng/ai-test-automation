@@ -5,7 +5,12 @@ Tutte le impostazioni in un unico posto.
 """
 import os
 from dotenv import load_dotenv
-from typing import Literal, Tuple
+from typing import Literal
+
+from config.ui_overrides import UIOverridesConfig
+from config.apps.amc import AMCConfig
+from config.apps.lab import LABConfig
+from config.apps.lab_ui import LabUIConfig
 
 load_dotenv()
 
@@ -121,67 +126,6 @@ class PlaywrightConfig:
     LOCALE = os.getenv("PLAYWRIGHT_LOCALE", "it-IT")
     TIMEZONE = os.getenv("PLAYWRIGHT_TIMEZONE", "Europe/Rome")
 
-    # Registro incrementale per inspect_interactive_elements / inspect_region:
-    # blocchi custom (spesso div / web component) che il nucleo in tools.py non include.
-    # Estendere quando una run fallisce la discovery; evitare .pointer globale fuori da inspect_region.
-    # Nota: righe tabella (mat-row, tr in tbody, …) sono già gestite a parte in tools.py (pass 2b).
-    _INSPECT_EXTRA_CLICKABLE_DEFAULTS: Tuple[str, ...] = (
-        # UNITY – KPI circolari dashboard (solo contatori cliccabili)
-        "div.circle-card.pointer",
-        # Griglia tile home (app-home-activity); copre anche tile senza role="button" nel markup
-        "div.home-app[tabindex='0']",
-        # Stessa tile se usano tabindex vuoto esplicito
-        'div.home-app[tabindex=""]',
-        # Card contenitore con classi Angular dinamiche ma token circle-card stabile
-        "div[class*='circle-card'].pointer",
-        # Pannello espandibile Material (header cliccabile, spesso non è <button>)
-        "mat-expansion-panel-header",
-        # Voci menu/lista come link (nav / impostazioni)
-        "a.mat-mdc-list-item",
-        # Chip / opzioni filtro selezionabili (MDC)
-        "mat-chip-option",
-    )
-
-    # scroll_to_bottom: il selettore `.sample-table-container` compare due volte nel DOM (wrapper vs
-    # contenitore interno). Se l’agent passa uno di questi alias, il tool scrolla la lista reale e
-    # porta in vista il riepilogo righe in fondo pagina.
-    _SCROLL_SAMPLE_TABLE_WRAPPER_ALIASES: Tuple[str, ...] = (
-        ".sample-table-container",
-        ".table.sample-table-container",
-        "div.sample-table-container",
-        "div.table.sample-table-container",
-    )
-    _SCROLL_SAMPLE_TABLE_LIST_LOCATOR: str = "sample-table div.search-results"
-    _SCROLL_SAMPLE_TABLE_FOOTER_TEXT: str = "Totale righe visualizzate"
-
-    @classmethod
-    def is_scroll_sample_table_wrapper(cls, selector: str) -> bool:
-        return selector.strip() in cls._SCROLL_SAMPLE_TABLE_WRAPPER_ALIASES
-
-    @classmethod
-    def get_scroll_sample_table_list_locator(cls) -> str:
-        return cls._SCROLL_SAMPLE_TABLE_LIST_LOCATOR
-
-    @classmethod
-    def get_scroll_sample_table_footer_text(cls) -> str:
-        return cls._SCROLL_SAMPLE_TABLE_FOOTER_TEXT
-
-    @classmethod
-    def get_inspect_extra_clickable_selectors(cls) -> Tuple[str, ...]:
-        """
-        Default del registro + valori aggiuntivi da .env (comma-separated).
-        Esempio: INSPECT_EXTRA_CLICKABLE_SELECTORS=div.my-tile.pointer,tr.clickable-row
-        """
-        raw = os.getenv("INSPECT_EXTRA_CLICKABLE_SELECTORS", "").strip()
-        env_extras = [p.strip() for p in raw.split(",") if p.strip()]
-        seen: set[str] = set()
-        merged: list[str] = []
-        for s in list(cls._INSPECT_EXTRA_CLICKABLE_DEFAULTS) + env_extras:
-            if s not in seen:
-                seen.add(s)
-                merged.append(s)
-        return tuple(merged)
-
 
 class FlaskConfig:
     """Configurazione Flask Server"""
@@ -190,45 +134,6 @@ class FlaskConfig:
     PORT = int(os.getenv("FLASK_PORT", "5000"))
     DEBUG = os.getenv("FLASK_DEBUG", "true").lower() == "true"
     ENV = os.getenv("FLASK_ENV", "development")
-
-
-class AMCConfig:
-    """Configurazione per test login AMC"""
-
-    # URL principale fornita nel test
-    URL = os.getenv(
-        "AMC_URL",
-        "https://amc.eng.it/multimodule/web/",
-    )
-    USERNAME = os.getenv("AMC_USERNAME", "")
-    PASSWORD = os.getenv("AMC_PASSWORD", "")
-
-    @classmethod
-    def validate(cls):
-        """Valida che le credenziali siano configurate"""
-        if not cls.USERNAME or not cls.PASSWORD:
-            return False
-        return True
-
-
-class LABConfig:
-    """Configurazione per test Laboratory / Clinical Laboratory"""
-
-    # URL principale fornita nel test
-    URL = os.getenv(
-        "LAB_URL",
-        "https://mdrsanitalab2.eng.it/multimodule/ELLIPSE_LAB/?ENGAPPCONFIGS=%7B%22ENG_APP_DISABLE_DATA_PROFILER%22%3Atrue%2C%22ENG_APP_DISABLE_ACTIVITY_PROFILER%22%3Atrue%2C%22ENG_APP_DISABLE_MENU_PROFILER%22%3Atrue%7D",
-    )
-
-    USERNAME = os.getenv("LAB_USERNAME", "")
-    PASSWORD = os.getenv("LAB_PASSWORD", "")
-
-    @classmethod
-    def validate(cls):
-        """Facoltativo: le credenziali LAB potrebbero non essere sempre configurate"""
-        if not cls.USERNAME or not cls.PASSWORD:
-            return False
-        return True
 
 
 class AgentConfig:
@@ -248,6 +153,8 @@ class AppConfig:
     MCP = MCPConfig
     LLM = LLMConfig
     PLAYWRIGHT = PlaywrightConfig
+    UI = UIOverridesConfig
+    LAB_UI = LabUIConfig
     FLASK = FlaskConfig
     AMC = AMCConfig
     LAB = LABConfig

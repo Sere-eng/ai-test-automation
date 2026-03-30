@@ -856,32 +856,31 @@
         let labScenarios = [];
         let currentScenarioId = '';
 
-        /** Preset: solo titoli visibili sulla home (come in elenco moduli). */
-        const LAB_HOME_MODULE_PRESETS = [
-            { label: 'Laboratorio Analisi', alt: 'Clinical Laboratory' },
-            { label: 'Tools', alt: '' },
-            { label: 'Sistema', alt: '' },
-            { label: 'Design System', alt: '' },
-            { label: 'Jobs Manager', alt: '' },
-            { label: 'Gestione report', alt: '' },
-            { label: 'Anagrafiche', alt: '' },
-            { label: 'UNITY - Clinical Data Manager', alt: '' },
-            { label: 'Decision Support System', alt: '' },
-            { label: 'Organigramma', alt: '' },
-            { label: 'RAD', alt: '' },
-            { label: 'Anagrafe Paziente', alt: '' },
-            { label: 'Configurazione Email', alt: '' },
-            { label: 'Gestione dei Parametri', alt: '' },
-            { label: 'BRIDGE', alt: '' },
-            { label: 'Audit', alt: '' },
-            { label: 'Gestione consensi', alt: '' },
-            { label: 'Configuratore per il Laboratorio Analisi', alt: '' },
-            { label: 'Gestore degli accessi', alt: '' },
-            { label: 'Dashboard PS', alt: '' },
-            { label: 'Telemedicina', alt: '' },
-        ];
+        /** Preset: titoli visibili sulla home (come in elenco moduli).
+         *  Caricati dal backend per evitare hardcode qui.
+         */
+        let LAB_HOME_MODULE_PRESETS = [];
 
-        function populateHomeModuleSelect(selectId, customWrapId) {
+        async function loadLabHomeModulePresets() {
+            if (LAB_HOME_MODULE_PRESETS && LAB_HOME_MODULE_PRESETS.length) return;
+            try {
+                const r = await fetch(API_BASE + '/api/ui/lab/home-modules');
+                const data = await r.json();
+                const mods = (data && data.modules) ? data.modules : [];
+                if (Array.isArray(mods) && mods.length) {
+                    LAB_HOME_MODULE_PRESETS = mods.map(m => ({
+                        label: (m && m.label) ? String(m.label) : '',
+                        alt: (m && m.alt) ? String(m.alt) : ''
+                    })).filter(x => x.label);
+                }
+            } catch (e) {
+                // fallback minimale: lascia vuoto e usa custom
+                LAB_HOME_MODULE_PRESETS = [];
+            }
+        }
+
+        async function populateHomeModuleSelect(selectId, customWrapId) {
+            await loadLabHomeModulePresets();
             const sel = document.getElementById(selectId);
             if (!sel || sel.dataset.populated === '1') return;
             const parts = LAB_HOME_MODULE_PRESETS.map((m, i) => {
@@ -898,12 +897,12 @@
             sel.onchange();
         }
 
-        function populateLabHomeModuleSelect() {
-            populateHomeModuleSelect('labHomeModuleSelect', 'labHomeModuleCustom');
+        async function populateLabHomeModuleSelect() {
+            await populateHomeModuleSelect('labHomeModuleSelect', 'labHomeModuleCustom');
         }
 
-        function populateDocHomeModuleSelect() {
-            populateHomeModuleSelect('docHomeModuleSelect', 'docHomeModuleCustom');
+        async function populateDocHomeModuleSelect() {
+            await populateHomeModuleSelect('docHomeModuleSelect', 'docHomeModuleCustom');
         }
 
         function requireLabCredentialsForPrefix() {
@@ -1291,12 +1290,12 @@
         }
 
         const examples = [
-            `Start the browser and navigate to https://amc.eng.it/multimodule/web/.
+            `Start the browser and navigate to the AMC URL.
 Wait for the page to fully load.
 
 Login to the application:
-- Fill the username field with AMC-User
-- Fill the password field with Ls6P*JB21
+- Fill the username field with <YOUR_USERNAME>
+- Fill the password field with <YOUR_PASSWORD>
 - Submit the form by pressing the login button
 - Wait for the page to load completely
 

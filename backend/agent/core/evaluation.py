@@ -1,8 +1,10 @@
-# backend/agent/evaluation.py
 """
 Logica di valutazione run: parsing eventi stream, pass/fail da tool results.
 Usa agent.utils per funzioni generiche (es. safe_json_loads); non sovrappone utils.
 """
+
+from __future__ import annotations
+
 import re
 from typing import Any, Optional
 
@@ -266,3 +268,4 @@ def _strip_redundant_wait_for_tile_title_after_click(
             continue
         kept.append(e)
     return kept
+

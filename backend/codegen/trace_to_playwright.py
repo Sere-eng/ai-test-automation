@@ -506,12 +506,12 @@ def _compile_step(
         selector = args.get("selector")
         if selector:
             s = selector.strip()
-            if AppConfig.PLAYWRIGHT.is_scroll_sample_table_wrapper(s):
+            if AppConfig.UI.is_scroll_sample_table_wrapper(s):
                 lines.append(
                     "    # scroll_to_bottom (wrapper elenco campioni: lista + footer)"
                 )
-                list_loc = AppConfig.PLAYWRIGHT.get_scroll_sample_table_list_locator()
-                foot_txt = AppConfig.PLAYWRIGHT.get_scroll_sample_table_footer_text()
+                list_loc = AppConfig.UI.get_scroll_sample_table_list_locator()
+                foot_txt = AppConfig.UI.get_scroll_sample_table_footer_text()
                 lines.append(f"    _sr = page.locator({repr(list_loc)})")
                 lines.append("    if _sr.count() > 0:")
                 lines.append(
