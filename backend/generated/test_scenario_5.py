@@ -63,9 +63,9 @@ def test_scenario_5(page: Page):
     page.get_by_text('AGGIUNGI GRUPPO').first.click()
     # fill_smart (strategy=css)
     # WARNING: Angular dynamic ID, potrebbe cambiare tra run
-    page.locator('#mat-input-19').fill('Gruppo Test')
+    page.locator('#mat-input-19').fill('Gruppo_AUTO_TEST')
     # click_smart (strategy=role)
-    page.get_by_role('button', name='Aggiungi filtro').first.click()
+    page.locator('card-group').nth(0).get_by_role('button', name='Aggiungi filtro').click()
     # fill_smart (strategy=label)
     page.get_by_label('Nome filtro*').first.fill('AUTO_PL_20231010')
     # fill_smart (strategy=label)

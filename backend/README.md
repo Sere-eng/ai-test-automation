@@ -31,16 +31,16 @@ Backend (Flask)
        │ Python call
        ▼
 AI Agent (LangGraph - ReAct)
-  ├─ system_prompt.py   ← regole comportamento agent
-  ├─ evaluation.py      ← pass/fail da tool results (non dal modello)
-  └─ orchestrator.py    ← Prefix Agent + Scenario Agent
+  ├─ prompts/*          ← system prompts per AMC/LAB/Prefix/Extraction
+  ├─ core/evaluation.py ← pass/fail da tool results (non dal modello)
+  └─ pipelines/*        ← Prefix Agent + Scenario Agent (es. LAB)
        │ MCP Protocol
        ▼
 MCP Client (langchain-mcp-adapters)
        │ stdio | HTTP
        ▼
 MCP Server (playwright_server_local / remote)
-  └─ 21 Playwright tools async
+  └─ 23 Playwright tools async
        │
        ▼
 Playwright Async (Chromium)
@@ -50,7 +50,7 @@ Playwright Async (Chromium)
 1. **Prefix Agent** → login, selezione organizzazione, navigazione al modulo Laboratory (browser rimane aperto)
 2. **Scenario Agent** → esegue lo scenario LAB dalla dashboard Laboratory, chiude il browser
 
-Il pass/fail è deciso da `evaluation.py` sui tool results, non dall'output testuale del modello.
+Il pass/fail è deciso da `core/evaluation.py` sui tool results, non dall'output testuale del modello.
 
 ---
 
@@ -94,7 +94,7 @@ Tutta la compilazione trace → script è **deterministica**: non viene mai chia
   Quando disponibile, usa anche `target["scope"]` (scope detection best-effort di `click_smart`/`fill_smart`) per generare un locator scoped
   del tipo `page.locator("<scope>").nth(i).get_by_role(...)`.
 - **Scroll esplicito**: `scroll_to_bottom(selector=...)` è mappato nel codegen. Per i wrapper elenco
-  campioni (`PlaywrightConfig.is_scroll_sample_table_wrapper`) il tool usa
+  campioni (`AppConfig.UI.is_scroll_sample_table_wrapper`) il tool usa
   `get_scroll_sample_table_list_locator` + `get_scroll_sample_table_footer_text`; altri selettori
   restano scroll su `locator(selector)`.
 
@@ -138,12 +138,13 @@ backend/
 │   └── settings.py                 # Configurazione centralizzata (LLM, MCP, Playwright)
 │
 ├── agent/
-│   ├── tools.py                    # 21 Playwright tools async
-│   ├── system_prompt.py            # Prompt AMC, LAB Scenario, LAB Prefix
+│   ├── tools.py                    # Implementazione Playwright (tool esposti via MCP, vedi tool_names.py)
+│   ├── prompts/                    # Prompt per app (AMC/LAB/Prefix/Extraction)
+│   ├── core/                       # Logica core deterministica (es. evaluation)
 │   ├── lab_scenarios.py            # Definizione 4 scenari LAB
-│   ├── orchestrator.py             # Prefix Agent + Scenario Agent + run_full
+│   ├── pipelines/                  # Orchestrazioni/pipeline (es. LAB)
+│   ├── extraction/                 # Estrazione scenari da documenti
 │   ├── test_agent_mcp.py           # TestAgentMCP: init, run_test_async, stream
-│   ├── evaluation.py               # Pass/fail logic da tool results
 │   └── utils.py                    # Serializzazione, logging, export grafo
 │
 ├── mcp_servers/
@@ -253,7 +254,8 @@ Il MCP server espone **23 tool async**. Fonte unica: `mcp_servers/tool_names.py`
 | `get_text(selector, selector_type)` | Estrae testo da elemento |
 | `get_text_by_visible_content(search_text, timeout)` | Trova il primo elemento visibile che contiene `search_text` ed estrae il testo completo (innerText). Usare solo per testi espliciti negli expected results dello scenario. |
 | `press_key(key)` | Simula pressione tasto (Enter, Escape, ...) |
-| `capture_screenshot(filename, return_base64)` | (Deprecated nel setup LAB) Screenshot full-page; normalmente NON usato. |
+| `scroll_to_bottom(selector)` | Scorre pagina o un contenitore (es. elenco campioni con lista + footer) |
+| `capture_screenshot(filename, return_base64)` | Screenshot full-page; raro nei flussi LAB (payload grandi se `return_base64=True`) |
 | `handle_cookie_banner(strategies, timeout)` | Gestione banner cookie con strategie multiple |
 
 ### Wait
@@ -316,10 +318,10 @@ click_smart(...)
 
 ## Orchestratore LAB
 
-`orchestrator.py` gestisce il flusso completo in due fasi con agenti separati.
+La pipeline LAB (`agent/pipelines/lab.py`) gestisce il flusso completo in due fasi con agenti separati.
 
 ```python
-from agent.orchestrator import run_full_sync
+from agent.pipelines.lab import run_full_sync
 
 result = run_full_sync(
     scenario_id="scenario_1",
@@ -421,8 +423,8 @@ POST /api/test/amc/login     # test login automatico (credenziali da .env)
 
 ## Note tecniche
 
-**Pass/fail:** deciso da `evaluation.py` sui tool results (non sull'output testuale del modello). Tolleranza: se l'ultimo uso di `click_smart`/`fill_smart` è `success`, errori precedenti dello stesso tool vengono ignorati.
+**Pass/fail:** deciso da `core/evaluation.py` sui tool results (non sull'output testuale del modello). Tolleranza: se l'ultimo uso di `click_smart`/`fill_smart` è `success`, errori precedenti dello stesso tool vengono ignorati.
 
-**System prompts** (`system_prompt.py`): tre prompt distinti — `AMC_SYSTEM_PROMPT`, `LAB_SYSTEM_PROMPT`, `LAB_PREFIX_PROMPT`. Il Prefix Agent lascia sempre il browser aperto (`close_browser` è esplicitamente vietato).
+**System prompts** (`agent/prompts/*`): prompt distinti per AMC/LAB/Prefix/Extraction. Il Prefix Agent lascia sempre il browser aperto (`close_browser` è esplicitamente vietato).
 
 **LangGraph graph export:** a ogni inizializzazione agent vengono generati `langgraph.mmd`, `langgraph.txt`, `langgraph.png` nella working directory.

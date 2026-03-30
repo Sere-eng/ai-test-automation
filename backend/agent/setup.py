@@ -9,17 +9,22 @@ from config.settings import AppConfig
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 
 
-def create_llm():
-    """Crea l'istanza LLM da AppConfig (OpenRouter, Azure o OpenAI)."""
+def create_llm(*, temperature: float | None = None, max_tokens: int | None = None):
+    """Crea l'istanza LLM da AppConfig (OpenRouter, Azure, Ollama o OpenAI).
+
+    `temperature` e `max_tokens` permettono override puntuali (es. estrazione scenari).
+    """
     provider = AppConfig.LLM.get_provider()
+    temp = AppConfig.LLM.TEMPERATURE if temperature is None else temperature
+    mt = AppConfig.LLM.MAX_TOKENS if max_tokens is None else max_tokens
 
     if provider == "openrouter":
         return ChatOpenAI(
             model=AppConfig.LLM.OPENROUTER_MODEL,
             api_key=AppConfig.LLM.OPENROUTER_API_KEY,
             base_url="https://openrouter.ai/api/v1",
-            temperature=AppConfig.LLM.TEMPERATURE,
-            max_tokens=AppConfig.LLM.MAX_TOKENS,
+            temperature=temp,
+            max_tokens=mt,
         )
     if provider == "azure":
         return AzureChatOpenAI(
@@ -27,8 +32,8 @@ def create_llm():
             azure_deployment=AppConfig.LLM.AZURE_DEPLOYMENT,
             api_version=AppConfig.LLM.AZURE_API_VERSION,
             api_key=AppConfig.LLM.AZURE_API_KEY,
-            temperature=AppConfig.LLM.TEMPERATURE,
-            max_tokens=AppConfig.LLM.MAX_TOKENS, #fixme: CAMBIO PER REASONING MODELS OAI
+            temperature=temp,
+            max_tokens=mt, #fixme: CAMBIO PER REASONING MODELS OAI
             #max_completion_tokens=AppConfig.LLM.MAX_TOKENS # for reasoning models
         )
     if provider == "ollama":
@@ -36,15 +41,15 @@ def create_llm():
             model=AppConfig.LLM.OLLAMA_MODEL,
             api_key="ollama",  # Ollama non verifica la key
             base_url=AppConfig.LLM.OLLAMA_ENDPOINT,
-            temperature=AppConfig.LLM.TEMPERATURE,
-            max_tokens=AppConfig.LLM.MAX_TOKENS,
+            temperature=temp,
+            max_tokens=mt,
         )
     # default: openai
     return ChatOpenAI(
         model=AppConfig.LLM.OPENAI_MODEL,
         api_key=AppConfig.LLM.OPENAI_API_KEY,
-        temperature=AppConfig.LLM.TEMPERATURE,
-        max_tokens=AppConfig.LLM.MAX_TOKENS,
+        temperature=temp,
+        max_tokens=mt,
     )
 
 

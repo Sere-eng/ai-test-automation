@@ -55,11 +55,13 @@ def test_scenario_1(page: Page):
     # Steps translated from MCP tool trace
     # click_smart (strategy=role)
     page.get_by_role('button', name='Laboratorio').first.click()
+    # wait_for_load_state
+    page.wait_for_load_state('domcontentloaded')
     # click_smart (strategy=role)
     page.get_by_role('button', name='Modifica').first.click()
     # click_smart (strategy=text)
     page.get_by_text('AGGIUNGI GRUPPO').first.click()
-    # fill_smart (strategy=css_id)
+    # fill_smart (strategy=css)
     # WARNING: Angular dynamic ID, potrebbe cambiare tra run
     page.locator('#mat-input-19').fill('Gruppo Test')
     # click_smart (strategy=role)
@@ -68,3 +70,5 @@ def test_scenario_1(page: Page):
     page.get_by_label('Nome filtro*').first.fill('Filtro Test')
     # click_smart (strategy=role)
     page.get_by_role('button', name='Conferma').first.click()
+    # wait_for_text_content
+    page.get_by_text('Filtro Test').first.wait_for()

@@ -1,4 +1,3 @@
-# backend/agent/batch_runner.py
 """
 Batch Test Runner - Esegue più scenari LAB in sequenza.
 """
@@ -10,7 +9,7 @@ from pathlib import Path
 import json
 
 from agent.lab_scenarios import LabScenario
-from agent.orchestrator import run_prefix_to_home, run_lab_scenario
+from agent.pipelines.lab import run_prefix_to_home, run_lab_scenario
 from agent.utils import make_json_serializable
 
 
@@ -349,11 +348,11 @@ if __name__ == "__main__":
     from agent.lab_scenarios import LAB_SCENARIOS
     
     if len(sys.argv) < 2:
-        print("Uso: python batch_runner.py <scenario_ids>")
+        print("Uso (dalla cartella backend): python -m agent.pipelines.batch <scenario_ids>")
         print("\nEsempi:")
-        print("  python batch_runner.py scenario_1")
-        print("  python batch_runner.py scenario_1 scenario_2 scenario_3")
-        print("  python batch_runner.py all  # esegue tutti gli scenari")
+        print("  python -m agent.pipelines.batch scenario_1")
+        print("  python -m agent.pipelines.batch scenario_1 scenario_2 scenario_3")
+        print("  python -m agent.pipelines.batch all  # esegue tutti gli scenari")
         print(f"\nScenari disponibili: {', '.join([s.id for s in LAB_SCENARIOS])}")
         sys.exit(1)
     

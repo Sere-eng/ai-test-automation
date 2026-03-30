@@ -84,7 +84,7 @@ User / Tester
 Flask API
    │
    ▼
-Orchestrator (orchestrator.py)
+Pipeline LAB (`backend/agent/pipelines/lab.py`)
    ├── Prefix Agent  → login → selezione org → tile Laboratory  (browser rimane aperto)
    └── Scenario Agent → esegue lo scenario LAB dalla dashboard  (chiude il browser)
          │
@@ -110,7 +110,7 @@ Orchestrator (orchestrator.py)
 JSON response
 ```
 
-Pass/fail deciso da `evaluation.py` sui tool results — non dall'output testuale del modello.
+Pass/fail deciso da `backend/agent/core/evaluation.py` sui tool results — non dall'output testuale del modello.
 
 ---
 
@@ -119,4 +119,4 @@ Pass/fail deciso da `evaluation.py` sui tool results — non dall'output testual
 | File | Contenuto |
 |------|-----------|
 | [`backend/README.md`](backend/README.md) | Setup, configurazione, API endpoints, riferimento completo ai tool |
-| [`backend/agent/TOOLS.md`](backend/agent/TOOLS.md) | Guida operativa ai 21 tool Playwright MCP: input/output, pattern d'uso |
+| [`backend/agent/TOOLS.md`](backend/agent/TOOLS.md) | Guida operativa ai 23 tool Playwright MCP: input/output, pattern d'uso |

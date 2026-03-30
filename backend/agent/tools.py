@@ -5,6 +5,7 @@ Playwright Tools - ASYNC Version (compatibile con MCP asyncio)
 import asyncio
 import base64
 import datetime
+import json
 from playwright.async_api import async_playwright, Page
 import re
 from typing import Literal, Optional, List, Dict
@@ -15,15 +16,13 @@ from config.settings import AppConfig
 def _build_clickable_selector_for_inspect() -> str:
     """
     Selettore composito per la discovery dei clickabili: set HTML/WCAG standard
-    + registro configurabile (AppConfig.PLAYWRIGHT.get_inspect_extra_clickable_selectors).
+    + registro configurabile (AppConfig.UI.get_inspect_extra_clickable_selectors).
     """
     base = (
         "button, a, input[type='submit'], input[type='button'], "
-        "[role='button'], [role='link'], [role='menuitem'], [role='option'], "
-        "div.ds-tab-navigation-link-container, div.ds-tab-navigation-link-text, "
-        "div.ds-tool-card-wrapper, div.filter-wrapper.pointer, div.ds-add-button-container"
+        "[role='button'], [role='link'], [role='menuitem'], [role='option']"
     )
-    extra = AppConfig.PLAYWRIGHT.get_inspect_extra_clickable_selectors()
+    extra = AppConfig.UI.get_inspect_extra_clickable_selectors()
     if not extra:
         return base
     return base + ", " + ", ".join(extra)
@@ -376,11 +375,11 @@ class PlaywrightTools:
 
             if selector:
                 sel_norm = selector.strip()
-                if AppConfig.PLAYWRIGHT.is_scroll_sample_table_wrapper(sel_norm):
+                if AppConfig.UI.is_scroll_sample_table_wrapper(sel_norm):
                     detail: list[str] = []
                     page = self.page
                     sr = page.locator(
-                        AppConfig.PLAYWRIGHT.get_scroll_sample_table_list_locator()
+                        AppConfig.UI.get_scroll_sample_table_list_locator()
                     )
                     try:
                         if await sr.count() > 0:
@@ -391,7 +390,7 @@ class PlaywrightTools:
                     except Exception:
                         pass
                     foot = page.get_by_text(
-                        AppConfig.PLAYWRIGHT.get_scroll_sample_table_footer_text(),
+                        AppConfig.UI.get_scroll_sample_table_footer_text(),
                         exact=False,
                     )
                     try:
@@ -1012,34 +1011,31 @@ class PlaywrightTools:
                         if count > 1:
                             element = await first.element_handle(timeout=1000)
                             if element:
+                                scope_selectors = AppConfig.UI.get_scope_detection_selectors()
                                 scope_info = await element.evaluate(
-                                    """
-                                    el => {
-                                        const scopeSelectors = [
-                                            'card-group', 'mat-card', '.mat-mdc-card',
-                                            '.filter-group', '[role="group"]',
-                                            '.mat-expansion-panel', 'mat-expansion-panel'
-                                        ];
+                                    f"""
+                                    el => {{
+                                        const scopeSelectors = {json.dumps(list(scope_selectors))};
                                         let current = el.parentElement;
-                                        while (current && current !== document.body) {
-                                            for (const sel of scopeSelectors) {
-                                                try {
-                                                    if (current.matches(sel)) {
+                                        while (current && current !== document.body) {{
+                                            for (const sel of scopeSelectors) {{
+                                                try {{
+                                                    if (current.matches(sel)) {{
                                                         const all = document.querySelectorAll(sel);
                                                         const idx = Array.from(all).indexOf(current);
-                                                        return {
+                                                        return {{
                                                             selector: sel,
                                                             index: idx,
                                                             total: all.length
-                                                        };
-                                                    }
-                                                } catch(e) {}
-                                            }
+                                                        }};
+                                                    }}
+                                                }} catch(e) {{}}
+                                            }}
                                             current = current.parentElement;
-                                        }
+                                        }}
                                         return null;
-                                    }
-                                """
+                                    }}
+                                    """
                                 )
                     except Exception:
                         # Scope detection è best-effort: se fallisce non blocca il test
@@ -1237,29 +1233,28 @@ class PlaywrightTools:
                         if count > 1:
                             element = await locator.first.element_handle(timeout=1000)
                             if element:
-                                scope_info = await element.evaluate("""
-                                    el => {
-                                        const scopeSelectors = [
-                                            'card-group', 'mat-card', '.mat-mdc-card',
-                                            '.filter-group', '[role="group"]',
-                                            '.mat-expansion-panel', 'mat-expansion-panel'
-                                        ];
+                                scope_selectors = AppConfig.UI.get_scope_detection_selectors()
+                                scope_info = await element.evaluate(
+                                    f"""
+                                    el => {{
+                                        const scopeSelectors = {json.dumps(list(scope_selectors))};
                                         let current = el.parentElement;
-                                        while (current && current !== document.body) {
-                                            for (const sel of scopeSelectors) {
-                                                try {
-                                                    if (current.matches(sel)) {
+                                        while (current && current !== document.body) {{
+                                            for (const sel of scopeSelectors) {{
+                                                try {{
+                                                    if (current.matches(sel)) {{
                                                         const all = document.querySelectorAll(sel);
                                                         const idx = Array.from(all).indexOf(current);
-                                                        return { selector: sel, index: idx, total: all.length };
-                                                    }
-                                                } catch(e) {}
-                                            }
+                                                        return {{ selector: sel, index: idx, total: all.length }};
+                                                    }}
+                                                }} catch(e) {{}}
+                                            }}
                                             current = current.parentElement;
-                                        }
+                                        }}
                                         return null;
-                                    }
-                                """)
+                                    }}
+                                    """
+                                )
                     except Exception:
                         # Scope detection è best-effort: se fallisce non blocca il fill
                         pass

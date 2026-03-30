@@ -11,9 +11,9 @@ import time
 import uuid
 
 from agent.setup import create_llm, create_mcp_config
-from agent.system_prompt import get_lab_optimized_prompt
+from agent.prompts.lab import get_lab_optimized_prompt
 from agent.utils import export_agent_graph, format_tool_io
-from agent.evaluation import (
+from agent.core.evaluation import (
     parse_tool_output,
     step_from_tool_end,
     error_from_tool_output,
@@ -24,7 +24,7 @@ from agent.evaluation import (
 from codegen.trace_extractor import extract_trace
 from codegen.trace_to_playwright import summarize_trace
 from config.settings import AppConfig
-from langgraph.prebuilt import create_react_agent
+from agent.runtime import MCPAgentRuntime
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,14 +38,17 @@ class TestAgentMCP:
         use_remote: Se True, usa MCP server remoto. Se False, usa locale (stdio)
     """
 
-    def __init__(self, custom_prompt=None):
+    def __init__(self, custom_prompt=None, runtime: MCPAgentRuntime | None = None):
         """
         Inizializza l'agent MCP con configurazione da AppConfig.
         custom_prompt: system prompt (opzionale); se None usa get_lab_optimized_prompt().
         """
-        self.llm = create_llm()
-        self.use_remote = AppConfig.MCP.use_remote()
-        self.mcp_config = create_mcp_config(self.use_remote)
+        self.runtime = runtime
+        self.llm = create_llm() if runtime is None else runtime.llm
+        self.use_remote = AppConfig.MCP.use_remote() if runtime is None else runtime.use_remote
+        self.mcp_config = (
+            create_mcp_config(self.use_remote) if runtime is None else runtime.mcp_config
+        )
         self.custom_prompt = custom_prompt
         self.system_message = self._build_system_message()
 
@@ -68,12 +71,21 @@ class TestAgentMCP:
         if self._initialized:
             return
 
-        print("Inizializzazione MCP Client...")
+        # Runtime condiviso: MCP + tool discovery una sola volta; agent cached per prompt.
+        if self.runtime is not None:
+            await self.runtime.ensure_initialized()
+            self.client = self.runtime.client
+            self.tools = self.runtime.tools
+            self.tools_count = len(self.tools)
+            self.tool_names = self.runtime.tool_names
+            self.agent = self.runtime.get_agent_for_prompt(self.system_message)
+            self._initialized = True
+            return
 
-        # Crea il client MCP
+        # Fallback: comportamento precedente (istanza autonoma)
+        print("Inizializzazione MCP Client...")
         self.client = MultiServerMCPClient(self.mcp_config)
 
-        # Carica i tool dal server MCP
         print("Caricamento tool da MCP Server...")
         tools = await self.client.get_tools()
         self.tools = tools
@@ -84,7 +96,8 @@ class TestAgentMCP:
         for tool in tools:
             print(f"   - {tool.name}")
 
-        # Crea l'agent ReAct con i tool MCP
+        from langgraph.prebuilt import create_react_agent
+
         self.agent = create_react_agent(self.llm, tools, prompt=self.system_message)
 
         print("Esportazione LangGraph visualization...")

@@ -1,24 +1,23 @@
-# backend/agent/orchestrator.py
 """
-Orchestrator per l'approccio agentico LAB: Prefix Agent (login → home) + Dashboard Agent (scenari).
+Pipeline LAB: prefix (login → home → tile) + scenario.
 
-Flusso:
-  1. run_prefix_to_home() → un agente con prompt "prefix" esegue login, org, Continua, verifica home.
-     Non chiude il browser (stesso server MCP = stesso browser).
-  2. run_lab_scenario(scenario_id) → un agente con prompt LAB esegue lo scenario dalla home.
-     Chiude il browser alla fine.
-  3. run_full(scenario_id) → esegue 1 poi 2 e restituisce risultato combinato.
+Questo modulo contiene la logica "di orchestrazione" (composizione di agenti/prompt),
+separata dall'infrastruttura runtime e dai prompt stessi.
 """
+
+from __future__ import annotations
 
 import asyncio
 from typing import Optional, Tuple
 
-from config.settings import AppConfig
-from agent.system_prompt import build_lab_prefix_prompt, get_lab_optimized_prompt
+from agent.prompts.lab import get_lab_optimized_prompt
+from agent.prompts.lab_prefix import build_lab_prefix_prompt
+from agent.runtime import MCPAgentRuntime
 from agent.test_agent_mcp import TestAgentMCP
 from agent.lab_scenarios import get_scenario_by_id, LabScenario
 from codegen.trace_extractor import extract_trace
 from codegen.trace_to_playwright import summarize_trace
+from config.settings import AppConfig
 
 
 def _resolve_home_tile(
@@ -36,7 +35,6 @@ def _resolve_home_tile(
     return label, alt
 
 
-# Istruzione per il Prefix Agent (URL, credenziali, modulo home)
 def _prefix_instruction(
     url: Optional[str] = None,
     user: Optional[str] = None,
@@ -63,7 +61,7 @@ def _prefix_instruction(
         "In 'Seleziona Organizzazione' dropdown: open it and select the SECOND option, i.e. 'ORGANIZZAZIONE DI SISTEMA' (not the first 'Dipartimento Interaziendale...'). "
         "Click the 'Continua' button. "
         f"Verify the home page with tiles is visible. Apri il modulo cliccando la tile dal titolo '{primary}' (come in pagina).{alt_note} "
-        f"When you are inside that module (its dashboard or menu visible), output one short sentence and STOP. Do NOT call close_browser()."
+        "When you are inside that module (its dashboard or menu visible), output one short sentence and STOP. Do NOT call close_browser()."
     )
 
 
@@ -104,11 +102,9 @@ async def run_prefix_to_home(
     Non chiude il browser; il server MCP (remoto o locale) mantiene la sessione.
     """
     primary, alt = _resolve_home_tile(module_label, module_label_alt)
-    prefix_prompt = build_lab_prefix_prompt(
-        tile_primary=primary,
-        tile_alternate=alt,
-    )
-    agent = TestAgentMCP(custom_prompt=prefix_prompt)
+    prefix_prompt = build_lab_prefix_prompt(tile_primary=primary, tile_alternate=alt)
+    runtime = MCPAgentRuntime()
+    agent = TestAgentMCP(custom_prompt=prefix_prompt, runtime=runtime)
     instruction = _prefix_instruction(
         url=url,
         user=user,
@@ -129,16 +125,7 @@ async def run_lab_scenario(
     """
     Esegue lo scenario LAB dalla home. Presuppone che il browser sia già sulla home
     (dopo run_prefix_to_home sullo stesso server MCP).
-
-    Args:
-        scenario_id: ID dello scenario da cercare in LAB_SCENARIOS (opzionale se scenario è fornito)
-        scenario: Oggetto LabScenario diretto (per scenari dinamici estratti da documenti)
-        verbose: Se True stampa log dettagliati
-
-    Returns:
-        Dict con risultato dell'esecuzione
     """
-    # Se scenario non è fornito, cerca per ID
     if scenario is None:
         if scenario_id is None:
             return {
@@ -173,31 +160,23 @@ async def run_lab_scenario(
                 "scenario_id": scenario_id,
             }
 
-    # Esegui lo scenario
-    agent = TestAgentMCP(custom_prompt=get_lab_optimized_prompt())
+    runtime = MCPAgentRuntime()
+    agent = TestAgentMCP(custom_prompt=get_lab_optimized_prompt(), runtime=runtime)
     instruction = _scenario_instruction(scenario)
     result = await agent.run_test_async(instruction, verbose=verbose)
     result["phase"] = "scenario"
     result["scenario_id"] = scenario.id
     result["scenario_name"] = scenario.name
 
-    # Testo naturale prodotto dal modello (per uso "umano")
     model_notes = result.get("notes")
-
-    # Summary deterministica derivata direttamente dalla trace MCP (steps)
     steps = result.get("steps") or []
     trace = extract_trace(steps)
     if trace:
         result["trace_summary"] = summarize_trace(
             trace, scenario_id=scenario_id, scenario_name=scenario.name
         )
-
-    # Esponi entrambi:
-    # - notes: frase naturale del modello (per compatibilità/UI)
-    # - trace_summary: riepilogo tecnico dalla trace
     if model_notes:
         result["notes"] = model_notes
-
     return result
 
 
@@ -212,20 +191,22 @@ async def run_full(
     module_label_alt: Optional[str] = None,
 ) -> dict:
     """
-    Esegue prima il prefix (login → home), poi lo scenario LAB.
-    Restituisce un risultato combinato; passed = True solo se entrambe le fasi passano.
-
-    - url/user/password possono essere passati esplicitamente (es. da frontend);
-      se None, viene usata la configurazione da AppConfig.LAB.
+    Esegue prefix + scenario LAB usando un runtime condiviso (stessa sessione MCP/browser).
     """
-    prefix_result = await run_prefix_to_home(
-        verbose=verbose,
+    runtime = MCPAgentRuntime()
+
+    primary, alt = _resolve_home_tile(module_label, module_label_alt)
+    prefix_prompt = build_lab_prefix_prompt(tile_primary=primary, tile_alternate=alt)
+    prefix_agent = TestAgentMCP(custom_prompt=prefix_prompt, runtime=runtime)
+    prefix_instruction = _prefix_instruction(
         url=url,
         user=user,
         password=password,
         module_label=module_label,
         module_label_alt=module_label_alt,
     )
+    prefix_result = await prefix_agent.run_test_async(prefix_instruction, verbose=verbose)
+    prefix_result["phase"] = "prefix"
     if not prefix_result.get("passed", False):
         return {
             "passed": False,
@@ -236,12 +217,41 @@ async def run_full(
             "artifacts": prefix_result.get("artifacts", []),
         }
 
-    scenario_result = await run_lab_scenario(scenario_id, verbose=verbose)
+    scenario_agent = TestAgentMCP(custom_prompt=get_lab_optimized_prompt(), runtime=runtime)
+    scenario_obj = get_scenario_by_id(scenario_id)
+    if not scenario_obj:
+        return {
+            "passed": False,
+            "phase": "full",
+            "prefix": prefix_result,
+            "scenario": None,
+            "errors": [
+                {
+                    "tool": "orchestrator",
+                    "message": f"Scenario '{scenario_id}' not found",
+                }
+            ],
+            "artifacts": prefix_result.get("artifacts", []),
+        }
+
+    scenario_instruction = _scenario_instruction(scenario_obj)
+    scenario_result = await scenario_agent.run_test_async(
+        scenario_instruction, verbose=verbose
+    )
+    scenario_result["phase"] = "scenario"
+    scenario_result["scenario_id"] = scenario_obj.id
+    scenario_result["scenario_name"] = scenario_obj.name
+
+    steps = scenario_result.get("steps") or []
+    trace = extract_trace(steps)
+    if trace:
+        scenario_result["trace_summary"] = summarize_trace(
+            trace, scenario_id=scenario_id, scenario_name=scenario_obj.name
+        )
+
     passed = scenario_result.get("passed", False)
     errors = prefix_result.get("errors", []) + scenario_result.get("errors", [])
-    artifacts = prefix_result.get("artifacts", []) + scenario_result.get(
-        "artifacts", []
-    )
+    artifacts = prefix_result.get("artifacts", []) + scenario_result.get("artifacts", [])
 
     return {
         "passed": passed,
@@ -281,7 +291,7 @@ def run_full_sync(
                 module_label_alt=module_label_alt,
             )
         )
-    # Già in un loop (es. Jupyter): esegui in un thread
+
     import concurrent.futures
 
     with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -299,15 +309,3 @@ def run_full_sync(
         )
         return future.result()
 
-
-if __name__ == "__main__":
-    import sys
-
-    scenario_id = sys.argv[1] if len(sys.argv) > 1 else "scenario_1"
-    print(f"Orchestrator: prefix → scenario {scenario_id}")
-    result = run_full_sync(scenario_id, verbose=True)
-    print(f"Passed: {result.get('passed')}")
-    if result.get("errors"):
-        for e in result["errors"]:
-            print(f"  Error: [{e.get('tool')}] {e.get('message')}")
-    sys.exit(0 if result.get("passed") else 1)
