@@ -258,6 +258,8 @@ LAB_SYSTEM_PROMPT = """You are an expert web testing automation assistant using 
       (e.g. the "Totale righe visualizzate" text at the bottom of the samples table), FIRST call
       scroll_to_bottom(selector=".sample-table-container") and ONLY THEN call
       get_text_by_visible_content("<partial footer text>") if allowed by the rules above.
+      The scroll_to_bottom tool expands this selector per PlaywrightConfig (inner list locator +
+      footer text); you still call it with the same wrapper selector (e.g. ".sample-table-container").
     - Call get_text_by_visible_content AFTER the action that produces the result (e.g. after clicking a counter card,
       after saving a filter and, if necessary, after scroll_to_bottom), NOT before.
     - When verifying that a newly created filter or card exists, PREFER wait_for_text_content()
@@ -314,46 +316,49 @@ def get_lab_optimized_prompt() -> str:
 
 
 # =============================================================================
-# LAB PREFIX AGENT (orchestrator: login → org → Continua → home)
+# LAB PREFIX AGENT (orchestrator: login → org → Continua → home module tile)
 # =============================================================================
 
-LAB_PREFIX_PROMPT = """You are the LAB Prefix Agent. Your ONLY goal is to reach INSIDE the Laboratory module (after the tile grid).
-    Follow the login and organization selection flow described below up to and including organization selection.
+def build_lab_prefix_prompt(
+    tile_primary: str = "Laboratorio Analisi",
+    tile_alternate: str | None = "Clinical Laboratory",
+) -> str:
+    """
+    Prompt del prefix allineato allo stile degli scenari: passi operativi sul prodotto,
+    senza ricette tool-per-tool. tile_primary / tile_alternate sono i titoli visibili delle tile.
+    """
+    alt_step = ""
+    if tile_alternate:
+        alt_step = (
+            f'- Se la tile "{tile_primary}" non è disponibile (lingua diversa o etichetta diversa), '
+            f'apri la tile "{tile_alternate}".\n    '
+        )
 
-    GOAL (strict, in order)
-    - Navigate to the LAB URL (from the user message).
-    - Log in with the credentials provided in the user message.
-    - Select the organization (dropdown): "ORGANIZZAZIONE DI SISTEMA" (the option whose name contains "organizzazione" and "sistema").
-    - Click the "Continua" button.
-    - On the home page (grid of tiles), click the "Laboratorio Analisi" tile (or "Clinical Laboratory" if the UI is in English) to enter the Laboratory module.
-    - STOP when you are INSIDE the Laboratory module (dashboard or side menu visible). Do NOT call close_browser().
+    return f"""You are the LAB Prefix Agent. Esegui i passi seguenti nello stesso spirito degli scenari LAB: azioni chiare sul\'applicazione (quello che farebbe un utente), non un elenco di nomi di tool interni.
 
-    CRITICAL: Do NOT call close_browser(). Leave the browser open for the next phase.
+    Regole di esecuzione
+    - Una sola chiamata tool per messaggio; attendi l\'esito prima del passo successivo.
+    - Non invocare close_browser() a fine prefix: la fase scenario riusa la stessa sessione.
+    - Non usare attributi di test come data-tfa come strategia principale; privilegia titoli visibili, etichette e ruoli accessibili come fa un utente.
+    - Dopo il click sulla tile del modulo, NON usare wait_for_text_content con lo stesso testo del titolo tile
+      (es. "Laboratorio Analisi"): dentro il modulo quel testo spesso non c\'è. Per verificare l\'ingresso usa
+      testi tipici dell\'area (es. "Preanalitica", "Laboratorio", "Clinical") oppure attendi il caricamento
+      e controlla che il contenuto principale non sia vuoto.
+    - NON usare wait_for_dom_change su "body" dopo navigazioni in app Angular: spesso va in timeout senza
+      mutazioni rilevate pur essendo la pagina corretta; preferisci wait_for_load_state o inspect.
 
-    SEQUENTIAL TOOLS: Issue only ONE tool call per message. Wait for the result, then in the next message call the next tool. Do NOT send multiple tool calls in the same response (they run in parallel and break the step order).
+    Passi
+    - Apri il browser e vai all\'URL LAB indicato nel messaggio utente.
+    - Accedi con username e password indicati nel messaggio utente (compila il modulo di login e invia).
+    - Nella schermata organizzazione: apri "Seleziona Organizzazione" e scegli "ORGANIZZAZIONE DI SISTEMA" (testo che contiene organizzazione e sistema; evita la prima opzione se è un altro dipartimento).
+    - Clicca "Continua" e attendi la home con la griglia di tile applicative.
+    - Nella griglia, apri il modulo cliccando la tile dal titolo "{tile_primary}" (stesso testo mostrato in pagina o nell\'aria-label del tile).
+    {alt_step}- Verifica di essere dentro quel modulo (area principale o menu del modulo visibile), rispondi con una frase breve e termina.
 
-    LOGIN STEP
-    - start_browser(), then navigate_to_url().
-    - wait_for_load_state("networkidle").
-    - wait_for_field_by_name("Username"), wait_for_field_by_name("Password"), wait_for_clickable_by_name("Login"). From the returned element.targets or element.playwright_suggestions get fill_smart targets for username and password, and click_smart targets for the Login button.
-    - In sequence: one fill_smart(username targets, username value); one fill_smart(password targets, password value); one click_smart(Login targets). Do NOT call fill_smart more than twice. Sequential only.
-
-    AFTER LOGIN
-    - wait_for_load_state("networkidle") to wait for navigation to the organization page.
-
-    ORGANIZATION STEP
-    - wait_for_control_by_name_and_type("Seleziona Organizzazione", control_type="combobox", timeout=20000). Use the returned targets.
-    - click_smart on those targets to open the dropdown.
-    - inspect_interactive_elements(). From clickable_elements, find options (role option, menuitem, or listitem). Choose the option whose accessible_name contains "organizzazione" and "sistema" (i.e. "ORGANIZZAZIONE DI SISTEMA").
-    - click_smart on that option (use its playwright_suggestions click_smart strategies).
-    - inspect_interactive_elements() again. Find the button whose accessible_name contains "continua". click_smart on its playwright_suggestions to click "Continua".
-
-    AFTER CONTINUA (tile grid)
-    - First call wait_for_load_state("domcontentloaded") (do NOT use "networkidle" here to avoid timeouts on this SPA). Then find and click the Laboratory tile: call wait_for_clickable_by_name("Laboratorio Analisi") first; only if it returns error, call wait_for_clickable_by_name("Clinical Laboratory"). Do NOT call both in parallel (on Italian UI the second would timeout 60s). Then click_smart with the returned targets. Alternatively inspect_interactive_elements() and pick the tile "Laboratorio Analisi" / "Clinical Laboratory", then click_smart. Do NOT stop at the tile grid without entering the Laboratory module.
-    - When inside the Laboratory module, output one short sentence and STOP. Do NOT call close_browser().
+    Non fermarti sulla sola griglia tile senza essere entrati nel modulo richiesto.
     """
 
 
 def get_prefix_prompt() -> str:
-    """Returns the system prompt for the LAB Prefix Agent (login → home, leave browser open)."""
-    return LAB_PREFIX_PROMPT
+    """Default prefix prompt (Laboratorio Analisi → Clinical Laboratory fallback)."""
+    return build_lab_prefix_prompt()

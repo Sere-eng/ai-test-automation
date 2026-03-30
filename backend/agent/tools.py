@@ -12,6 +12,23 @@ from typing import Literal, Optional, List, Dict
 from config.settings import AppConfig
 
 
+def _build_clickable_selector_for_inspect() -> str:
+    """
+    Selettore composito per la discovery dei clickabili: set HTML/WCAG standard
+    + registro configurabile (AppConfig.PLAYWRIGHT.get_inspect_extra_clickable_selectors).
+    """
+    base = (
+        "button, a, input[type='submit'], input[type='button'], "
+        "[role='button'], [role='link'], [role='menuitem'], [role='option'], "
+        "div.ds-tab-navigation-link-container, div.ds-tab-navigation-link-text, "
+        "div.ds-tool-card-wrapper, div.filter-wrapper.pointer, div.ds-add-button-container"
+    )
+    extra = AppConfig.PLAYWRIGHT.get_inspect_extra_clickable_selectors()
+    if not extra:
+        return base
+    return base + ", " + ", ".join(extra)
+
+
 def _normalize_css_selector(by: str, target: dict) -> Optional[str]:
     """Normalize CSS selector: for css_id or id-like selector (e.g. mat-input-17), prefix with #."""
     selector = target.get("selector") or (
@@ -350,13 +367,58 @@ class PlaywrightTools:
         Args:
             selector: CSS del contenitore scrollabile (es. ".sample-table-container").
                       Se None, esegue scroll della pagina (window).
+                      Per i wrapper elenco campioni registrati in PlaywrightConfig: scroll sulla lista
+                      configurata e scroll_into_view del testo footer, poi fallback sul selettore passato.
         """
         try:
             if not self.page:
                 return {"status": "error", "message": "Browser non avviato"}
 
             if selector:
-                # Use .first to avoid strict mode when multiple elements match (e.g. nested .sample-table-container)
+                sel_norm = selector.strip()
+                if AppConfig.PLAYWRIGHT.is_scroll_sample_table_wrapper(sel_norm):
+                    detail: list[str] = []
+                    page = self.page
+                    sr = page.locator(
+                        AppConfig.PLAYWRIGHT.get_scroll_sample_table_list_locator()
+                    )
+                    try:
+                        if await sr.count() > 0:
+                            await sr.first.evaluate(
+                                "el => { el.scrollTop = el.scrollHeight; }"
+                            )
+                            detail.append("search-results")
+                    except Exception:
+                        pass
+                    foot = page.get_by_text(
+                        AppConfig.PLAYWRIGHT.get_scroll_sample_table_footer_text(),
+                        exact=False,
+                    )
+                    try:
+                        if await foot.count() > 0:
+                            await foot.first.scroll_into_view_if_needed()
+                            detail.append("footer")
+                    except Exception:
+                        pass
+                    if detail:
+                        return {
+                            "status": "success",
+                            "message": "Scroll eseguito (elenco campioni UNITY)",
+                            "target": sel_norm,
+                            "scroll_mode": "unity_sample_list",
+                            "detail": detail,
+                        }
+                    locator = page.locator(sel_norm).first
+                    await locator.evaluate(
+                        "el => { el.scrollTop = el.scrollHeight; }"
+                    )
+                    return {
+                        "status": "success",
+                        "message": "Scroll eseguito fino in fondo (fallback contenitore)",
+                        "target": sel_norm,
+                        "scroll_mode": "fallback_container",
+                    }
+
                 locator = self.page.locator(selector).first
                 await locator.evaluate("el => { el.scrollTop = el.scrollHeight; }")
                 target = selector
@@ -1244,6 +1306,10 @@ class PlaywrightTools:
         Preferisce standard WCAG (role/label/text). Se presente, include anche `data-tfa`
         come fallback "test id" (utile in app corporate) ma con priorità più bassa.
 
+        Blocchi custom senza role (es. KPI circolari): il set dei candidati è il nucleo
+        HTML/WCAG più il registro `PlaywrightConfig.get_inspect_extra_clickable_selectors()`
+        (.env `INSPECT_EXTRA_CLICKABLE_SELECTORS` e default in settings).
+
         Args:
             in_iframe: opzionale dict per ispezionare l'interno di un iframe invece
                        della pagina principale. Stessa semantica usata da altri tool:
@@ -1323,12 +1389,7 @@ class PlaywrightTools:
                     continue
 
             # === 2. ELEMENTI CLICCABILI ===
-            clickable_selector = (
-                "button, a, input[type='submit'], input[type='button'], "
-                "[role='button'], [role='link'], [role='menuitem'], [role='option'], "
-                "div.ds-tab-navigation-link-container, div.ds-tab-navigation-link-text, "
-                "div.ds-tool-card-wrapper, div.filter-wrapper.pointer, div.ds-add-button-container"
-            )
+            clickable_selector = _build_clickable_selector_for_inspect()
             clickables = await context.locator(clickable_selector).all()
             clickable_info = []
 
@@ -1368,6 +1429,28 @@ class PlaywrightTools:
                     except Exception:
                         pass
                     suggestions = []
+                    # KPI dashboard cerchi: div senza role; il titolo navigabile è in h4 (es. "Campioni con Check-in")
+                    if tag == "div":
+                        kpi_heading = await elem.evaluate(
+                            """
+                            el => {
+                                if (!el.classList || !el.classList.contains('circle-card')
+                                    || !el.classList.contains('pointer')) return null;
+                                const h4 = el.querySelector('h4');
+                                return h4 ? h4.textContent.trim() : null;
+                            }
+                            """
+                        )
+                        if kpi_heading:
+                            suggestions.append(
+                                {
+                                    "strategy": "text_kpi_heading",
+                                    "click_smart": {
+                                        "by": "text",
+                                        "text": kpi_heading,
+                                    },
+                                }
+                            )
                     if effective_role and accessible_name:
                         clean_name = _strip_material_icon_prefix(accessible_name)
                         suggestions.append(
@@ -1877,12 +1960,7 @@ class PlaywrightTools:
                 }
 
             # === 1. ELEMENTI CLICCABILI NELLA REGIONE ===
-            clickable_selector = (
-                "button, a, input[type='submit'], input[type='button'], "
-                "[role='button'], [role='link'], [role='menuitem'], [role='option'], "
-                "div.ds-tab-navigation-link-container, div.ds-tab-navigation-link-text, "
-                "div.ds-tool-card-wrapper, div.filter-wrapper.pointer, div.ds-add-button-container"
-            )
+            clickable_selector = _build_clickable_selector_for_inspect()
             clickables = await root.locator(clickable_selector).all()
             clickable_info = []
 
@@ -1922,6 +2000,27 @@ class PlaywrightTools:
                     except Exception:
                         pass
                     suggestions = []
+                    if tag == "div":
+                        kpi_heading = await elem.evaluate(
+                            """
+                            el => {
+                                if (!el.classList || !el.classList.contains('circle-card')
+                                    || !el.classList.contains('pointer')) return null;
+                                const h4 = el.querySelector('h4');
+                                return h4 ? h4.textContent.trim() : null;
+                            }
+                            """
+                        )
+                        if kpi_heading:
+                            suggestions.append(
+                                {
+                                    "strategy": "text_kpi_heading",
+                                    "click_smart": {
+                                        "by": "text",
+                                        "text": kpi_heading,
+                                    },
+                                }
+                            )
                     if effective_role and accessible_name:
                         clean_name = _strip_material_icon_prefix(accessible_name)
                         suggestions.append(

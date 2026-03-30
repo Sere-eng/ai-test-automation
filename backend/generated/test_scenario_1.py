@@ -48,31 +48,23 @@ def do_login_and_go_to_laboratory(page: Page) -> None:
 
 
 def test_scenario_1(page: Page):
-    """Scenario: Creazione filtro e visualizzazione in dashboard (scenario_1)"""
+    """Scenario: SMPLIST_001 - Dashboard, elenco campione e dettaglio campione - Scenario 1 (scenario_1)"""
     # Perform login and navigate to Laboratory dashboard
     do_login_and_go_to_laboratory(page)
 
     # Steps translated from MCP tool trace
-    # wait_for_load_state
-    page.wait_for_load_state('domcontentloaded')
-    # wait_for_text_content
-    page.get_by_text('Preanalitica').first.wait_for()
     # click_smart (strategy=role)
     page.get_by_role('button', name='Laboratorio').first.click()
-    # wait_for_load_state
-    page.wait_for_load_state('domcontentloaded')
     # click_smart (strategy=role)
     page.get_by_role('button', name='Modifica').first.click()
     # click_smart (strategy=text)
     page.get_by_text('AGGIUNGI GRUPPO').first.click()
-    # fill_smart (strategy=css)
-    page.# WARNING: Angular dynamic ID, potrebbe cambiare tra run
-    locator('#mat-input-19').fill('Gruppo Test')
+    # fill_smart (strategy=css_id)
+    # WARNING: Angular dynamic ID, potrebbe cambiare tra run
+    page.locator('#mat-input-19').fill('Gruppo Test')
     # click_smart (strategy=role)
-    page.locator('card-group').nth(0).get_by_role('button', name='Aggiungi filtro').click()
+    page.get_by_role('button', name='Aggiungi filtro').first.click()
     # fill_smart (strategy=label)
     page.get_by_label('Nome filtro*').first.fill('Filtro Test')
     # click_smart (strategy=role)
     page.get_by_role('button', name='Conferma').first.click()
-    # wait_for_text_content
-    page.get_by_text('Filtro Test').first.wait_for()

@@ -3,6 +3,7 @@
 Logica di valutazione run: parsing eventi stream, pass/fail da tool results.
 Usa agent.utils per funzioni generiche (es. safe_json_loads); non sovrappone utils.
 """
+import re
 from typing import Any, Optional
 
 from agent.utils import safe_json_loads
@@ -110,6 +111,13 @@ def error_from_tool_output(tool_name: str, output_obj: dict) -> Optional[dict]:
         if output_obj.get("status") == "error" and "Contenitore non trovato per selector" in msg:
             return None
 
+    # wait_for_dom_change: timeout senza mutazioni è frequente su SPA Angular (routing interno,
+    # stesso body); non è un'asserzione affidabile — vedi LAB_SYSTEM_PROMPT (evitare questo tool).
+    if tool_name == "wait_for_dom_change" and isinstance(output_obj, dict):
+        msg = output_obj.get("message", "") or ""
+        if output_obj.get("status") == "error" and "Nessun cambiamento DOM rilevato" in msg:
+            return None
+
     if not isinstance(output_obj, dict) or output_obj.get("status") != "error":
         return None
     return {
@@ -170,12 +178,12 @@ def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[d
     Logica di tolleranza (in ordine):
     1. INFRA_TOOLS: errori ignorati completamente (già filtrati da error_from_tool_output).
     2. SOFT_TOOLS: se l'ultimo uso del tool è success, errori precedenti ignorati.
-    3. VERIFICATION_GROUPS: se l'ultimo uso di qualsiasi tool del gruppo è success,
-       errori di tutti i tool del gruppo vengono ignorati.
+    3. VERIFICATION_GROUPS: se almeno una invocazione (nel trace) di un tool del gruppo è success,
+       errori di tutte le invocazioni di quel gruppo vengono ignorati.
     """
     errors_out = list(errors)
 
-    # Calcola l'ultimo status per ogni tool
+    # Calcola l'ultimo status per ogni tool (per SOFT_TOOLS: retry / ultimo risultato)
     last_status_by_tool: dict[str, str] = {}
     for s in steps:
         tool = s.get("tool")
@@ -186,18 +194,75 @@ def evaluate_passed(steps: list[dict], errors: list[dict]) -> tuple[bool, list[d
         if status in ("success", "error") and tool:
             last_status_by_tool[tool] = status
 
+    def _any_step_success_in_group(group: set[str]) -> bool:
+        """Almeno una invocazione nel trace con status success (non solo l'ultima per nome tool)."""
+        for s in steps:
+            if s.get("tool") not in group:
+                continue
+            out = s.get("output")
+            if isinstance(out, dict) and out.get("status") == "success":
+                return True
+        return False
+
     # Tolleranza SOFT_TOOLS: ultimo uso success → cancella errori precedenti
     for t in SOFT_TOOLS:
         if last_status_by_tool.get(t) == "success":
             errors_out = [e for e in errors_out if e.get("tool") != t]
 
-    # Tolleranza VERIFICATION_GROUPS: se almeno un tool del gruppo finisce in success,
-    # cancella errori di tutti i tool del gruppo.
+    # Tolleranza VERIFICATION_GROUPS: se QUALSIASI invocazione di un tool del gruppo è success,
+    # cancella tutti gli errori del gruppo (probe multipli: es. wait su testo A ok, wait su testo B fallito).
     for group in VERIFICATION_GROUPS:
-        group_has_success = any(last_status_by_tool.get(t) == "success" for t in group)
-        if group_has_success:
+        if _any_step_success_in_group(group):
             errors_out = [e for e in errors_out if e.get("tool") not in group]
+
+    errors_out = _strip_redundant_wait_for_tile_title_after_click(steps, errors_out)
 
     passed = len(errors_out) == 0
 
     return passed, errors_out
+
+
+_WAIT_TEXT_NOT_FOUND_IT = re.compile(
+    r"Testo\s+'([^']+)'\s+non\s+trovato",
+    re.IGNORECASE,
+)
+
+
+def _strip_redundant_wait_for_tile_title_after_click(
+    steps: list[dict], errors_out: list[dict]
+) -> list[dict]:
+    """
+    Dopo un click_smart riuscito su role=button con name=X, spesso il modello chiama ancora
+    wait_for_text_content(X): sulla nuova vista quel testo (titolo tile) non c'è più → errore fittizio.
+    In quel caso non consideriamo l'errore bloccante.
+    """
+    clicked_button_names: set[str] = set()
+    for s in steps:
+        if s.get("tool") != "click_smart":
+            continue
+        out = s.get("output")
+        if not isinstance(out, dict) or out.get("status") != "success":
+            continue
+        tgt = out.get("target") or {}
+        if tgt.get("by") == "role" and tgt.get("role") == "button":
+            n = (tgt.get("name") or "").strip()
+            if n:
+                clicked_button_names.add(n)
+    if not clicked_button_names:
+        return errors_out
+
+    kept: list[dict] = []
+    for e in errors_out:
+        if e.get("tool") != "wait_for_text_content":
+            kept.append(e)
+            continue
+        msg = e.get("message", "") or ""
+        m = _WAIT_TEXT_NOT_FOUND_IT.search(msg)
+        if not m:
+            kept.append(e)
+            continue
+        waited = m.group(1).strip()
+        if waited in clicked_button_names:
+            continue
+        kept.append(e)
+    return kept

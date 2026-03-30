@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Test Automation</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg: #0a0a0a;
@@ -28,12 +31,12 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Space Grotesk', system-ui, sans-serif;
             background: radial-gradient(1200px 600px at 80% -10%, #1f1f1f 0%, transparent 60%),
-                        radial-gradient(900px 500px at 0% 20%, #202020 0%, transparent 55%),
-                        var(--bg);
+                radial-gradient(900px 500px at 0% 20%, #202020 0%, transparent 55%),
+                var(--bg);
             color: var(--text);
             min-height: 100vh;
             display: flex;
@@ -41,13 +44,13 @@
             align-items: center;
             padding: 60px 20px;
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 60px;
             max-width: 900px;
         }
-        
+
         .logo {
             font-size: 14px;
             font-weight: 600;
@@ -55,7 +58,7 @@
             margin-bottom: 40px;
             letter-spacing: 1px;
         }
-        
+
         h1 {
             font-size: 56px;
             font-weight: 700;
@@ -63,17 +66,17 @@
             margin-bottom: 20px;
             letter-spacing: -1px;
         }
-        
+
         h1 .highlight {
             color: var(--accent);
         }
-        
+
         .subtitle {
             font-size: 18px;
             color: var(--muted);
             font-weight: 400;
         }
-        
+
         .container {
             width: 100%;
             max-width: 900px;
@@ -84,7 +87,7 @@
             overflow: hidden;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
-        
+
         .terminal-header {
             background: var(--panel-2);
             padding: 12px 20px;
@@ -93,7 +96,7 @@
             color: #666;
             font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
         }
-        
+
         textarea {
             width: 100%;
             background: transparent;
@@ -106,11 +109,11 @@
             min-height: 200px;
             outline: none;
         }
-        
+
         textarea::placeholder {
             color: #444;
         }
-        
+
         .actions {
             padding: 20px 30px;
             border-top: 1px solid var(--border);
@@ -119,7 +122,7 @@
             justify-content: flex-end;
             gap: 12px;
         }
-        
+
         .btn {
             padding: 12px 32px;
             border: none;
@@ -130,28 +133,28 @@
             transition: all 0.2s ease;
             font-family: inherit;
         }
-        
+
         .btn-primary {
             background: var(--accent);
             color: white;
         }
-        
+
         .btn-primary:hover:not(:disabled) {
             background: var(--accent-2);
             transform: translateY(-1px);
         }
-        
+
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         .btn-secondary {
             background: transparent;
             color: var(--muted);
             border: 1px solid #333;
         }
-        
+
         .btn-secondary:hover {
             border-color: #555;
             color: #aaa;
@@ -173,7 +176,7 @@
             border-color: #555;
             color: #aaa;
         }
-        
+
         .result {
             margin-top: 30px;
             width: 100%;
@@ -184,11 +187,11 @@
             padding: 30px;
             display: none;
         }
-        
+
         .result.show {
             display: block;
         }
-        
+
         .result-header {
             font-size: 14px;
             font-weight: 600;
@@ -196,15 +199,15 @@
             padding-bottom: 15px;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .result.success .result-header {
             color: var(--success);
         }
-        
+
         .result.error .result-header {
             color: var(--error);
         }
-        
+
         .result-content {
             color: #aaa;
             line-height: 1.6;
@@ -212,7 +215,7 @@
             font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
             font-size: 14px;
         }
-        
+
         /* Script section per Playwright */
         .script-section {
             margin-top: 30px;
@@ -331,11 +334,11 @@
             margin-top: 30px;
             color: var(--muted);
         }
-        
+
         .loading.show {
             display: block;
         }
-        
+
         .spinner {
             width: 40px;
             height: 40px;
@@ -345,9 +348,11 @@
             animation: spin 0.8s linear infinite;
             margin: 0 auto 15px;
         }
-        
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .tabs {
@@ -357,6 +362,7 @@
             border-bottom: 1px solid var(--border);
             background: var(--panel-2);
         }
+
         .tab {
             padding: 14px 24px;
             font-size: 14px;
@@ -368,21 +374,37 @@
             font-family: inherit;
             border-bottom: 2px solid transparent;
         }
-        .tab:hover { color: #aaa; }
+
+        .tab:hover {
+            color: #aaa;
+        }
+
         .tab.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
             background: var(--panel);
         }
-        .panel { display: none; padding: 24px 30px; }
-        .panel.active { display: block; }
+
+        .panel {
+            display: none;
+            padding: 24px 30px;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
         .panel .panel-desc {
             font-size: 13px;
             color: var(--muted);
             margin-bottom: 16px;
             line-height: 1.5;
         }
-        .lab-select-wrap { margin-bottom: 20px; }
+
+        .lab-select-wrap {
+            margin-bottom: 20px;
+        }
+
         .lab-select-wrap label {
             display: block;
             font-size: 12px;
@@ -391,6 +413,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
         select.lab-scenario-select {
             width: 100%;
             padding: 12px 14px;
@@ -401,7 +424,12 @@
             font-size: 14px;
             font-family: inherit;
         }
-        select.lab-scenario-select option { background: var(--panel); color: var(--text); }
+
+        select.lab-scenario-select option {
+            background: var(--panel);
+            color: var(--text);
+        }
+
         .lab-steps {
             font-size: 13px;
             color: var(--muted);
@@ -412,6 +440,7 @@
             border: 1px solid var(--border);
             white-space: pre-wrap;
         }
+
         .lab-login-section {
             margin-bottom: 20px;
             padding: 14px;
@@ -419,6 +448,7 @@
             border-radius: 8px;
             border: 1px solid var(--border);
         }
+
         .lab-login-section .section-label {
             font-size: 12px;
             color: var(--muted);
@@ -426,8 +456,18 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .lab-login-section .field { margin-bottom: 10px; }
-        .lab-login-section label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+        .lab-login-section .field {
+            margin-bottom: 10px;
+        }
+
+        .lab-login-section label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
         .lab-login-section input {
             width: 100%;
             padding: 10px 12px;
@@ -437,10 +477,24 @@
             color: var(--text);
             font-size: 14px;
         }
-        .lab-login-section input::placeholder { color: var(--muted); opacity: 0.8; }
-        .lab-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center;}
-        .lab-actions-row .btn { flex: 0 0 auto; }
-        
+
+        .lab-login-section input::placeholder {
+            color: var(--muted);
+            opacity: 0.8;
+        }
+
+        .lab-actions-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+            align-items: center;
+        }
+
+        .lab-actions-row .btn {
+            flex: 0 0 auto;
+        }
+
         /* File input styling */
         input[type="file"] {
             width: 100%;
@@ -452,6 +506,7 @@
             font-size: 14px;
             cursor: pointer;
         }
+
         input[type="file"]::-webkit-file-upload-button {
             background: var(--panel-2);
             border: 1px solid var(--border);
@@ -462,10 +517,11 @@
             cursor: pointer;
             font-family: inherit;
         }
+
         input[type="file"]::-webkit-file-upload-button:hover {
             background: var(--bg-2);
         }
-        
+
         /* Batch Progress Styles */
         .batch-progress {
             margin-top: 24px;
@@ -474,11 +530,11 @@
             border-radius: 8px;
             padding: 20px;
         }
-        
+
         .progress-container {
             margin-top: 16px;
         }
-        
+
         .progress-header {
             display: flex;
             justify-content: space-between;
@@ -486,17 +542,17 @@
             margin-bottom: 12px;
             font-size: 14px;
         }
-        
+
         .progress-header #progressStatus {
             color: var(--text);
             font-weight: 500;
         }
-        
+
         .progress-header #progressCount {
             color: var(--muted);
             font-family: 'IBM Plex Mono', monospace;
         }
-        
+
         .progress-bar-container {
             width: 100%;
             height: 8px;
@@ -505,14 +561,14 @@
             overflow: hidden;
             margin-bottom: 16px;
         }
-        
+
         .progress-bar {
             height: 100%;
             background: linear-gradient(90deg, var(--accent), var(--accent-2));
             width: 0%;
             transition: width 0.3s ease;
         }
-        
+
         .progress-details {
             font-size: 13px;
             line-height: 1.8;
@@ -521,7 +577,7 @@
             max-height: 300px;
             overflow-y: auto;
         }
-        
+
         .progress-item {
             padding: 8px 12px;
             margin-bottom: 6px;
@@ -529,50 +585,58 @@
             border-left: 3px solid var(--border);
             border-radius: 4px;
         }
-        
+
         .progress-item.active {
             border-left-color: var(--accent);
             animation: pulse 1.5s ease-in-out infinite;
         }
-        
+
         .progress-item.success {
             border-left-color: var(--success);
         }
-        
+
         .progress-item.error {
             border-left-color: var(--error);
         }
-        
+
         .progress-item .scenario-name {
             color: var(--text);
             font-weight: 500;
             margin-bottom: 4px;
         }
-        
+
         .progress-item .step-info {
             color: var(--muted);
             font-size: 12px;
         }
-        
+
         .progress-item .error-message {
             color: var(--error);
             font-size: 12px;
             margin-top: 4px;
         }
-        
+
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <div class="logo">AI TEST AUTOMATION</div>
         <h1>ENABLE AI TO <span class="highlight">TEST</span> THE WEB</h1>
         <p class="subtitle">Describe your test in natural language or run a predefined LAB scenario</p>
     </div>
-    
+
     <div class="container">
         <div class="tabs">
             <button class="tab active" data-tab="custom" onclick="switchTab('custom')">Custom test</button>
@@ -581,11 +645,7 @@
         </div>
         <div id="panel-custom" class="panel active">
             <div class="terminal-header">USER@AI-TEST:~/NEW_TEST</div>
-            <textarea 
-                id="testDescription" 
-                placeholder="Describe your task..."
-                spellcheck="false"
-            ></textarea>
+            <textarea id="testDescription" placeholder="Describe your task..." spellcheck="false"></textarea>
             <div class="actions">
                 <button class="btn btn-secondary" onclick="clearTest()">Clear</button>
                 <button class="btn btn-primary" id="runBtn" onclick="runTest()">Run Test</button>
@@ -593,21 +653,38 @@
         </div>
         <div id="panel-lab" class="panel">
             <p class="panel-desc">
-                You can <strong>login first</strong>, then <strong>run a scenario</strong> separately, or run <strong>login + scenario</strong> in one shot.
+                Inserisci <strong>URL, username e password</strong> (nessun fallback sul server per Login / Run
+                full). Dopo il login, scegli quale <strong>tile della home</strong> aprire (es. Laboratorio
+                Analisi).
             </p>
             <div class="lab-login-section">
-                <div class="section-label">1. Login (optional — leave empty to use server default)</div>
+                <div class="section-label">1. Accesso LAB</div>
                 <div class="field">
                     <label for="labUrl">URL</label>
-                    <input type="text" id="labUrl" placeholder="e.g. https://mdrsanitalab2.eng.it/... (empty = from server)">
+                    <input type="text" id="labUrl" placeholder="https://…/multimodule/…">
                 </div>
                 <div class="field">
                     <label for="labUsername">Username</label>
-                    <input type="text" id="labUsername" placeholder="(empty = from server)">
+                    <input type="text" id="labUsername" placeholder="username" autocomplete="username">
                 </div>
                 <div class="field">
                     <label for="labPassword">Password</label>
-                    <input type="password" id="labPassword" placeholder="(empty = from server)">
+                    <input type="password" id="labPassword" placeholder="password" autocomplete="current-password">
+                </div>
+                <div class="lab-select-wrap">
+                    <label for="labHomeModuleSelect">Modulo (tile sulla home dopo &quot;Continua&quot;)</label>
+                    <select id="labHomeModuleSelect" class="lab-scenario-select"></select>
+                </div>
+                <div id="labHomeModuleCustom" class="field-group-custom"
+                    style="display:none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                    <div class="field">
+                        <label for="labModuleCustomLabel">Titolo tile (come in pagina)</label>
+                        <input type="text" id="labModuleCustomLabel" placeholder="es. Gestione report">
+                    </div>
+                    <div class="field">
+                        <label for="labModuleCustomAlt">Titolo alternativo / lingua (opz.)</label>
+                        <input type="text" id="labModuleCustomAlt" placeholder="es. English title">
+                    </div>
                 </div>
                 <div class="lab-actions-row">
                     <button class="btn btn-secondary" id="runLoginBtn" onclick="runLabLogin()">Login</button>
@@ -620,71 +697,103 @@
                 </select>
             </div>
             <div id="labStepsPreview" class="lab-steps" style="display:none;"></div>
-            
+
             <div class="actions lab-actions-row">
-                <button class="btn btn-primary" id="runScenarioBtn" onclick="runLabScenarioOnly()">Run scenario only</button>
-                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login + scenario)</button>
+                <button class="btn btn-primary" id="runScenarioBtn" onclick="runLabScenarioOnly()">Run scenario
+                    only</button>
+                <button class="btn btn-primary" id="runLabBtn" onclick="runLabTest()">Run full (login +
+                    scenario)</button>
                 <label class="generate-toggle">
                     <input type="checkbox" id="generateScriptToggle">
                     <span>generate script</span>
                 </label>
             </div>
         </div>
-        
+
         <div id="panel-document" class="panel">
             <p class="panel-desc">
-                <strong>Upload a test case document</strong> (Word, HTML, Excel, or CSV), extract scenarios automatically, and run them all at once.
+                <strong>Upload a test case document</strong> (Word, HTML, Excel, or CSV), extract scenarios
+                automatically, and run them all at once.
             </p>
-            
+
             <div class="lab-login-section">
                 <div class="section-label">1. Upload Document</div>
                 <div class="field">
                     <label for="docFile">Select .doc, .docx, .xlsx, .xls, .csv, or .html file</label>
-                    <input type="file" id="docFile" accept=".doc,.docx,.html,.htm,.xlsx,.xls,.csv" style="padding: 8px; cursor: pointer;">
+                    <input type="file" id="docFile" accept=".doc,.docx,.html,.htm,.xlsx,.xls,.csv"
+                        style="padding: 8px; cursor: pointer;">
                 </div>
                 <div class="lab-actions-row">
                     <button class="btn btn-secondary" id="uploadBtn" onclick="uploadDocument()">Upload</button>
                 </div>
                 <div id="uploadStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
             </div>
-            
+
             <div class="lab-login-section" id="extractSection" style="display:none;">
                 <div class="section-label">2. Extract Scenarios (AI)</div>
                 <div class="lab-actions-row">
-                    <button class="btn btn-secondary" id="extractBtn" onclick="extractScenarios()">Extract Scenarios</button>
+                    <button class="btn btn-secondary" id="extractBtn" onclick="extractScenarios()">Extract
+                        Scenarios</button>
                 </div>
                 <div id="extractStatus" style="margin-top: 10px; font-size: 13px; color: var(--muted);"></div>
-                
+
                 <div id="extractionProgress" style="display:none; margin-top: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
-                        <span id="extractProgressStatus" style="color: var(--text); font-weight: 500;">Processing...</span>
-                        <span id="extractProgressCount" style="color: var(--muted); font-family: 'IBM Plex Mono', monospace;">0/0</span>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+                        <span id="extractProgressStatus"
+                            style="color: var(--text); font-weight: 500;">Processing...</span>
+                        <span id="extractProgressCount"
+                            style="color: var(--muted); font-family: 'IBM Plex Mono', monospace;">0/0</span>
                     </div>
-                    <div style="width: 100%; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
-                        <div id="extractProgressBar" style="height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0%; transition: width 0.3s ease;"></div>
+                    <div
+                        style="width: 100%; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+                        <div id="extractProgressBar"
+                            style="height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0%; transition: width 0.3s ease;">
+                        </div>
                     </div>
-                    <div id="extractProgressDetails" style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); max-height: 150px; overflow-y: auto; line-height: 1.6;"></div>
+                    <div id="extractProgressDetails"
+                        style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); max-height: 150px; overflow-y: auto; line-height: 1.6;">
+                    </div>
                 </div>
             </div>
-            
+
             <div id="scenariosPreview" class="lab-steps" style="display:none; margin-top: 20px;">
                 <div class="section-label">Extracted Scenarios</div>
                 <div id="scenariosList" style="margin-top: 10px;"></div>
             </div>
-            
+
             <div class="lab-login-section" id="batchSection" style="display:none;">
                 <div class="section-label">3. Run Test(s)</div>
+                <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
+                    Come nel tab LAB scenario: <strong>URL, username e password</strong> obbligatori; scegli la
+                    <strong>tile della home</strong> da aprire dopo il login (es. Laboratorio Analisi).
+                </p>
                 <div class="field">
                     <label for="batchUrl">URL</label>
-                    <input type="text" id="batchUrl" placeholder="https://your-lab-url.com">
+                    <input type="text" id="batchUrl" placeholder="https://…/multimodule/…" autocomplete="url">
                 </div>
                 <div class="field">
                     <label for="batchUsername">Username</label>
-                    <input type="text" id="batchUsername" placeholder="username">
+                    <input type="text" id="batchUsername" placeholder="username" autocomplete="username">
                 </div>
                 <div class="field">
                     <label for="batchPassword">Password</label>
-                    <input type="password" id="batchPassword" placeholder="password">
+                    <input type="password" id="batchPassword" placeholder="password" autocomplete="current-password">
+                </div>
+                <div class="lab-select-wrap">
+                    <label for="docHomeModuleSelect">Modulo (tile sulla home dopo &quot;Continua&quot;)</label>
+                    <select id="docHomeModuleSelect" class="lab-scenario-select"></select>
+                </div>
+                <div id="docHomeModuleCustom" class="field-group-custom"
+                    style="display:none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                    <div class="field">
+                        <label for="docModuleCustomLabel">Titolo tile (come in pagina)</label>
+                        <input type="text" id="docModuleCustomLabel" placeholder="es. Gestione report">
+                    </div>
+                    <div class="field">
+                        <label for="docModuleCustomAlt">Titolo alternativo / lingua (opz.)</label>
+                        <input type="text" id="docModuleCustomAlt" placeholder="es. English title">
+                    </div>
                 </div>
                 <div class="field">
                     <label for="extractedScenarioSelect">Select Scenario (optional)</label>
@@ -693,11 +802,12 @@
                     </select>
                 </div>
                 <div class="lab-actions-row">
-                    <button class="btn btn-secondary" id="runSingleBtn" onclick="runSingleScenario()" style="margin-right: 12px;">Run Selected</button>
+                    <button class="btn btn-secondary" id="runSingleBtn" onclick="runSingleScenario()"
+                        style="margin-right: 12px;">Run Selected</button>
                     <button class="btn btn-primary" id="runBatchBtn" onclick="runBatchTest()">Run All Scenarios</button>
                 </div>
             </div>
-            
+
             <div class="batch-progress" id="batchProgress" style="display:none;">
                 <div class="section-label">Batch Test Progress</div>
                 <div class="progress-container">
@@ -712,13 +822,13 @@
                 </div>
             </div>
         </div>
-        </div>
-    
+    </div>
+
     <div class="loading" id="loading">
         <div class="spinner"></div>
         <p id="loadingText">Running test...</p>
     </div>
-    
+
     <div class="result" id="result">
         <div class="result-header" id="resultHeader"></div>
         <div class="result-content" id="resultContent"></div>
@@ -746,12 +856,120 @@
         let labScenarios = [];
         let currentScenarioId = '';
 
+        /** Preset: solo titoli visibili sulla home (come in elenco moduli). */
+        const LAB_HOME_MODULE_PRESETS = [
+            { label: 'Laboratorio Analisi', alt: 'Clinical Laboratory' },
+            { label: 'Tools', alt: '' },
+            { label: 'Sistema', alt: '' },
+            { label: 'Design System', alt: '' },
+            { label: 'Jobs Manager', alt: '' },
+            { label: 'Gestione report', alt: '' },
+            { label: 'Anagrafiche', alt: '' },
+            { label: 'UNITY - Clinical Data Manager', alt: '' },
+            { label: 'Decision Support System', alt: '' },
+            { label: 'Organigramma', alt: '' },
+            { label: 'RAD', alt: '' },
+            { label: 'Anagrafe Paziente', alt: '' },
+            { label: 'Configurazione Email', alt: '' },
+            { label: 'Gestione dei Parametri', alt: '' },
+            { label: 'BRIDGE', alt: '' },
+            { label: 'Audit', alt: '' },
+            { label: 'Gestione consensi', alt: '' },
+            { label: 'Configuratore per il Laboratorio Analisi', alt: '' },
+            { label: 'Gestore degli accessi', alt: '' },
+            { label: 'Dashboard PS', alt: '' },
+            { label: 'Telemedicina', alt: '' },
+        ];
+
+        function populateHomeModuleSelect(selectId, customWrapId) {
+            const sel = document.getElementById(selectId);
+            if (!sel || sel.dataset.populated === '1') return;
+            const parts = LAB_HOME_MODULE_PRESETS.map((m, i) => {
+                const enc = encodeURIComponent(JSON.stringify({ label: m.label, alt: m.alt || '' }));
+                return '<option value="p' + i + '" data-module="' + enc + '">' + escapeHtml(m.label) + '</option>';
+            });
+            parts.push('<option value="__custom__">Personalizzato…</option>');
+            sel.innerHTML = parts.join('');
+            sel.dataset.populated = '1';
+            sel.onchange = function () {
+                const custom = document.getElementById(customWrapId);
+                if (custom) custom.style.display = sel.value === '__custom__' ? 'block' : 'none';
+            };
+            sel.onchange();
+        }
+
+        function populateLabHomeModuleSelect() {
+            populateHomeModuleSelect('labHomeModuleSelect', 'labHomeModuleCustom');
+        }
+
+        function populateDocHomeModuleSelect() {
+            populateHomeModuleSelect('docHomeModuleSelect', 'docHomeModuleCustom');
+        }
+
+        function requireLabCredentialsForPrefix() {
+            const url = document.getElementById('labUrl').value.trim();
+            const username = document.getElementById('labUsername').value.trim();
+            const password = document.getElementById('labPassword').value;
+            if (!url || !username || !password) {
+                alert('Compila URL, username e password per questa operazione (nessun valore predefinito dal server).');
+                return null;
+            }
+            return { url, username, password };
+        }
+
+        function getModulePayload(selectId, customLabelId, customAltId) {
+            const sel = document.getElementById(selectId);
+            if (!sel) return {};
+            if (sel.value === '__custom__') {
+                const label = document.getElementById(customLabelId).value.trim();
+                if (!label) {
+                    return { _error: 'Indica il titolo della tile in \"Personalizzato\".' };
+                }
+                const out = { module_label: label };
+                const alt = document.getElementById(customAltId).value.trim();
+                if (alt) out.module_label_alt = alt;
+                return out;
+            }
+            const opt = sel.selectedOptions[0];
+            let mod = {};
+            try {
+                const raw = opt.getAttribute('data-module');
+                if (raw) mod = JSON.parse(decodeURIComponent(raw));
+            } catch (e) { mod = {}; }
+            const out = { module_label: mod.label || '' };
+            if (mod.alt) out.module_label_alt = mod.alt;
+            return out;
+        }
+
+        function getLabModulePayload() {
+            return getModulePayload('labHomeModuleSelect', 'labModuleCustomLabel', 'labModuleCustomAlt');
+        }
+
+        function getDocModulePayload() {
+            return getModulePayload('docHomeModuleSelect', 'docModuleCustomLabel', 'docModuleCustomAlt');
+        }
+
+        function escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.querySelector('.tab[data-tab="' + tabId + '"]').classList.add('active');
             document.getElementById('panel-' + tabId).classList.add('active');
-            if (tabId === 'lab' && labScenarios.length === 0) loadLabScenarios();
+            if (tabId === 'lab') {
+                populateLabHomeModuleSelect();
+                if (labScenarios.length === 0) loadLabScenarios();
+            }
+            if (tabId === 'document') {
+                populateDocHomeModuleSelect();
+            }
         }
 
         async function loadLabScenarios() {
@@ -768,7 +986,7 @@
                 select.innerHTML = labScenarios
                     .map((s, i) => '<option value="' + s.id + '">' + (i + 1) + '. ' + (s.name || s.id) + '</option>')
                     .join('');
-                select.onchange = function() {
+                select.onchange = function () {
                     const id = select.value;
                     currentScenarioId = id;
                     const preview = document.getElementById('labStepsPreview');
@@ -777,10 +995,10 @@
                     if (s) {
                         let text = '';
                         if (s.execution_steps && s.execution_steps.length) {
-                            text += 'Steps:\n' + s.execution_steps.map((st, i) => (i+1) + '. ' + st).join('\n');
+                            text += 'Steps:\n' + s.execution_steps.map((st, i) => (i + 1) + '. ' + st).join('\n');
                         }
                         if (s.expected_results && s.expected_results.length) {
-                            text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i+1) + '. ' + r).join('\n');
+                            text += '\n\nExpected results:\n' + s.expected_results.map((r, i) => (i + 1) + '. ' + r).join('\n');
                         }
                         preview.textContent = text || '';
                         preview.style.display = text ? 'block' : 'none';
@@ -807,6 +1025,8 @@
                 const parts = [];
                 const notes = data.result && (data.result.notes || data.result.final_answer);
                 if (notes) parts.push(notes);
+                const traceSummary = data.result && data.result.trace_summary;
+                if (traceSummary) parts.push('TRACE SUMMARY:\n' + traceSummary);
                 if (data.phase) parts.push('Phase: ' + data.phase);
                 if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
                 if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
@@ -822,7 +1042,7 @@
                 showScript(data.playwright_script, data.scenario_id || currentScenarioId);
             } else {
                 const scriptSec = document.getElementById('scriptSection');
-                if(scriptSec) scriptSec.classList.remove('show');
+                if (scriptSec) scriptSec.classList.remove('show');
             }
         }
 
@@ -850,11 +1070,10 @@
 
         function downloadScript() {
             const content = document.getElementById('scriptContent').value;
-            const scenarioId = currentScenarioId || 'scenario';
             const blob = new Blob([content], { type: 'text/plain' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'test_' + scenarioId + '.py';
+            a.download = 'test_' + (currentScenarioId || 'scenario') + '.py';
             a.click();
             URL.revokeObjectURL(a.href);
         }
@@ -919,22 +1138,26 @@
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const btn = document.getElementById('runLoginBtn');
-            const url = document.getElementById('labUrl').value.trim();
-            const username = document.getElementById('labUsername').value.trim();
-            const password = document.getElementById('labPassword').value;
+            const cred = requireLabCredentialsForPrefix();
+            if (!cred) return;
+            const mod = getLabModulePayload();
+            if (mod._error) { alert(mod._error); return; }
             document.getElementById('loadingText').textContent = 'Running login (prefix)…';
             resultDiv.classList.remove('show');
-            
+
             const scriptSec = document.getElementById('scriptSection');
-            if(scriptSec) scriptSec.classList.remove('show');
-            
+            if (scriptSec) scriptSec.classList.remove('show');
+
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
-                const body = {};
-                if (url) body.url = url;
-                if (username) body.username = username;
-                if (password) body.password = password;
+                const body = {
+                    url: cred.url,
+                    username: cred.username,
+                    password: cred.password,
+                    ...mod
+                };
+                delete body._error;
                 const response = await fetch(API_BASE + '/api/test/lab/prefix', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -960,7 +1183,7 @@
                 alert('Select a scenario');
                 return;
             }
-            
+
             // Supporto checkbox Playwright
             const generateScriptEl = document.getElementById('generateScriptToggle');
             const generateScript = generateScriptEl ? generateScriptEl.checked : false;
@@ -970,10 +1193,10 @@
             const btn = document.getElementById('runScenarioBtn');
             document.getElementById('loadingText').textContent = 'Running scenario…';
             resultDiv.classList.remove('show');
-            
+
             const scriptSec = document.getElementById('scriptSection');
-            if(scriptSec) scriptSec.classList.remove('show');
-            
+            if (scriptSec) scriptSec.classList.remove('show');
+
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
@@ -1002,22 +1225,34 @@
                 alert('Select a scenario');
                 return;
             }
+            const cred = requireLabCredentialsForPrefix();
+            if (!cred) return;
+            const mod = getLabModulePayload();
+            if (mod._error) { alert(mod._error); return; }
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const btn = document.getElementById('runLabBtn');
             document.getElementById('loadingText').textContent = 'Running LAB test (prefix + scenario)…';
             resultDiv.classList.remove('show');
-            
+
             const scriptSec = document.getElementById('scriptSection');
-            if(scriptSec) scriptSec.classList.remove('show');
-            
+            if (scriptSec) scriptSec.classList.remove('show');
+
             loadingDiv.classList.add('show');
             btn.disabled = true;
             try {
+                const payload = {
+                    scenario_id: scenarioId,
+                    url: cred.url,
+                    username: cred.username,
+                    password: cred.password,
+                    ...mod
+                };
+                delete payload._error;
                 const response = await fetch(API_BASE + '/api/test/lab/full', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ scenario_id: scenarioId })
+                    body: JSON.stringify(payload)
                 });
                 const data = await response.json();
                 loadingDiv.classList.remove('show');
@@ -1033,6 +1268,8 @@
                     if (prefixNote) parts.push('Prefix: ' + prefixNote);
                     const scenarioNote = data.scenario && (data.scenario.notes || data.scenario.final_answer);
                     if (scenarioNote) parts.push('Scenario: ' + scenarioNote);
+                    const scenarioTraceSummary = data.scenario && data.scenario.trace_summary;
+                    if (scenarioTraceSummary) parts.push('TRACE SUMMARY:\n' + scenarioTraceSummary);
                     if (data.phase) parts.push('Phase: ' + data.phase);
                     if (data.duration_ms) parts.push('Duration: ' + data.duration_ms + ' ms');
                     if (data.errors && data.errors.length) parts.push('Errors: ' + JSON.stringify(data.errors));
@@ -1079,43 +1316,43 @@ Perform a search for 'carm' and verify results appear.
 
 Close the browser.`
         ];
-        
+
         // ==================== DOCUMENT UPLOAD FUNCTIONS (TUO LAVORO) ====================
-        
+
         let uploadedFilename = null;
         let extractedScenarios = null;
-        
+
         async function uploadDocument() {
             const fileInput = document.getElementById('docFile');
             const statusDiv = document.getElementById('uploadStatus');
             const btn = document.getElementById('uploadBtn');
-            
+
             if (!fileInput.files || !fileInput.files[0]) {
                 statusDiv.textContent = '❌ Please select a file first';
                 statusDiv.style.color = 'var(--error)';
                 return;
             }
-            
+
             const file = fileInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
-            
+
             statusDiv.textContent = '⏳ Uploading...';
             statusDiv.style.color = 'var(--muted)';
             btn.disabled = true;
-            
+
             try {
                 const response = await fetch(API_BASE + '/api/test/upload', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     uploadedFilename = data.filename;
                     statusDiv.textContent = `✅ Uploaded: ${data.filename} (${(data.size_bytes / 1024).toFixed(1)} KB)`;
                     statusDiv.style.color = 'var(--success)';
-                    
+
                     // Show extract section
                     document.getElementById('extractSection').style.display = 'block';
                 } else {
@@ -1129,13 +1366,13 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         async function extractScenarios() {
             if (!uploadedFilename) {
                 alert('Please upload a document first');
                 return;
             }
-            
+
             const statusDiv = document.getElementById('extractStatus');
             const btn = document.getElementById('extractBtn');
             const previewDiv = document.getElementById('scenariosPreview');
@@ -1145,19 +1382,19 @@ Close the browser.`
             const progressStatus = document.getElementById('extractProgressStatus');
             const progressCount = document.getElementById('extractProgressCount');
             const progressDetails = document.getElementById('extractProgressDetails');
-            
+
             statusDiv.textContent = '⏳ Starting extraction...';
             statusDiv.style.color = 'var(--muted)';
             btn.disabled = true;
             previewDiv.style.display = 'none';
-            
+
             // Show progress UI
             progressDiv.style.display = 'block';
             progressBar.style.width = '0%';
             progressStatus.textContent = 'Analyzing document...';
             progressCount.textContent = '0/0';
             progressDetails.innerHTML = '';
-            
+
             // Simulate progress steps
             let currentStep = 0;
             const steps = [
@@ -1167,7 +1404,7 @@ Close the browser.`
                 { text: 'Processing scenarios...', progress: 70 },
                 { text: 'Finalizing...', progress: 90 }
             ];
-            
+
             const progressInterval = setInterval(() => {
                 if (currentStep < steps.length) {
                     const step = steps[currentStep];
@@ -1178,7 +1415,7 @@ Close the browser.`
                     currentStep++;
                 }
             }, 400);
-            
+
             try {
                 const response = await fetch(API_BASE + '/api/test/extract-scenarios', {
                     method: 'POST',
@@ -1186,93 +1423,62 @@ Close the browser.`
                     body: JSON.stringify({ file: uploadedFilename })
                 });
                 const data = await response.json();
-                
+
                 clearInterval(progressInterval);
                 progressBar.style.width = '100%';
-                
+
                 if (data.status === 'success') {
                     extractedScenarios = data.scenarios;
-                    
+
                     // Update final status
                     progressStatus.textContent = `✅ Extraction complete!`;
                     progressCount.textContent = `${data.scenarios_count}/${data.scenarios_count}`;
                     progressDetails.innerHTML += `<div style="margin-top: 8px; color: var(--success); font-weight: 500;">✅ Successfully extracted ${data.scenarios_count} test case(s) from "${data.document.title}"</div>`;
-                    
+
                     statusDiv.textContent = `✅ Extracted ${data.scenarios_count} scenarios from "${data.document.title}"`;
                     statusDiv.style.color = 'var(--success)';
-                    
+
                     // Show scenarios preview
                     scenariosListDiv.innerHTML = '';
                     data.scenarios.forEach((scenario, idx) => {
                         const scenarioDiv = document.createElement('div');
                         scenarioDiv.style.cssText = 'background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 10px;';
-                        
+
                         // Build HTML with all available fields
                         let htmlContent = `<div style="font-weight: 600; color: var(--accent); margin-bottom: 4px;">${idx + 1}. ${scenario.name}</div>`;
-                        
-                        // Metadata row: ID, Row, Codice, Modulo, Ambiente, Criticità
-                        let metaParts = [`ID: ${scenario.id}`];
-                        if (scenario.row_number) metaParts.push(`Row: ${scenario.row_number}`);
-                        if (scenario.modulo)   metaParts.push(`Modulo: ${scenario.modulo}`);
-                        if (scenario.ambiente) metaParts.push(`Ambiente: ${scenario.ambiente}`);
-                        if (scenario.criticita) metaParts.push(`Criticità: ${scenario.criticita}`);
-                        if (scenario.versione_inizio) metaParts.push(`Ver. inizio: ${scenario.versione_inizio}`);
-                        htmlContent += `<div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">${metaParts.join(' | ')}</div>`;
-                        
-                        // Obiettivo (formato strutturato)
-                        if (scenario.objective && scenario.objective.trim()) {
-                            const objClean = scenario.objective.trim().replace(/\n/g, '<br>');
-                            htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(251, 191, 36, 0.08); border-left: 3px solid #fbbf24; padding: 10px; border-radius: 4px;">
-                                <strong style="color: #fbbf24; display: block; margin-bottom: 6px;">🎯 Obiettivo</strong>
-                                <div style="margin: 0; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${objClean}</div>
-                            </div>`;
-                        }
-                        
-                        // Funzione (formato strutturato)
-                        if (scenario.funzione && scenario.funzione.trim()) {
-                            htmlContent += `<div style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">⚙️ <strong>Funzione:</strong> ${scenario.funzione.trim()}</div>`;
-                        }
-                        
+                        htmlContent += `<div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">ID: ${scenario.id}${scenario.row_number ? ` | Row: ${scenario.row_number}` : ''}</div>`;
+
                         // Prerequisites (for Excel files)
                         if (scenario.prerequisites && scenario.prerequisites.trim()) {
-                            const prereqClean = scenario.prerequisites.trim().replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
+                            const prereqClean = escapeHtml(scenario.prerequisites.trim()).replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
                             htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(79, 70, 229, 0.1); border-left: 3px solid #4f46e5; padding: 10px; border-radius: 4px;">
                                 <strong style="color: #818cf8; display: block; margin-bottom: 6px;">📋 Prerequisites</strong>
                                 <div style="margin: 0; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${prereqClean}</div>
                             </div>`;
                         }
-                        
+
                         // Input Data (for Excel files)
                         if (scenario.input_data && scenario.input_data.trim()) {
-                            const inputClean = scenario.input_data.trim().replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
+                            const inputClean = escapeHtml(scenario.input_data.trim()).replace(/\n\s*\n/g, '\n').replace(/\n/g, '<br>');
                             htmlContent += `<div style="font-size: 13px; margin-bottom: 10px; background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; padding: 10px; border-radius: 4px;">
                                 <strong style="color: #34d399; display: block; margin-bottom: 6px;">📝 Input Data</strong>
                                 <div style="margin: 0; line-height: 1.6; color: #e0e0e0; font-size: 12px;">${inputClean}</div>
                             </div>`;
                         }
-                        
+
                         // Execution Steps
                         if (scenario.execution_steps && scenario.execution_steps.length > 0) {
-                            const stepsHtml = scenario.execution_steps.map(s => {
-                                const sClean = s.replace(/\n/g, '<br>');
-                                return `<li style="margin-bottom: 6px;">${sClean}</li>`;
-                            }).join('');
-                            htmlContent += `<div style="font-size: 13px; margin-bottom: 6px;"><strong>Steps:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${stepsHtml}</ul></div>`;
+                            htmlContent += `<div style="font-size: 13px; margin-bottom: 6px;"><strong>Steps:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${scenario.execution_steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul></div>`;
                         }
-                        
                         // Expected Results
                         if (scenario.expected_results && scenario.expected_results.length > 0) {
-                            const resHtml = scenario.expected_results.map(r => {
-                                const rClean = r.replace(/\n/g, '<br>');
-                                return `<li style="margin-bottom: 6px;">${rClean}</li>`;
-                            }).join('');
-                            htmlContent += `<div style="font-size: 13px;"><strong>Expected Results:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${resHtml}</ul></div>`;
+                            htmlContent += `<div style="font-size: 13px;"><strong>Expected Results:</strong><ul style="margin: 2px 0 0 20px; line-height: 1.5;">${scenario.expected_results.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul></div>`;
                         }
-                        
+
                         scenarioDiv.innerHTML = htmlContent;
                         scenariosListDiv.appendChild(scenarioDiv);
                     });
-                    
+
                     // Populate scenario selector dropdown
                     const scenarioSelect = document.getElementById('extractedScenarioSelect');
                     scenarioSelect.innerHTML = '<option value="">-- Select to run single scenario --</option>';
@@ -1282,9 +1488,10 @@ Close the browser.`
                         option.textContent = `${idx + 1}. ${scenario.name}`;
                         scenarioSelect.appendChild(option);
                     });
-                    
+
                     previewDiv.style.display = 'block';
                     document.getElementById('batchSection').style.display = 'block';
+                    populateDocHomeModuleSelect();
                 } else {
                     statusDiv.textContent = `❌ Error: ${data.message}`;
                     statusDiv.style.color = 'var(--error)';
@@ -1295,29 +1502,35 @@ Close the browser.`
                 progressBar.style.background = 'var(--error)';
                 progressStatus.textContent = '❌ Extraction failed';
                 progressDetails.innerHTML += `<div style="margin-top: 8px; color: var(--error); font-weight: 500;">❌ Error: ${error.message}</div>`;
-                
+
                 statusDiv.textContent = `❌ Extraction failed: ${error.message}`;
                 statusDiv.style.color = 'var(--error)';
             } finally {
                 btn.disabled = false;
             }
         }
-        
+
         async function runBatchTest() {
             if (!extractedScenarios || extractedScenarios.length === 0) {
                 alert('Please extract scenarios first');
                 return;
             }
-            
+
             const url = document.getElementById('batchUrl').value.trim();
             const username = document.getElementById('batchUsername').value.trim();
             const password = document.getElementById('batchPassword').value;
-            
+
             if (!url || !username || !password) {
-                alert('Please fill in URL, username, and password');
+                alert('Compila URL, username e password (come nel tab LAB scenario).');
                 return;
             }
-            
+
+            const docMod = getDocModulePayload();
+            if (docMod._error) {
+                alert(docMod._error);
+                return;
+            }
+
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const batchProgressDiv = document.getElementById('batchProgress');
@@ -1326,29 +1539,29 @@ Close the browser.`
             const progressStatus = document.getElementById('progressStatus');
             const progressCount = document.getElementById('progressCount');
             const progressDetails = document.getElementById('progressDetails');
-            
+
             // Hide previous results, show progress
             resultDiv.classList.remove('show');
             loadingDiv.classList.remove('show');
             batchProgressDiv.style.display = 'block';
             btn.disabled = true;
-            
+
             // Reset progress
             progressBar.style.width = '0%';
             progressStatus.textContent = 'Initializing batch test...';
             progressCount.textContent = `0/${extractedScenarios.length}`;
             progressDetails.innerHTML = '';
-            
+
             let completedScenarios = 0;
             let currentScenario = null;
             const scenarioElements = {};
-            
+
             function updateProgress() {
                 const percentage = (completedScenarios / extractedScenarios.length) * 100;
                 progressBar.style.width = `${percentage}%`;
                 progressCount.textContent = `${completedScenarios}/${extractedScenarios.length}`;
             }
-            
+
             function addScenarioElement(scenarioId, scenarioName) {
                 const div = document.createElement('div');
                 div.className = 'progress-item active';
@@ -1361,7 +1574,7 @@ Close the browser.`
                 scenarioElements[scenarioId] = div;
                 progressDetails.scrollTop = progressDetails.scrollHeight;
             }
-            
+
             function updateScenarioElement(scenarioId, message, status = 'active') {
                 const div = scenarioElements[scenarioId];
                 if (div) {
@@ -1373,7 +1586,7 @@ Close the browser.`
                     progressDetails.scrollTop = progressDetails.scrollHeight;
                 }
             }
-            
+
             function addErrorToScenario(scenarioId, error) {
                 const div = scenarioElements[scenarioId];
                 if (div) {
@@ -1386,20 +1599,8 @@ Close the browser.`
                     errorDiv.textContent = `❌ ${error}`;
                 }
             }
-            
+
             try {
-                const eventSource = new EventSource(
-                    API_BASE + '/api/test/batch/stream?' + new URLSearchParams({
-                        data: JSON.stringify({
-                            scenarios: extractedScenarios,
-                            url: url,
-                            username: username,
-                            password: password,
-                            save_results: true
-                        })
-                    })
-                );
-                
                 const response = await fetch(API_BASE + '/api/test/batch/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1408,22 +1609,25 @@ Close the browser.`
                         url: url,
                         username: username,
                         password: password,
-                        save_results: true
+                        save_results: true,
+                        generate_script: true,
+                        module_label: docMod.module_label,
+                        ...(docMod.module_label_alt ? { module_label_alt: docMod.module_label_alt } : {})
                     })
                 });
-                
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    
+
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
-                    buffer = lines.pop(); 
-                    
+                    buffer = lines.pop();
+
                     for (const line of lines) {
                         if (line.startsWith('event:')) {
                             continue;
@@ -1438,7 +1642,7 @@ Close the browser.`
                         }
                     }
                 }
-                
+
                 function handleSSEEvent(eventData) {
                     if (eventData.scenario_index !== undefined) {
                         currentScenario = eventData.scenario_id;
@@ -1472,39 +1676,76 @@ Close the browser.`
                         addErrorToScenario(eventData.scenario_id, eventData.error);
                     }
                 }
-                
+
                 function showFinalResults(data) {
                     progressStatus.textContent = 'Batch test completed!';
-                    
+
                     const resultContent = document.getElementById('resultContent');
                     const resultHeader = document.getElementById('resultHeader');
                     resultDiv.classList.add('show');
                     resultContent.innerHTML = '';
-                    
+
                     const summary = data.summary || {};
                     const total = data.total_scenarios || 0;
                     const success = summary.success || 0;
                     const failed = summary.failed || 0;
                     const error = summary.error || 0;
                     const successRate = total > 0 ? ((success / total) * 100).toFixed(1) : 0;
-                    
+
                     resultDiv.className = 'result ' + (success === total ? 'success' : 'error') + ' show';
                     resultHeader.textContent = `BATCH TEST RESULTS: ${success}/${total} passed (${successRate}%)`;
-                    
+
                     let html = '<div style="font-size: 14px; line-height: 1.8;">';
                     html += `<div style="margin-bottom: 12px;"><strong>Total:</strong> ${total} scenarios</div>`;
                     html += `<div style="color: var(--success); margin-bottom: 6px;"><strong>✓ Passed:</strong> ${success}</div>`;
                     html += `<div style="color: var(--error); margin-bottom: 6px;"><strong>✗ Failed:</strong> ${failed}</div>`;
                     html += `<div style="color: var(--error); margin-bottom: 12px;"><strong>💥 Errors:</strong> ${error}</div>`;
-                    
+
                     if (data.saved_to) {
                         html += `<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"><strong>Report saved to:</strong><br/><code style="color: var(--accent);">${data.saved_to}</code></div>`;
                     }
-                    
+
+                    const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
+                    if (scenarios.length) {
+                        html += `<div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);">`;
+                        html += `<div style="font-weight: 600; margin-bottom: 12px;">Traceability & Agent Summary</div>`;
+
+                        scenarios.forEach((sc, i) => {
+                            const scenarioStatus = sc.overall_status || 'unknown';
+                            const statusColor =
+                                scenarioStatus === 'success' ? 'var(--success)' :
+                                    (scenarioStatus === 'failed' || scenarioStatus === 'error') ? 'var(--error)' : 'var(--muted)';
+                            const scenarioResult = sc.scenario_result || {};
+                            const agentSummary = scenarioResult.notes || scenarioResult.final_answer || '';
+                            const traceSummary = scenarioResult.trace_summary || '';
+                            const script = sc.playwright_script || '';
+                            const scenarioTitle = `${i + 1}. ${sc.scenario_name || sc.scenario_id || 'Scenario'}`;
+
+                            html += `<div style="margin-bottom: 12px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;">`;
+                            html += `<div style="font-weight: 600; margin-bottom: 8px;">${escapeHtml(scenarioTitle)} <span style="color: ${statusColor}; font-weight: 500;">(${escapeHtml(scenarioStatus)})</span></div>`;
+
+                            if (agentSummary) {
+                                html += `<div style="margin-bottom: 10px;"><strong>Agent Summary:</strong><div style="margin-top: 4px; white-space: pre-wrap;">${escapeHtml(agentSummary)}</div></div>`;
+                            }
+                            if (traceSummary) {
+                                html += `<div style="margin-bottom: 10px;"><strong>Trace Summary:</strong><div style="margin-top: 4px; white-space: pre-wrap;">${escapeHtml(traceSummary)}</div></div>`;
+                            }
+                            if (script) {
+                                html += `<details style="margin-top: 6px;"><summary style="cursor:pointer; color: var(--accent);">Playwright script</summary>`;
+                                html += `<pre style="margin-top: 8px; padding: 10px; background: #111; border: 1px solid var(--border); border-radius: 4px; overflow-x: auto; white-space: pre;">${escapeHtml(script)}</pre>`;
+                                html += `</details>`;
+                            }
+
+                            html += `</div>`;
+                        });
+
+                        html += `</div>`;
+                    }
+
                     html += '</div>';
                     resultContent.innerHTML = html;
                 }
-                
+
             } catch (error) {
                 resultDiv.classList.add('show');
                 resultDiv.className = 'result error show';
@@ -1514,40 +1755,47 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         async function runSingleScenario() {
             if (!extractedScenarios || extractedScenarios.length === 0) {
                 alert('Please extract scenarios first');
                 return;
             }
-            
+
             const scenarioIndex = document.getElementById('extractedScenarioSelect').value;
             if (scenarioIndex === '') {
                 alert('Please select a scenario from the dropdown');
                 return;
             }
-            
+
             const url = document.getElementById('batchUrl').value.trim();
             const username = document.getElementById('batchUsername').value.trim();
             const password = document.getElementById('batchPassword').value;
-            
+
             if (!url || !username || !password) {
-                alert('Please fill in URL, username, and password');
+                alert('Compila URL, username e password (come nel tab LAB scenario).');
                 return;
             }
-            
+
+            const docMod = getDocModulePayload();
+            if (docMod._error) {
+                alert(docMod._error);
+                return;
+            }
+
             const selectedScenario = extractedScenarios[parseInt(scenarioIndex)];
+            currentScenarioId = selectedScenario.id || ('test_case_' + scenarioIndex);
             const resultDiv = document.getElementById('result');
             const loadingDiv = document.getElementById('loading');
             const batchProgressDiv = document.getElementById('batchProgress');
             const btn = document.getElementById('runSingleBtn');
-            
+
             document.getElementById('loadingText').textContent = `Running scenario: ${selectedScenario.name}...`;
             resultDiv.classList.remove('show');
             loadingDiv.classList.add('show');
             batchProgressDiv.style.display = 'none';
             btn.disabled = true;
-            
+
             try {
                 const response = await fetch(API_BASE + '/api/test/batch', {
                     method: 'POST',
@@ -1557,40 +1805,73 @@ Close the browser.`
                         url: url,
                         username: username,
                         password: password,
-                        save_results: true
+                        save_results: true,
+                        generate_script: true, // Generate Playwright script
+                        module_label: docMod.module_label,
+                        ...(docMod.module_label_alt ? { module_label_alt: docMod.module_label_alt } : {})
                     })
                 });
                 const data = await response.json();
                 loadingDiv.classList.remove('show');
-                
+
                 const resultContent = document.getElementById('resultContent');
                 const resultHeader = document.getElementById('resultHeader');
                 resultDiv.classList.add('show');
                 resultContent.innerHTML = '';
-                
+
                 if (data.summary) {
                     const summary = data.summary;
                     const passed = summary.success || 0;
                     const failed = summary.failed || 0;
                     const error = summary.error || 0;
-                    
+
                     resultDiv.className = 'result ' + (passed > 0 ? 'success' : 'error') + ' show';
                     resultHeader.textContent = passed > 0 ? 'SCENARIO PASSED ✅' : 'SCENARIO FAILED ❌';
-                    
+
                     let html = '<div style="font-size: 14px; line-height: 1.8;">';
                     html += `<div style="margin-bottom: 12px;"><strong>Scenario:</strong> ${selectedScenario.name}</div>`;
                     html += `<div style="color: ${passed > 0 ? 'var(--success)' : 'var(--error)'}; margin-bottom: 12px;"><strong>Status:</strong> ${passed > 0 ? 'Success' : 'Failed'}</div>`;
-                    
+
                     if (data.scenarios && data.scenarios[0] && data.scenarios[0].error) {
                         html += `<div style="margin-top: 12px; padding: 12px; background: var(--bg); border-left: 3px solid var(--error); border-radius: 4px;">`;
                         html += `<strong>Error:</strong><br/>${data.scenarios[0].error}`;
                         html += `</div>`;
                     }
-                    
+                    const firstScenarioAgentSummary =
+                        data.scenarios &&
+                        data.scenarios[0] &&
+                        data.scenarios[0].scenario_result &&
+                        (data.scenarios[0].scenario_result.notes || data.scenarios[0].scenario_result.final_answer);
+                    if (firstScenarioAgentSummary) {
+                        html += `<div style="margin-top: 12px; padding: 12px; background: var(--bg); border-left: 3px solid var(--success); border-radius: 4px;">`;
+                        html += `<strong>AGENT SUMMARY:</strong><br/><div style="margin-top: 6px; white-space: pre-wrap;">${firstScenarioAgentSummary}</div>`;
+                        html += `</div>`;
+                    }
+                    const firstScenarioTraceSummary =
+                        data.scenarios &&
+                        data.scenarios[0] &&
+                        (
+                            (data.scenarios[0].scenario_result && data.scenarios[0].scenario_result.trace_summary) ||
+                            (data.scenarios[0].result && data.scenarios[0].result.trace_summary)
+                        );
+                    if (firstScenarioTraceSummary) {
+                        html += `<div style="margin-top: 12px; padding: 12px; background: var(--bg); border-left: 3px solid var(--accent); border-radius: 4px;">`;
+                        html += `<strong>TRACE SUMMARY:</strong><br/><div style="margin-top: 6px; white-space: pre-wrap;">${firstScenarioTraceSummary}</div>`;
+                        html += `</div>`;
+                    }
+
                     if (data.saved_to) {
                         html += `<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"><strong>Report saved to:</strong><br/><code style="color: var(--accent);">${data.saved_to}</code></div>`;
                     }
-                    
+
+                    // mostra script se presente
+                    if (data.playwright_script) {
+                        showScript(data.playwright_script, data.scenario_id || currentScenarioId);
+                    } else {
+                        const scriptSec = document.getElementById('scriptSection');
+                        if (scriptSec) scriptSec.classList.remove('show');
+                    }
+
                     html += '</div>';
                     resultContent.innerHTML = html;
                 } else {
@@ -1608,18 +1889,18 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         // ==================== END DOCUMENT UPLOAD FUNCTIONS ====================
-        
+
         function loadExample(index) {
             document.getElementById('testDescription').value = examples[index];
         }
-        
+
         function clearTest() {
             document.getElementById('testDescription').value = '';
             document.getElementById('result').classList.remove('show');
             const scriptSec = document.getElementById('scriptSection');
-            if(scriptSec) scriptSec.classList.remove('show');
+            if (scriptSec) scriptSec.classList.remove('show');
         }
 
         async function runTest() {
@@ -1636,8 +1917,8 @@ Close the browser.`
 
             resultDiv.classList.remove('show');
             const scriptSec = document.getElementById('scriptSection');
-            if(scriptSec) scriptSec.classList.remove('show');
-            
+            if (scriptSec) scriptSec.classList.remove('show');
+
             loadingDiv.classList.add('show');
             btn.disabled = true;
 
@@ -1652,22 +1933,22 @@ Close the browser.`
                 });
 
                 const data = await response.json();
-                
+
                 loadingDiv.classList.remove('show');
                 resultDiv.classList.add('show');
 
                 const resultContent = document.getElementById('resultContent');
-                resultContent.innerHTML = ''; 
-                
+                resultContent.innerHTML = '';
+
                 if (data.status === 'success' && data.passed) {
                     resultDiv.className = 'result success show';
                     document.getElementById('resultHeader').textContent = '✓ SUCCESS';
-                    
+
                     const textNode = document.createElement('div');
                     textNode.style.whiteSpace = 'pre-wrap';
                     textNode.textContent = data.final_answer || 'Test completed successfully';
                     resultContent.appendChild(textNode);
-                    
+
                     if (data.screenshot) {
                         const imgLabel = document.createElement('div');
                         imgLabel.textContent = '📸 Final Screenshot:';
@@ -1675,7 +1956,7 @@ Close the browser.`
                         imgLabel.style.marginBottom = '10px';
                         imgLabel.style.color = 'var(--success)';
                         resultContent.appendChild(imgLabel);
-                        
+
                         const img = document.createElement('img');
                         const cleanBase64 = data.screenshot.replace(/\s/g, '');
                         img.src = 'data:image/png;base64,' + cleanBase64;
@@ -1683,7 +1964,7 @@ Close the browser.`
                         img.style.borderRadius = '6px';
                         img.style.border = '1px solid var(--border)';
                         img.style.display = 'block';
-                        img.onerror = function(e) {
+                        img.onerror = function (e) {
                             imgLabel.textContent = '❌ Failed to load screenshot (check console)';
                             imgLabel.style.color = 'var(--error)';
                         };
@@ -1704,7 +1985,7 @@ Close the browser.`
                 btn.disabled = false;
             }
         }
-        
+
         document.getElementById('testDescription').addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
                 runTest();
@@ -1712,4 +1993,5 @@ Close the browser.`
         });
     </script>
 </body>
+
 </html>

@@ -11,38 +11,59 @@ Flusso:
 """
 
 import asyncio
-from typing import Optional
+from typing import Optional, Tuple
 
 from config.settings import AppConfig
-from agent.system_prompt import get_prefix_prompt, get_lab_optimized_prompt
+from agent.system_prompt import build_lab_prefix_prompt, get_lab_optimized_prompt
 from agent.test_agent_mcp import TestAgentMCP
 from agent.lab_scenarios import get_scenario_by_id, LabScenario
 from codegen.trace_extractor import extract_trace
 from codegen.trace_to_playwright import summarize_trace
 
 
-# Istruzione per il Prefix Agent (URL e credenziali parametrizzabili, con fallback da config)
+def _resolve_home_tile(
+    module_label: Optional[str] = None,
+    module_label_alt: Optional[str] = None,
+) -> Tuple[str, Optional[str]]:
+    """
+    Tile da aprire sulla home dopo il Continua (solo titoli visibili).
+    Se module_label è assente, default storico: Laboratorio Analisi + Clinical Laboratory.
+    """
+    label = (module_label or "").strip()
+    if not label:
+        return "Laboratorio Analisi", "Clinical Laboratory"
+    alt = (module_label_alt or "").strip() or None
+    return label, alt
+
+
+# Istruzione per il Prefix Agent (URL, credenziali, modulo home)
 def _prefix_instruction(
     url: Optional[str] = None,
     user: Optional[str] = None,
     password: Optional[str] = None,
+    module_label: Optional[str] = None,
+    module_label_alt: Optional[str] = None,
 ) -> str:
     """
-    Costruisce l'istruzione naturale per il Prefix Agent (login → organizzazione → Continua → tile LAB).
-
-    - Se url/user/password sono forniti esplicitamente, usa quelli.
-    - Altrimenti fa fallback su AppConfig.LAB (e infine sui placeholder "<... from env>").
+    - Se url/user/password sono forniti esplicitamente, usa quelli; altrimenti AppConfig.LAB.
+    - module_* definisce la tile sulla griglia home (solo titolo visibile in UI).
     """
     resolved_url = url or AppConfig.LAB.URL
     resolved_user = user or AppConfig.LAB.USERNAME or "<username from env>"
     resolved_password = password or AppConfig.LAB.PASSWORD or "<password from env>"
+    primary, alt = _resolve_home_tile(module_label, module_label_alt)
+    alt_note = (
+        f" Se non trovi la tile '{primary}', usa il titolo alternativo '{alt}'."
+        if alt
+        else ""
+    )
     return (
         f"Navigate to {resolved_url}. "
         f"Log in with username '{resolved_user}' and password '{resolved_password}'. "
         "In 'Seleziona Organizzazione' dropdown: open it and select the SECOND option, i.e. 'ORGANIZZAZIONE DI SISTEMA' (not the first 'Dipartimento Interaziendale...'). "
         "Click the 'Continua' button. "
-        "Verify the home page with tiles is visible. Then CLICK the tile 'Laboratorio Analisi' (use this exact label first; if the UI is in English, use 'Clinical Laboratory') to enter the Laboratory module. "
-        "When you are inside the Laboratory module (Laboratory dashboard or menu visible), output one short sentence and STOP. Do NOT call close_browser()."
+        f"Verify the home page with tiles is visible. Apri il modulo cliccando la tile dal titolo '{primary}' (come in pagina).{alt_note} "
+        f"When you are inside that module (its dashboard or menu visible), output one short sentence and STOP. Do NOT call close_browser()."
     )
 
 
@@ -51,20 +72,16 @@ def _scenario_instruction(scenario: LabScenario) -> str:
     results = "\n".join(f"- {r}" for r in scenario.expected_results)
     hints_section = (
         f"\nOPERATIVE HINTS (scenario-specific):\n{scenario.prompt_hints.strip()}\n"
-        if scenario.prompt_hints else ""
+        if scenario.prompt_hints
+        else ""
     )
     return (
         "The browser is already open and you are inside the Laboratory module "
-        "(you may see Preanalitica or Laboratorio). "
+        "(you may see Preanalitica or Laboratorio or Preanalytic or Laboratory). "
         "Do NOT call start_browser() or navigate_to_url().\n\n"
-        "SEQUENTIAL TOOLS: Issue only ONE tool call per message. "
-        "Wait for the result, then in the next message call the next tool. "
-        "Do NOT send multiple tool calls in the same response "
-        "(they would run in parallel and break the step order).\n\n"
-        "INITIAL WAIT: call wait_for_load_state(\"domcontentloaded\"), then "
-        "wait_for_text_content(\"Preanalitica\") — if it times out try "
-        "wait_for_text_content(\"Laboratorio\"). "
-        "Do NOT inspect or interact while the main content area is still blank.\n\n"
+        "Esegui nel modo dei passi sotto: una sola azione tool per messaggio; attendi l'esito prima "
+        "del passo successivo. Aspetta che il contenuto principale della dashboard sia visibile prima "
+        "di interagire se la vista è ancora vuota.\n\n"
         f"Scenario: {scenario.name} (id: {scenario.id})\n\n"
         f"Steps:\n{steps}\n\n"
         f"Expected results (for verification):\n{results}\n"
@@ -79,13 +96,26 @@ async def run_prefix_to_home(
     url: Optional[str] = None,
     user: Optional[str] = None,
     password: Optional[str] = None,
+    module_label: Optional[str] = None,
+    module_label_alt: Optional[str] = None,
 ) -> dict:
     """
-    Esegue il Prefix Agent: login → selezione organizzazione → Continua → verifica home.
+    Esegue il Prefix Agent: login → selezione organizzazione → Continua → apertura tile modulo su home.
     Non chiude il browser; il server MCP (remoto o locale) mantiene la sessione.
     """
-    agent = TestAgentMCP(custom_prompt=get_prefix_prompt())
-    instruction = _prefix_instruction(url=url, user=user, password=password)
+    primary, alt = _resolve_home_tile(module_label, module_label_alt)
+    prefix_prompt = build_lab_prefix_prompt(
+        tile_primary=primary,
+        tile_alternate=alt,
+    )
+    agent = TestAgentMCP(custom_prompt=prefix_prompt)
+    instruction = _prefix_instruction(
+        url=url,
+        user=user,
+        password=password,
+        module_label=module_label,
+        module_label_alt=module_label_alt,
+    )
     result = await agent.run_test_async(instruction, verbose=verbose)
     result["phase"] = "prefix"
     return result
@@ -94,17 +124,17 @@ async def run_prefix_to_home(
 async def run_lab_scenario(
     scenario_id: Optional[str] = None,
     scenario: Optional[LabScenario] = None,
-    verbose: bool = True
+    verbose: bool = True,
 ) -> dict:
     """
     Esegue lo scenario LAB dalla home. Presuppone che il browser sia già sulla home
     (dopo run_prefix_to_home sullo stesso server MCP).
-    
+
     Args:
         scenario_id: ID dello scenario da cercare in LAB_SCENARIOS (opzionale se scenario è fornito)
         scenario: Oggetto LabScenario diretto (per scenari dinamici estratti da documenti)
         verbose: Se True stampa log dettagliati
-    
+
     Returns:
         Dict con risultato dell'esecuzione
     """
@@ -114,7 +144,12 @@ async def run_lab_scenario(
             return {
                 "phase": "scenario",
                 "passed": False,
-                "errors": [{"tool": "orchestrator", "message": "Either scenario_id or scenario must be provided"}],
+                "errors": [
+                    {
+                        "tool": "orchestrator",
+                        "message": "Either scenario_id or scenario must be provided",
+                    }
+                ],
                 "artifacts": [],
                 "steps": [],
                 "notes": "",
@@ -125,14 +160,19 @@ async def run_lab_scenario(
             return {
                 "phase": "scenario",
                 "passed": False,
-                "errors": [{"tool": "orchestrator", "message": f"Scenario '{scenario_id}' not found"}],
+                "errors": [
+                    {
+                        "tool": "orchestrator",
+                        "message": f"Scenario '{scenario_id}' not found",
+                    }
+                ],
                 "artifacts": [],
                 "steps": [],
                 "notes": "",
                 "duration_ms": 0,
                 "scenario_id": scenario_id,
             }
-    
+
     # Esegui lo scenario
     agent = TestAgentMCP(custom_prompt=get_lab_optimized_prompt())
     instruction = _scenario_instruction(scenario)
@@ -168,6 +208,8 @@ async def run_full(
     url: Optional[str] = None,
     user: Optional[str] = None,
     password: Optional[str] = None,
+    module_label: Optional[str] = None,
+    module_label_alt: Optional[str] = None,
 ) -> dict:
     """
     Esegue prima il prefix (login → home), poi lo scenario LAB.
@@ -181,6 +223,8 @@ async def run_full(
         url=url,
         user=user,
         password=password,
+        module_label=module_label,
+        module_label_alt=module_label_alt,
     )
     if not prefix_result.get("passed", False):
         return {
@@ -195,7 +239,9 @@ async def run_full(
     scenario_result = await run_lab_scenario(scenario_id, verbose=verbose)
     passed = scenario_result.get("passed", False)
     errors = prefix_result.get("errors", []) + scenario_result.get("errors", [])
-    artifacts = prefix_result.get("artifacts", []) + scenario_result.get("artifacts", [])
+    artifacts = prefix_result.get("artifacts", []) + scenario_result.get(
+        "artifacts", []
+    )
 
     return {
         "passed": passed,
@@ -204,7 +250,8 @@ async def run_full(
         "scenario": scenario_result,
         "errors": errors,
         "artifacts": artifacts,
-        "duration_ms": prefix_result.get("duration_ms", 0) + scenario_result.get("duration_ms", 0),
+        "duration_ms": prefix_result.get("duration_ms", 0)
+        + scenario_result.get("duration_ms", 0),
     }
 
 
@@ -214,6 +261,8 @@ def run_full_sync(
     url: Optional[str] = None,
     user: Optional[str] = None,
     password: Optional[str] = None,
+    module_label: Optional[str] = None,
+    module_label_alt: Optional[str] = None,
 ) -> dict:
     """Versione sincrona di run_full (per Flask o script non-async)."""
     try:
@@ -228,10 +277,13 @@ def run_full_sync(
                 url=url,
                 user=user,
                 password=password,
+                module_label=module_label,
+                module_label_alt=module_label_alt,
             )
         )
     # Già in un loop (es. Jupyter): esegui in un thread
     import concurrent.futures
+
     with concurrent.futures.ThreadPoolExecutor() as pool:
         future = pool.submit(
             asyncio.run,
@@ -241,6 +293,8 @@ def run_full_sync(
                 url=url,
                 user=user,
                 password=password,
+                module_label=module_label,
+                module_label_alt=module_label_alt,
             ),
         )
         return future.result()
@@ -248,6 +302,7 @@ def run_full_sync(
 
 if __name__ == "__main__":
     import sys
+
     scenario_id = sys.argv[1] if len(sys.argv) > 1 else "scenario_1"
     print(f"Orchestrator: prefix → scenario {scenario_id}")
     result = run_full_sync(scenario_id, verbose=True)

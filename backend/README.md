@@ -93,7 +93,10 @@ Tutta la compilazione trace → script è **deterministica**: non viene mai chia
   il codegen applica `.first` ai locator `get_by_*` quando non sono già scoped.
   Quando disponibile, usa anche `target["scope"]` (scope detection best-effort di `click_smart`/`fill_smart`) per generare un locator scoped
   del tipo `page.locator("<scope>").nth(i).get_by_role(...)`.
-- **Scroll esplicito**: `scroll_to_bottom(selector=...)` è mappato nel codegen e viene emesso nello script (scroll del contenitore o della window).
+- **Scroll esplicito**: `scroll_to_bottom(selector=...)` è mappato nel codegen. Per i wrapper elenco
+  campioni (`PlaywrightConfig.is_scroll_sample_table_wrapper`) il tool usa
+  `get_scroll_sample_table_list_locator` + `get_scroll_sample_table_footer_text`; altri selettori
+  restano scroll su `locator(selector)`.
 
 **Esempi rapidi (trace → Playwright):**
 
@@ -107,14 +110,19 @@ Tutta la compilazione trace → script è **deterministica**: non viene mai chia
 page.get_by_role("button", name="Aggiungi filtro").first.click()
 ```
 
-2) `scroll_to_bottom` su contenitore:
+2) `scroll_to_bottom` su contenitore (wrapper elenco campioni → lista + footer):
 
 ```python
 # trace step (semplificato)
 {"tool": "scroll_to_bottom", "args": {"selector": ".sample-table-container"}}
 
-# codice generato
-page.locator(".sample-table-container").first.evaluate("el => { el.scrollTop = el.scrollHeight; }")
+# codice generato (valori da AppConfig.PLAYWRIGHT.get_scroll_sample_table_*)
+_sr = page.locator("sample-table div.search-results")
+if _sr.count() > 0:
+    _sr.first.evaluate("el => { el.scrollTop = el.scrollHeight; }")
+_foot = page.get_by_text("Totale righe visualizzate", exact=False)
+if _foot.count() > 0:
+    _foot.first.scroll_into_view_if_needed()
 ```
 
 ## Struttura del Progetto

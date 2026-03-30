@@ -53,9 +53,15 @@ class TestDocumentParser:
             return self._parse_html()
         elif file_ext == '.docx':
             return self._parse_docx()
+        elif file_ext == ".doc":
+            # Accetta solo .doc "finto" HTML (tipico export JIRA).
+            # I .doc binari legacy non sono parseabili in modo affidabile via decode testo.
+            raise ValueError(
+                "Il file .doc caricato non e' in formato HTML esportato. "
+                "Salvalo come .docx o .html e riprova."
+            )
         else:
-            # File .doc che in realtà è HTML (come quelli esportati da JIRA)
-            return self._parse_html()
+            raise ValueError(f"Formato file non supportato: {file_ext}")
     
     def _is_html(self) -> bool:
         """Verifica se il contenuto è HTML."""

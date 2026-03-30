@@ -17,21 +17,26 @@ from agent.utils import make_json_serializable
 class BatchTestRunner:
     """Esegue batch di scenari LAB con supporto per progress callbacks."""
     
-    def __init__(self, 
+    def __init__(self,
                  url: Optional[str] = None,
                  username: Optional[str] = None,
                  password: Optional[str] = None,
+                 module_label: Optional[str] = None,
+                 module_label_alt: Optional[str] = None,
                  progress_callback: Optional[Callable] = None):
         """
         Args:
             url: URL dell'applicazione (None = usa config)
             username: Username per login (None = usa config)
             password: Password per login (None = usa config)
+            module_label / module_label_alt: titoli tile home dopo Continua (vedi orchestrator)
             progress_callback: Funzione chiamata per eventi di progress (event_type, data)
         """
         self.url = url
         self.username = username
         self.password = password
+        self.module_label = module_label
+        self.module_label_alt = module_label_alt
         self.results = []
         self.progress_callback = progress_callback
         
@@ -94,7 +99,9 @@ class BatchTestRunner:
                 verbose=verbose,
                 url=self.url,
                 user=self.username,
-                password=self.password
+                password=self.password,
+                module_label=self.module_label,
+                module_label_alt=self.module_label_alt,
             )
             scenario_result['prefix_result'] = make_json_serializable(prefix_result)
             
@@ -290,6 +297,8 @@ def run_batch_sync(
     url: Optional[str] = None,
     username: Optional[str] = None,
     password: Optional[str] = None,
+    module_label: Optional[str] = None,
+    module_label_alt: Optional[str] = None,
     verbose: bool = True,
     save_results: bool = True
 ) -> Dict:
@@ -301,13 +310,20 @@ def run_batch_sync(
         url: URL dell'applicazione (None = usa config)
         username: Username (None = usa config)
         password: Password (None = usa config)
+        module_label / module_label_alt: tile home dopo login (opzionale, vedi orchestrator)
         verbose: Se True stampa log
         save_results: Se True salva risultati su file
     
     Returns:
         Dict con risultati del batch
     """
-    runner = BatchTestRunner(url=url, username=username, password=password)
+    runner = BatchTestRunner(
+        url=url,
+        username=username,
+        password=password,
+        module_label=module_label,
+        module_label_alt=module_label_alt,
+    )
     
     # Esegui in asyncio event loop
     try:

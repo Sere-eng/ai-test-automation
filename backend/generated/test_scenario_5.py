@@ -48,15 +48,11 @@ def do_login_and_go_to_laboratory(page: Page) -> None:
 
 
 def test_scenario_5(page: Page):
-    """Scenario: Creazione filtro con Piano di lavoro e Descrizione (scenario_5)"""
+    """Scenario: SMPLIST_001 - Dashboard, elenco campione e dettaglio campione - Scenario 5 (scenario_5)"""
     # Perform login and navigate to Laboratory dashboard
     do_login_and_go_to_laboratory(page)
 
     # Steps translated from MCP tool trace
-    # wait_for_load_state
-    page.wait_for_load_state('domcontentloaded')
-    # wait_for_text_content
-    page.get_by_text('Preanalitica').first.wait_for()
     # click_smart (strategy=role)
     page.get_by_role('button', name='Laboratorio').first.click()
     # wait_for_load_state
@@ -67,11 +63,11 @@ def test_scenario_5(page: Page):
     page.get_by_text('AGGIUNGI GRUPPO').first.click()
     # fill_smart (strategy=css)
     # WARNING: Angular dynamic ID, potrebbe cambiare tra run
-    page.locator('#mat-input-19').fill('AUTO_PL_20230315')
+    page.locator('#mat-input-19').fill('Gruppo Test')
     # click_smart (strategy=role)
     page.get_by_role('button', name='Aggiungi filtro').first.click()
     # fill_smart (strategy=label)
-    page.get_by_label('Nome filtro*').first.fill('AUTO_PL_20230315')
+    page.get_by_label('Nome filtro*').first.fill('AUTO_PL_20231010')
     # fill_smart (strategy=label)
     page.get_by_label('Descrizione').first.fill('Creato da test automatico')
     # click_smart (strategy=role)
@@ -81,4 +77,4 @@ def test_scenario_5(page: Page):
     # click_smart (strategy=role)
     page.get_by_role('button', name='Conferma').first.click(force=True)
     # wait_for_text_content
-    page.get_by_text('AUTO_PL_20230315').first.wait_for()
+    page.get_by_text('AUTO_PL_20231010').first.wait_for()
